@@ -35,13 +35,442 @@
         }
     </script>
     <style>
-        body {
-            background-color: #EFEFEF;
-            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+        :root {
+            --shell-bg: #FAFAFA;
+            --shell-border: #EFEFEF;
+            --body-bg: #EFEFEF;
+            --text-primary: #2C3D2E;
+            --text-muted: #7A8B76;
+            --surface-main: #FFFFFF;
+            --surface-soft: #F4EFE6;
+            --surface-muted: #EFEFEF;
         }
+
+        body {
+            background-color: var(--body-bg);
+            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+            color: var(--text-primary);
+        }
+
+        #app-shell {
+            background-color: var(--shell-bg);
+            border-color: var(--shell-border);
+            transition: background-color 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+        }
+
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #7A8B76; border-radius: 2px; }
+
+        button:not(:disabled),
+        .custom-file-upload {
+            transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease, background-color 180ms ease, color 180ms ease, border-color 180ms ease;
+            transform-origin: center;
+        }
+
+        button:not(:disabled):hover,
+        .custom-file-upload:hover {
+            transform: translateY(-1px);
+            filter: saturate(1.03);
+        }
+
+        button:not(:disabled):active,
+        .custom-file-upload:active {
+            transform: translateY(1px) scale(0.985);
+        }
+
+        button:focus-visible,
+        input:focus-visible,
+        select:focus-visible,
+        textarea:focus-visible,
+        .custom-file-upload:focus-within {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(197, 160, 89, 0.24);
+        }
+
+        body.theme-dark {
+            --shell-bg: #17201D;
+            --shell-border: #2A3833;
+            --body-bg: #111715;
+            --text-primary: #F3EBDD;
+            --text-muted: #BBC7BC;
+            --surface-main: #1E2925;
+            --surface-soft: #29342F;
+            --surface-muted: #131A18;
+        }
+
+        body.theme-dark #main-header {
+            background: linear-gradient(135deg, #25312C 0%, #1A2320 100%);
+            color: #F6F0E4;
+            border-bottom: 1px solid var(--shell-border);
+        }
+
+        body.theme-dark #main-nav {
+            background-color: #17201D;
+            color: var(--text-muted);
+            border-top-color: var(--shell-border);
+            box-shadow: 0 -12px 30px rgba(0, 0, 0, 0.35);
+        }
+
+        body.theme-dark .bg-white { background-color: var(--surface-main) !important; }
+        body.theme-dark .bg-parchment { background-color: var(--shell-bg) !important; }
+        body.theme-dark .bg-parchmentDark { background-color: var(--surface-muted) !important; }
+        body.theme-dark .bg-accent { background-color: var(--surface-soft) !important; }
+        body.theme-dark .text-forest { color: var(--text-primary) !important; }
+        body.theme-dark .text-sage { color: var(--text-muted) !important; }
+        body.theme-dark .border-parchmentDark,
+        body.theme-dark .border-accent,
+        body.theme-dark .border-sage { border-color: var(--shell-border) !important; }
+
+        body.theme-dark input,
+        body.theme-dark select,
+        body.theme-dark textarea {
+            color: var(--text-primary);
+            background-color: var(--surface-main) !important;
+            border-color: var(--shell-border) !important;
+        }
+
+        body.theme-dark input::placeholder,
+        body.theme-dark textarea::placeholder {
+            color: #8DA08F;
+        }
+
+        body.theme-dark ::-webkit-scrollbar-thumb {
+            background: #9CAB99;
+        }
+
+        .notebook-spread {
+            background:
+                radial-gradient(circle at top left, rgba(255, 255, 255, 0.9), transparent 32%),
+                linear-gradient(135deg, #fffdf6 0%, #f7f1e6 50%, #fffdfa 100%);
+            perspective: 1800px;
+        }
+
+        .notebook-book-frame {
+            width: min(100%, 70rem);
+            margin-inline: auto;
+        }
+
+        .notebook-book-cover-frame {
+            width: min(100%, 42rem);
+            margin-inline: auto;
+        }
+
+        .notebook-book-cover-surface {
+            min-height: clamp(26rem, 86vw, 44rem);
+            aspect-ratio: 0.74 / 1;
+        }
+
+        .notebook-book-spread-surface {
+            min-height: clamp(30rem, 78vw, 46rem);
+            aspect-ratio: 1.55 / 1;
+        }
+
+        .notebook-paper {
+            background:
+                linear-gradient(to bottom, transparent 0, transparent 31px, rgba(122, 139, 118, 0.12) 31px, rgba(122, 139, 118, 0.12) 32px, transparent 32px) 0 0 / 100% 34px,
+                linear-gradient(90deg, rgba(197, 160, 89, 0.22) 0, rgba(197, 160, 89, 0.22) 1px, transparent 1px) 38px 0 / 100% 100%,
+                rgba(255, 255, 255, 0.9);
+            box-shadow: inset 0 0 0 1px rgba(122, 139, 118, 0.08);
+        }
+
+        .notebook-swipe-surface {
+            touch-action: pan-y;
+            user-select: none;
+        }
+
+        .notebook-cover-shell {
+            perspective: 2200px;
+        }
+
+        .notebook-cover-panel {
+            position: relative;
+            transform-origin: left center;
+            transform-style: preserve-3d;
+            background: var(--cover-surface, linear-gradient(135deg, #ddd0b9 0%, #c5b18d 48%, #aa9065 100%));
+            color: var(--cover-ink, #2b241a);
+            box-shadow:
+                0 32px 60px rgba(44, 61, 46, 0.24),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+            transition: transform 320ms cubic-bezier(0.2, 0.72, 0.18, 1), box-shadow 220ms ease;
+        }
+
+        .notebook-cover-panel::before {
+            content: '';
+            position: absolute;
+            top: 0.75rem;
+            bottom: 0.75rem;
+            left: 1rem;
+            width: 1rem;
+            border-radius: 999px;
+            background: var(--cover-spine, linear-gradient(180deg, rgba(102, 74, 33, 0.72), rgba(72, 54, 29, 0.92)));
+            box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.15);
+        }
+
+        .notebook-binding-column {
+            position: absolute;
+            top: 1.7rem;
+            bottom: 1.7rem;
+            left: 1.15rem;
+            width: 3rem;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: space-evenly;
+            z-index: 6;
+            pointer-events: none;
+        }
+
+        .notebook-binding-column.is-spread {
+            left: 0.95rem;
+            width: 3.2rem;
+            top: 1.9rem;
+            bottom: 1.9rem;
+            z-index: 15;
+        }
+
+        .notebook-binding-ring {
+            position: relative;
+            width: 2.4rem;
+            height: 1.35rem;
+            border-radius: 999px;
+            border: 3px solid var(--ring-metal, #bcc4cc);
+            background: linear-gradient(180deg, rgba(255,255,255,0.68), rgba(255,255,255,0.04));
+            box-shadow:
+                inset 1px 1px 0 var(--ring-highlight, rgba(255,255,255,0.8)),
+                inset -2px -2px 0 rgba(87, 97, 109, 0.18),
+                0 8px 12px var(--ring-shadow, rgba(68, 78, 90, 0.18));
+        }
+
+        .notebook-binding-ring::before {
+            content: '';
+            position: absolute;
+            inset: 0.28rem 0.45rem;
+            border-radius: 999px;
+            background: rgba(255, 253, 247, 0.96);
+            box-shadow: inset 0 1px 2px rgba(170, 179, 189, 0.22);
+        }
+
+        .notebook-binding-column.is-spread .notebook-binding-ring {
+            width: 2.7rem;
+            height: 1.5rem;
+        }
+
+        .notebook-cover-panel:hover {
+            box-shadow:
+                0 40px 74px rgba(44, 61, 46, 0.26),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+        }
+
+        .notebook-cover-plate {
+            background: var(--cover-plate, rgba(255, 255, 255, 0.5));
+            border: 1px solid var(--cover-plate-border, rgba(88, 62, 31, 0.16));
+            color: var(--cover-ink, #2b241a);
+            box-shadow: 0 14px 24px rgba(44, 61, 46, 0.12);
+            backdrop-filter: blur(8px);
+        }
+
+        .notebook-cover-sticker {
+            border: 1px solid rgba(255, 255, 255, 0.45);
+            box-shadow: 0 14px 24px rgba(44, 61, 46, 0.16);
+            backdrop-filter: blur(4px);
+        }
+
+        .notebook-cover-sticker.is-transparent {
+            border-color: transparent;
+            box-shadow: none;
+            backdrop-filter: none;
+        }
+
+        .notebook-cover-sticker.is-floating-emoji {
+            filter: drop-shadow(0 10px 14px rgba(73, 55, 27, 0.18));
+        }
+
+        .notebook-cover-sticker-tape {
+            position: absolute;
+            top: 0.45rem;
+            width: 1.25rem;
+            height: 0.6rem;
+            border-radius: 0.3rem;
+            background: linear-gradient(180deg, rgba(255, 250, 240, 0.92), rgba(239, 224, 192, 0.72));
+            border: 1px solid rgba(145, 118, 70, 0.16);
+            box-shadow: 0 2px 6px rgba(67, 50, 25, 0.12);
+            opacity: 0.94;
+        }
+
+        .notebook-cover-sticker-tape.left {
+            left: 0.45rem;
+            transform: rotate(-18deg);
+        }
+
+        .notebook-cover-sticker-tape.right {
+            right: 0.45rem;
+            transform: rotate(16deg);
+        }
+
+        .cover-editor-preview-sticker {
+            cursor: grab;
+            touch-action: none;
+            user-select: none;
+        }
+
+        .cover-editor-preview-sticker:active {
+            cursor: grabbing;
+        }
+
+        .notebook-page-turn-sheet {
+            pointer-events: none;
+            position: absolute;
+            top: 1.5rem;
+            bottom: 1.5rem;
+            width: calc(50% - 1rem);
+            opacity: 0;
+            z-index: 20;
+            border-radius: 1.5rem;
+            background:
+                linear-gradient(90deg, rgba(255, 251, 241, 0.98), rgba(243, 234, 214, 0.96) 48%, rgba(216, 202, 173, 0.92));
+            box-shadow: 0 12px 28px rgba(44, 61, 46, 0.18);
+            backface-visibility: hidden;
+        }
+
+        .notebook-page-turn-sheet.is-next {
+            right: 1rem;
+            transform-origin: left center;
+        }
+
+        .notebook-page-turn-sheet.is-prev {
+            left: 1rem;
+            transform-origin: right center;
+        }
+
+        .notebook-page-turn-sheet.turning.is-next {
+            animation: notebookTurnNext 420ms cubic-bezier(0.2, 0.72, 0.18, 1) forwards;
+        }
+
+        .notebook-page-turn-sheet.turning.is-prev {
+            animation: notebookTurnPrev 420ms cubic-bezier(0.2, 0.72, 0.18, 1) forwards;
+        }
+
+        .notebook-ruled-block {
+            min-height: 34px;
+        }
+
+        .notebook-line-row {
+            min-height: 34px;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            border-bottom: 1px solid rgba(122, 139, 118, 0.1);
+        }
+
+        .notebook-line-row--top {
+            align-items: flex-start;
+        }
+
+        .notebook-line-text {
+            display: block;
+            padding-top: 2px;
+            line-height: 34px;
+        }
+
+        @keyframes notebookTurnNext {
+            0% {
+                opacity: 0.12;
+                transform: perspective(2200px) rotateY(0deg) translateX(0);
+            }
+            15% {
+                opacity: 0.95;
+            }
+            100% {
+                opacity: 0;
+                transform: perspective(2200px) rotateY(-162deg) translateX(-28px);
+            }
+        }
+
+        @keyframes notebookTurnPrev {
+            0% {
+                opacity: 0.12;
+                transform: perspective(2200px) rotateY(0deg) translateX(0);
+            }
+            15% {
+                opacity: 0.95;
+            }
+            100% {
+                opacity: 0;
+                transform: perspective(2200px) rotateY(162deg) translateX(28px);
+            }
+        }
+
+        body.theme-dark .notebook-spread {
+            background:
+                radial-gradient(circle at top left, rgba(255, 255, 255, 0.05), transparent 32%),
+                linear-gradient(135deg, #24302c 0%, #1b2421 50%, #202b27 100%);
+            border-color: rgba(188, 199, 188, 0.18) !important;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.35) !important;
+        }
+
+        body.theme-dark .notebook-paper {
+            background:
+                linear-gradient(to bottom, transparent 0, transparent 31px, rgba(188, 199, 188, 0.08) 31px, rgba(188, 199, 188, 0.08) 32px, transparent 32px) 0 0 / 100% 34px,
+                linear-gradient(90deg, rgba(197, 160, 89, 0.16) 0, rgba(197, 160, 89, 0.16) 1px, transparent 1px) 38px 0 / 100% 100%,
+                rgba(24, 33, 29, 0.9);
+            box-shadow: inset 0 0 0 1px rgba(188, 199, 188, 0.08);
+        }
+
+        body.theme-dark .notebook-cover-panel {
+            box-shadow:
+                0 32px 60px rgba(0, 0, 0, 0.35),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+        }
+
+        body.theme-dark .notebook-binding-ring {
+            background: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.02));
+            box-shadow:
+                inset 1px 1px 0 rgba(255,255,255,0.14),
+                inset -2px -2px 0 rgba(0, 0, 0, 0.24),
+                0 10px 14px rgba(0, 0, 0, 0.22);
+        }
+
+        body.theme-dark .notebook-binding-ring::before {
+            background: rgba(244, 246, 248, 0.92);
+        }
+
+        body.theme-dark .notebook-cover-panel:hover {
+            box-shadow:
+                0 42px 76px rgba(0, 0, 0, 0.42),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+        }
+
+        body.theme-dark .notebook-page-turn-sheet {
+            background:
+                linear-gradient(90deg, rgba(42, 53, 49, 0.98), rgba(34, 43, 39, 0.96) 48%, rgba(19, 25, 22, 0.94));
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
+        }
+
+        body.theme-dark .notebook-line-row {
+            border-bottom-color: rgba(188, 199, 188, 0.1);
+        }
+
+        body.theme-dark .notebook-cover-plate {
+            box-shadow: 0 14px 24px rgba(0, 0, 0, 0.24);
+        }
+
+        body.theme-dark .notebook-cover-sticker {
+            box-shadow: 0 16px 26px rgba(0, 0, 0, 0.28);
+        }
+
+        body.theme-dark .notebook-cover-sticker.is-transparent {
+            box-shadow: none;
+        }
+
+        body.theme-dark .notebook-cover-sticker.is-floating-emoji {
+            filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.26));
+        }
+
+        body.theme-dark .notebook-cover-sticker-tape {
+            background: linear-gradient(180deg, rgba(255, 249, 235, 0.86), rgba(217, 200, 168, 0.66));
+            border-color: rgba(255, 239, 211, 0.12);
+        }
         
         .cooking-mode-active #main-header,
         .cooking-mode-active #main-nav {
@@ -67,7 +496,7 @@
 
     <div id="google_translate_element" style="display:none;"></div>
 
-    <div class="w-full max-w-6xl mx-auto flex flex-col min-h-screen relative shadow-2xl bg-parchment overflow-hidden border-x border-parchmentDark">
+    <div id="app-shell" class="w-full max-w-6xl mx-auto flex flex-col min-h-screen relative shadow-2xl bg-parchment overflow-hidden border-x border-parchmentDark">
         
         <header id="main-header" class="bg-sage text-parchment p-4 shadow-sm z-10 flex justify-between items-center transition-all sticky top-0" translate="no">
             <div>
@@ -92,6 +521,29 @@
                                 </button>
                                 <button id="notes-save-btn" class="flex-1 bg-gold text-white h-12 rounded-sm font-bold hover:bg-yellow-600 transition-colors">
                                     <i data-lucide="save" class="w-4 h-4 inline mr-2"></i>Save Notes
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="cover-editor-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden opacity-0 scale-95 transition-all duration-300 flex items-center justify-center z-50">
+                        <div class="bg-white rounded-md shadow-2xl p-6 md:p-8 max-w-6xl mx-4 w-full max-h-[90vh] overflow-y-auto">
+                            <div class="flex items-center justify-between gap-4 mb-6">
+                                <div>
+                                    <h2 class="font-fantasy font-bold text-3xl text-forest">Edit Notebook Cover</h2>
+                                    <p class="text-sm font-semibold text-sage mt-1">Personalize your cover with color, title, and stickers. This stays private to your own archive.</p>
+                                </div>
+                                <button onclick="closeCoverEditor()" class="w-11 h-11 rounded-full border border-parchmentDark bg-white text-sage flex items-center justify-center shadow-sm">
+                                    <i data-lucide="x" class="w-5 h-5"></i>
+                                </button>
+                            </div>
+
+                            <div id="cover-editor-body"></div>
+
+                            <div class="flex flex-col-reverse md:flex-row gap-4 mt-8">
+                                <button onclick="closeCoverEditor()" class="flex-1 bg-white text-sage h-12 rounded-sm font-bold border border-parchmentDark hover:text-forest transition-colors">Cancel</button>
+                                <button onclick="saveCoverEditor()" class="flex-1 bg-forest text-white h-12 rounded-sm font-bold hover:bg-sage transition-colors flex items-center justify-center gap-2">
+                                    <i data-lucide="save" class="w-4 h-4"></i> Save Cover
                                 </button>
                             </div>
                         </div>
@@ -176,6 +628,9 @@
             email: "",
             measurementSystem: "Metric", 
             language: "en",
+            themeMode: "light",
+            indexViewMode: "cards",
+            notebookCover: getDefaultNotebookCover(),
             favorites: [],
             myRecipeRatings: {}
         };
@@ -187,6 +642,11 @@
         let showListSearch = false;
         let showListFilters = false;
         let browseQuery = "";
+        let indexViewMode = "cards";
+        let notebookPageIndex = 0;
+        let notebookCoverOpen = false;
+        let draftNotebookCover = null;
+        let currentIndexRecipeIds = [];
         let categoryFilter = "";
         let difficultyFilter = "";
         let dietFilter = [];
@@ -254,9 +714,553 @@
             }, 200);
         }
 
+        function escapeHTML(value = '') {
+            return String(value).replace(/[&<>"']/g, char => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[char]));
+        }
+
+        function getDefaultNotebookCoverSticker(seed = 0) {
+            const presets = [
+                { text: 'SOUP', emoji: '🥣', color: 'blue', background: 'solid', x: 80, y: 20, size: 'md', rotation: -6 },
+                { text: 'COSY', emoji: '✨', color: 'gold', background: 'solid', x: 24, y: 78, size: 'sm', rotation: 5 },
+                { text: 'HOME', emoji: '🏡', color: 'sage', background: 'solid', x: 76, y: 78, size: 'md', rotation: -3 }
+            ];
+            const preset = presets[seed % presets.length];
+            return {
+                id: `cover-sticker-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                ...preset
+            };
+        }
+
+        function getNotebookCoverStickerEmojiOptions() {
+            return [
+                { value: '', label: 'No emoji' },
+                { value: '🥣', label: '🥣 Bowl' },
+                { value: '🍲', label: '🍲 Stew' },
+                { value: '🍜', label: '🍜 Noodles' },
+                { value: '🍰', label: '🍰 Cake' },
+                { value: '🥖', label: '🥖 Bread' },
+                { value: '☕', label: '☕ Coffee' },
+                { value: '🍋', label: '🍋 Lemon' },
+                { value: '🌿', label: '🌿 Herb' },
+                { value: '🍄', label: '🍄 Mushroom' },
+                { value: '🔥', label: '🔥 Flame' },
+                { value: '✨', label: '✨ Sparkles' },
+                { value: '💛', label: '💛 Heart' },
+                { value: '📖', label: '📖 Book' },
+                { value: '🧁', label: '🧁 Cupcake' },
+                { value: '🍓', label: '🍓 Strawberry' },
+                { value: '🥕', label: '🥕 Carrot' },
+                { value: '🧄', label: '🧄 Garlic' },
+                { value: '🧈', label: '🧈 Butter' },
+                { value: '🌞', label: '🌞 Sun' },
+                { value: '🌙', label: '🌙 Moon' }
+            ];
+        }
+
+        function getDefaultNotebookCover() {
+            return {
+                palette: 'oat',
+                ringColor: 'silver',
+                title: '',
+                subtitle: '',
+                spineLabel: '',
+                stickers: []
+            };
+        }
+
+        function normalizeNotebookCover(cover) {
+            const base = getDefaultNotebookCover();
+            const nextCover = { ...base, ...(cover || {}) };
+            const normalizedSpineLabel = String(cover?.spineLabel ?? '').trim();
+            const normalizedRingColor = ['silver', 'gold', 'black'].includes(cover?.ringColor) ? cover.ringColor : base.ringColor;
+            const incomingStickers = Array.isArray(cover?.stickers) ? cover.stickers.slice(0, 6) : [];
+            nextCover.spineLabel = normalizedSpineLabel === 'Recipe Archive' ? '' : normalizedSpineLabel;
+            nextCover.ringColor = normalizedRingColor;
+            nextCover.stickers = incomingStickers.map((sticker, index) => ({
+                ...getDefaultNotebookCoverSticker(index),
+                ...(sticker || {}),
+                id: sticker?.id || `cover-sticker-${Date.now()}-${index}`,
+                rotation: Number(sticker?.rotation ?? getDefaultNotebookCoverSticker(index).rotation),
+                emoji: sticker?.emoji ?? getDefaultNotebookCoverSticker(index).emoji ?? '',
+                background: sticker?.background === 'none' ? 'none' : 'solid',
+                x: Number.isFinite(Number(sticker?.x)) ? Number(sticker.x) : getNotebookCoverStickerCoordinates(sticker?.position || getDefaultNotebookCoverSticker(index).position).x,
+                y: Number.isFinite(Number(sticker?.y)) ? Number(sticker.y) : getNotebookCoverStickerCoordinates(sticker?.position || getDefaultNotebookCoverSticker(index).position).y
+            }));
+            return nextCover;
+        }
+
+        function getNotebookCoverPalette(palette) {
+            const palettes = {
+                oat: {
+                    surface: 'radial-gradient(circle at top left, rgba(255,255,255,0.42), transparent 28%), linear-gradient(135deg, #ddd0b9 0%, #c5b18d 48%, #aa9065 100%)',
+                    border: '#b59f79',
+                    spine: 'linear-gradient(180deg, rgba(102,74,33,0.72), rgba(72,54,29,0.92))',
+                    plate: 'rgba(255,255,255,0.58)',
+                    plateBorder: 'rgba(88,62,31,0.16)',
+                    ink: '#2b241a'
+                },
+                sage: {
+                    surface: 'radial-gradient(circle at top left, rgba(255,255,255,0.18), transparent 28%), linear-gradient(135deg, #91a392 0%, #70856f 50%, #57695a 100%)',
+                    border: '#637566',
+                    spine: 'linear-gradient(180deg, rgba(58,83,63,0.82), rgba(37,56,42,0.96))',
+                    plate: 'rgba(248,250,248,0.4)',
+                    plateBorder: 'rgba(38,57,44,0.18)',
+                    ink: '#f4efe6'
+                },
+                berry: {
+                    surface: 'radial-gradient(circle at top left, rgba(255,255,255,0.16), transparent 28%), linear-gradient(135deg, #b47074 0%, #91545d 50%, #6f3847 100%)',
+                    border: '#7b4b53',
+                    spine: 'linear-gradient(180deg, rgba(111,56,71,0.9), rgba(72,30,42,0.98))',
+                    plate: 'rgba(255,244,245,0.26)',
+                    plateBorder: 'rgba(79,30,43,0.16)',
+                    ink: '#fff5f1'
+                },
+                midnight: {
+                    surface: 'radial-gradient(circle at top left, rgba(255,255,255,0.1), transparent 28%), linear-gradient(135deg, #324550 0%, #24313a 50%, #182027 100%)',
+                    border: '#2b3c46',
+                    spine: 'linear-gradient(180deg, rgba(17,26,33,0.9), rgba(8,13,17,0.98))',
+                    plate: 'rgba(242,247,250,0.14)',
+                    plateBorder: 'rgba(220,235,243,0.08)',
+                    ink: '#edf4f7'
+                },
+                sunflower: {
+                    surface: 'radial-gradient(circle at top left, rgba(255,255,255,0.28), transparent 28%), linear-gradient(135deg, #f1d676 0%, #ddb34f 48%, #ba8830 100%)',
+                    border: '#c29842',
+                    spine: 'linear-gradient(180deg, rgba(133,92,22,0.78), rgba(99,66,13,0.96))',
+                    plate: 'rgba(255,252,241,0.44)',
+                    plateBorder: 'rgba(115,82,22,0.14)',
+                    ink: '#4a3610'
+                }
+            };
+
+            return palettes[palette] || palettes.oat;
+        }
+
+        function getNotebookCoverStickerPalette(color) {
+            const palettes = {
+                gold: { bg: '#ecd276', text: '#5b4718' },
+                blue: { bg: '#83b7da', text: '#21475e' },
+                coral: { bg: '#ef9b82', text: '#5d2f24' },
+                sage: { bg: '#95be96', text: '#29432d' },
+                lilac: { bg: '#d9beea', text: '#4b3555' },
+                cream: { bg: '#f5ead5', text: '#5a4830' }
+            };
+
+            return palettes[color] || palettes.gold;
+        }
+
+        function getNotebookCoverStickerCoordinates(position) {
+            const positions = {
+                'top-left': { x: 24, y: 22 },
+                'top-right': { x: 80, y: 20 },
+                'center': { x: 50, y: 48 },
+                'center-right': { x: 78, y: 50 },
+                'bottom-left': { x: 26, y: 78 },
+                'bottom-right': { x: 78, y: 78 }
+            };
+
+            return positions[position] || positions['top-right'];
+        }
+
+        function getNotebookCoverStickerSize(size, isEmojiOnly = false, isTransparent = false) {
+            if (isEmojiOnly) {
+                if (isTransparent) {
+                    const floatingEmojiSizes = {
+                        sm: 'h-12 w-12 text-3xl',
+                        md: 'h-16 w-16 text-4xl',
+                        lg: 'h-20 w-20 text-5xl'
+                    };
+
+                    return floatingEmojiSizes[size] || floatingEmojiSizes.md;
+                }
+
+                const emojiSizes = {
+                    sm: 'h-11 w-11 text-2xl',
+                    md: 'h-14 w-14 text-3xl',
+                    lg: 'h-16 w-16 text-4xl'
+                };
+
+                return emojiSizes[size] || emojiSizes.md;
+            }
+
+            const sizes = {
+                sm: 'min-w-[5rem] px-3 py-2 text-[10px]',
+                md: 'min-w-[6.5rem] px-4 py-2.5 text-[11px]',
+                lg: 'min-w-[8rem] px-5 py-3 text-xs'
+            };
+
+            return sizes[size] || sizes.md;
+        }
+
+        function getNotebookCoverPanelStyle(cover) {
+            const palette = getNotebookCoverPalette(cover.palette);
+            const ringPalette = {
+                silver: {
+                    metal: '#bcc4cc',
+                    shadow: 'rgba(85, 98, 111, 0.2)',
+                    highlight: 'rgba(255,255,255,0.82)'
+                },
+                gold: {
+                    metal: '#c9a24d',
+                    shadow: 'rgba(106, 74, 21, 0.22)',
+                    highlight: 'rgba(255,248,216,0.84)'
+                },
+                black: {
+                    metal: '#3f444d',
+                    shadow: 'rgba(13, 17, 22, 0.28)',
+                    highlight: 'rgba(203,208,214,0.4)'
+                }
+            }[cover.ringColor] || {
+                metal: '#bcc4cc',
+                shadow: 'rgba(85, 98, 111, 0.2)',
+                highlight: 'rgba(255,255,255,0.82)'
+            };
+
+            return `--cover-surface:${palette.surface};--cover-spine:${palette.spine};--cover-plate:${palette.plate};--cover-plate-border:${palette.plateBorder};--cover-ink:${palette.ink};--ring-metal:${ringPalette.metal};--ring-shadow:${ringPalette.shadow};--ring-highlight:${ringPalette.highlight};border-color:${palette.border};color:${palette.ink};`;
+        }
+
+        function renderNotebookBinding(ringColor, placement = 'cover') {
+            const placementClass = placement === 'spread' ? 'is-spread' : '';
+            const ringCount = placement === 'spread' ? 7 : 6;
+            return `
+                <div class="notebook-binding-column ${placementClass}" data-ring-color="${escapeHTML(ringColor || 'silver')}">
+                    ${Array.from({ length: ringCount }, (_, index) => `<span class="notebook-binding-ring" aria-hidden="true" style="transform:rotate(${index % 2 === 0 ? -5 : 4}deg)"></span>`).join('')}
+                </div>
+            `;
+        }
+
+        function renderNotebookCoverStickers(cover, isEditorPreview = false) {
+            return (cover.stickers || []).map((sticker, index) => {
+                const stickerPalette = getNotebookCoverStickerPalette(sticker.color);
+                const rawStickerText = (sticker.text || '').trim();
+                const stickerEmoji = escapeHTML((sticker.emoji || '').trim());
+                const stickerText = escapeHTML(rawStickerText || (!stickerEmoji ? 'STICKER' : ''));
+                const isEmojiOnly = Boolean(stickerEmoji && !rawStickerText);
+                const isTransparent = sticker.background === 'none';
+                const stickerSizeClass = getNotebookCoverStickerSize(sticker.size, isEmojiOnly, isTransparent);
+                const stickerX = Math.max(8, Math.min(92, Number(sticker.x) || 50));
+                const stickerY = Math.max(10, Math.min(90, Number(sticker.y) || 50));
+                const wrapperClasses = isEditorPreview ? 'cover-editor-preview-sticker' : '';
+                const stickerTone = isTransparent && !isEmojiOnly ? `text-shadow:0 1px 2px rgba(255,255,255,0.28);` : '';
+                const floatingEmojiMarkup = isTransparent && isEmojiOnly ? `
+                    <span class="notebook-cover-sticker-tape left" aria-hidden="true"></span>
+                    <span class="notebook-cover-sticker-tape right" aria-hidden="true"></span>
+                ` : '';
+                return `
+                    <div class="absolute ${wrapperClasses}" data-cover-sticker-index="${index}" style="left:${stickerX}%; top:${stickerY}%; transform:translate(-50%, -50%);">
+                        <div class="notebook-cover-sticker ${isTransparent ? 'is-transparent' : ''} ${isTransparent && isEmojiOnly ? 'is-floating-emoji relative isolate' : ''} rounded-2xl font-bold uppercase tracking-[0.18em] ${stickerSizeClass} ${isEmojiOnly ? 'flex items-center justify-center' : ''}" style="background:${isTransparent ? 'transparent' : stickerPalette.bg};color:${stickerPalette.text};transform:rotate(${Number(sticker.rotation) || 0}deg);${stickerTone}">
+                            ${floatingEmojiMarkup}
+                            <span class="inline-flex items-center ${isEmojiOnly ? '' : 'gap-2'} leading-none">
+                                ${stickerEmoji ? `<span class="${isEmojiOnly ? 'text-[1em]' : 'text-base'}" aria-hidden="true">${stickerEmoji}</span>` : ''}
+                                ${stickerText ? `<span>${stickerText}</span>` : ''}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderNotebookCoverFace(cover, previewRecipe, totalPages, isEditorPreview = false) {
+            const safeCover = normalizeNotebookCover(cover);
+            const title = escapeHTML((safeCover.title || '').trim());
+            const subtitle = escapeHTML((safeCover.subtitle || '').trim());
+            const spineLabel = escapeHTML((safeCover.spineLabel || '').trim());
+
+            return `
+                <div class="ml-10 relative h-full md:ml-12">
+                    ${renderNotebookBinding(safeCover.ringColor, 'cover')}
+                    <div class="relative z-20 flex items-start justify-end gap-4 pt-1">
+                        ${!isEditorPreview ? `
+                            <button onclick="event.stopPropagation(); openCoverEditor()" onpointerdown="event.stopPropagation()" class="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-white border-opacity-30 bg-white bg-opacity-20 px-4 text-[10px] font-bold uppercase tracking-[0.18em] shadow-sm backdrop-blur-sm">
+                                <i data-lucide="pencil-ruler" class="h-4 w-4"></i> Edit
+                            </button>
+                        ` : ''}
+                    </div>
+
+                    <div class="relative z-0 pr-16 pt-6">
+                        ${spineLabel ? `<div class="notebook-cover-plate inline-flex items-center rounded-full px-4 py-2 text-[10px] font-bold uppercase tracking-[0.3em] shadow-sm">${spineLabel}</div>` : ''}
+                        ${title ? `<h3 class="${spineLabel ? 'mt-8' : 'mt-4'} max-w-xl font-fantasy text-5xl font-bold leading-[0.95] md:text-6xl">${title}</h3>` : ''}
+                        ${subtitle ? `<p class="mt-5 max-w-lg text-sm font-semibold opacity-85 md:text-base">${subtitle}</p>` : ''}
+                    </div>
+
+                    <div class="absolute inset-0 z-10">
+                        ${renderNotebookCoverStickers(safeCover, isEditorPreview)}
+                    </div>
+                </div>
+            `;
+        }
+
+        function openCoverEditor() {
+            draftNotebookCover = JSON.parse(JSON.stringify(normalizeNotebookCover(userSettings.notebookCover)));
+            const modal = document.getElementById('cover-editor-modal');
+            if (!modal) return;
+            renderCoverEditor();
+            modal.classList.remove('hidden', 'opacity-0', 'scale-95');
+        }
+
+        function closeCoverEditor() {
+            const modal = document.getElementById('cover-editor-modal');
+            if (!modal) return;
+            modal.classList.add('hidden', 'opacity-0', 'scale-95');
+            draftNotebookCover = null;
+        }
+
+        function setDraftCoverField(field, value) {
+            if (!draftNotebookCover) return;
+            draftNotebookCover[field] = value;
+            renderCoverEditor();
+        }
+
+        function setDraftCoverPalette(palette) {
+            if (!draftNotebookCover) return;
+            draftNotebookCover.palette = palette;
+            renderCoverEditor();
+        }
+
+        function addDraftCoverSticker() {
+            if (!draftNotebookCover) return;
+            if (draftNotebookCover.stickers.length >= 6) {
+                showToast('Maximum 6 cover stickers', 'stickers');
+                return;
+            }
+
+            draftNotebookCover.stickers.push(getDefaultNotebookCoverSticker(draftNotebookCover.stickers.length));
+            renderCoverEditor();
+        }
+
+        function updateDraftCoverSticker(index, field, value) {
+            if (!draftNotebookCover?.stickers?.[index]) return;
+            draftNotebookCover.stickers[index][field] = field === 'rotation' ? Number(value) : value;
+            renderCoverEditor();
+        }
+
+        function updateDraftCoverStickerPosition(index, x, y) {
+            if (!draftNotebookCover?.stickers?.[index]) return;
+            draftNotebookCover.stickers[index].x = Math.max(8, Math.min(92, Number(x)));
+            draftNotebookCover.stickers[index].y = Math.max(10, Math.min(90, Number(y)));
+        }
+
+        function attachCoverEditorInteractions() {
+            const previewSurface = document.getElementById('cover-editor-preview-surface');
+            if (!previewSurface) return;
+
+            previewSurface.querySelectorAll('[data-cover-sticker-index]').forEach(stickerEl => {
+                stickerEl.addEventListener('pointerdown', event => {
+                    if (event.pointerType === 'mouse' && event.button !== 0) return;
+
+                    event.preventDefault();
+                    const stickerIndex = Number(stickerEl.dataset.coverStickerIndex);
+                    const rect = previewSurface.getBoundingClientRect();
+
+                    const moveSticker = moveEvent => {
+                        const relativeX = ((moveEvent.clientX - rect.left) / rect.width) * 100;
+                        const relativeY = ((moveEvent.clientY - rect.top) / rect.height) * 100;
+                        updateDraftCoverStickerPosition(stickerIndex, relativeX, relativeY);
+                        stickerEl.style.left = `${Math.max(8, Math.min(92, relativeX))}%`;
+                        stickerEl.style.top = `${Math.max(10, Math.min(90, relativeY))}%`;
+                    };
+
+                    const stopDragging = () => {
+                        window.removeEventListener('pointermove', moveSticker);
+                        window.removeEventListener('pointerup', stopDragging);
+                        window.removeEventListener('pointercancel', stopDragging);
+                    };
+
+                    window.addEventListener('pointermove', moveSticker);
+                    window.addEventListener('pointerup', stopDragging);
+                    window.addEventListener('pointercancel', stopDragging);
+                    stickerEl.setPointerCapture?.(event.pointerId);
+                });
+            });
+        }
+
+        function removeDraftCoverSticker(index) {
+            if (!draftNotebookCover) return;
+            draftNotebookCover.stickers.splice(index, 1);
+            renderCoverEditor();
+        }
+
+        function saveCoverEditor() {
+            userSettings.notebookCover = normalizeNotebookCover(draftNotebookCover);
+            saveData();
+            closeCoverEditor();
+            showToast('Cover saved!', 'book-open');
+            if (currentView === 'index' && indexViewMode === 'book') {
+                renderList();
+            }
+        }
+
+        function renderCoverEditor() {
+            const body = document.getElementById('cover-editor-body');
+            if (!body || !draftNotebookCover) return;
+
+            const previewRecipe = recipes.find(recipe => recipe.id === currentIndexRecipeIds[notebookPageIndex]) || recipes[0] || null;
+            const totalPages = Math.max(1, currentIndexRecipeIds.length || recipes.length || 1);
+            const stickerEmojiOptions = getNotebookCoverStickerEmojiOptions();
+            const paletteOptions = [
+                { key: 'oat', label: 'Oat' },
+                { key: 'sage', label: 'Sage' },
+                { key: 'berry', label: 'Berry' },
+                { key: 'midnight', label: 'Midnight' },
+                { key: 'sunflower', label: 'Sunflower' }
+            ];
+
+            body.innerHTML = `
+                <div class="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr,0.9fr]">
+                    <div class="rounded-[28px] border border-parchmentDark bg-accent bg-opacity-40 p-5 md:p-6">
+                        <p class="text-[11px] font-bold uppercase tracking-[0.3em] text-sage opacity-80">Live preview</p>
+                        <div class="notebook-cover-shell notebook-book-cover-frame mt-5">
+                            <div id="cover-editor-preview-surface" class="notebook-book-cover-surface notebook-cover-panel overflow-hidden rounded-[32px] border px-7 py-7 text-[#2b241a] md:px-10 md:py-10" style="${getNotebookCoverPanelStyle(draftNotebookCover)}">
+                                ${renderNotebookCoverFace(draftNotebookCover, previewRecipe, totalPages, true)}
+                            </div>
+                        </div>
+                        <p class="mt-3 text-[10px] font-bold uppercase tracking-[0.2em] text-sage opacity-80">Drag stickers directly on the preview to place them on the cover.</p>
+                    </div>
+
+                    <div class="space-y-5">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Title</label>
+                                <input type="text" maxlength="40" value="${escapeHTML(draftNotebookCover.title || '')}" oninput="setDraftCoverField('title', this.value)" class="${inputClass}" placeholder="Kitchen Notebook">
+                            </div>
+                            <div>
+                                <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Spine Label</label>
+                                <input type="text" maxlength="28" value="${escapeHTML(draftNotebookCover.spineLabel || '')}" oninput="setDraftCoverField('spineLabel', this.value)" class="${inputClass}" placeholder="Recipe Archive">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Subtitle</label>
+                                <textarea oninput="setDraftCoverField('subtitle', this.value)" class="${textareaClass}" placeholder="Add a personal line on the cover...">${escapeHTML(draftNotebookCover.subtitle || '')}</textarea>
+                            </div>
+                            <div>
+                                <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Binding Rings</label>
+                                <select onchange="setDraftCoverField('ringColor', this.value)" class="${inputClass}">
+                                    <option value="silver" ${draftNotebookCover.ringColor === 'silver' ? 'selected' : ''}>Silver</option>
+                                    <option value="gold" ${draftNotebookCover.ringColor === 'gold' ? 'selected' : ''}>Gold</option>
+                                    <option value="black" ${draftNotebookCover.ringColor === 'black' ? 'selected' : ''}>Black</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="rounded-xl border border-parchmentDark bg-white p-4">
+                            <div class="flex items-center justify-between gap-3 mb-4">
+                                <p class="text-xs font-bold uppercase tracking-[0.22em] text-sage">Cover Palette</p>
+                                <i data-lucide="palette" class="w-4 h-4 text-gold"></i>
+                            </div>
+                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                ${paletteOptions.map(option => {
+                                    const palette = getNotebookCoverPalette(option.key);
+                                    return `
+                                        <button type="button" onclick="setDraftCoverPalette('${option.key}')" class="rounded-xl border p-3 text-left ${draftNotebookCover.palette === option.key ? 'border-gold shadow-md' : 'border-parchmentDark'}">
+                                            <span class="block h-10 rounded-lg" style="background:${palette.surface};"></span>
+                                            <span class="mt-2 block text-xs font-bold uppercase tracking-[0.2em] text-sage">${option.label}</span>
+                                        </button>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+
+                        <div class="rounded-xl border border-parchmentDark bg-white p-4">
+                            <div class="flex items-center justify-between gap-3 mb-4">
+                                <div>
+                                    <p class="text-xs font-bold uppercase tracking-[0.22em] text-sage">Cover Stickers</p>
+                                    <p class="text-[10px] text-sage mt-1 font-semibold">Add up to 6 stickers for a more personal front cover.</p>
+                                </div>
+                                <button type="button" onclick="addDraftCoverSticker()" class="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-parchmentDark bg-white px-4 text-[10px] font-bold uppercase tracking-[0.18em] text-sage shadow-sm">
+                                    <i data-lucide="plus" class="w-4 h-4"></i> Add sticker
+                                </button>
+                            </div>
+
+                            <div class="space-y-4">
+                                ${draftNotebookCover.stickers.length > 0 ? draftNotebookCover.stickers.map((sticker, index) => `
+                                    <div class="rounded-xl border border-parchmentDark bg-accent bg-opacity-25 p-4 space-y-4">
+                                        <div class="flex items-center justify-between gap-3">
+                                            <p class="text-xs font-bold uppercase tracking-[0.2em] text-sage">Sticker ${index + 1}</p>
+                                            <button type="button" onclick="removeDraftCoverSticker(${index})" class="w-9 h-9 rounded-full border border-parchmentDark bg-white text-sage flex items-center justify-center shadow-sm">
+                                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                            </button>
+                                        </div>
+
+                                        <div>
+                                            <label class="block text-[11px] font-bold uppercase tracking-[0.2em] text-sage mb-2">Sticker Text</label>
+                                            <input type="text" maxlength="18" value="${escapeHTML(sticker.text || '')}" oninput="updateDraftCoverSticker(${index}, 'text', this.value)" class="${inputClass}" placeholder="SOUP CLUB">
+                                            <p class="mt-1 text-[10px] font-semibold text-sage">Leave this empty if you want an emoji-only sticker.</p>
+                                        </div>
+
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <div>
+                                                <label class="block text-[11px] font-bold uppercase tracking-[0.2em] text-sage mb-2">Emoji</label>
+                                                <select onchange="updateDraftCoverSticker(${index}, 'emoji', this.value)" class="${inputClass}">
+                                                    ${stickerEmojiOptions.map(option => `<option value="${escapeHTML(option.value)}" ${sticker.emoji === option.value ? 'selected' : ''}>${option.label}</option>`).join('')}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-[11px] font-bold uppercase tracking-[0.2em] text-sage mb-2">Color</label>
+                                                <select onchange="updateDraftCoverSticker(${index}, 'color', this.value)" class="${inputClass}">
+                                                    <option value="gold" ${sticker.color === 'gold' ? 'selected' : ''}>Gold</option>
+                                                    <option value="blue" ${sticker.color === 'blue' ? 'selected' : ''}>Blue</option>
+                                                    <option value="coral" ${sticker.color === 'coral' ? 'selected' : ''}>Coral</option>
+                                                    <option value="sage" ${sticker.color === 'sage' ? 'selected' : ''}>Sage</option>
+                                                    <option value="lilac" ${sticker.color === 'lilac' ? 'selected' : ''}>Lilac</option>
+                                                    <option value="cream" ${sticker.color === 'cream' ? 'selected' : ''}>Cream</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-[11px] font-bold uppercase tracking-[0.2em] text-sage mb-2">Background</label>
+                                                <select onchange="updateDraftCoverSticker(${index}, 'background', this.value)" class="${inputClass}">
+                                                    <option value="solid" ${sticker.background !== 'none' ? 'selected' : ''}>Sticker</option>
+                                                    <option value="none" ${sticker.background === 'none' ? 'selected' : ''}>Transparent</option>
+                                                </select>
+                                                <p class="mt-1 text-[10px] font-semibold text-sage">Transparent works especially well for emoji-only stickers.</p>
+                                            </div>
+                                            <div>
+                                                <label class="block text-[11px] font-bold uppercase tracking-[0.2em] text-sage mb-2">Size</label>
+                                                <select onchange="updateDraftCoverSticker(${index}, 'size', this.value)" class="${inputClass}">
+                                                    <option value="sm" ${sticker.size === 'sm' ? 'selected' : ''}>Small</option>
+                                                    <option value="md" ${sticker.size === 'md' ? 'selected' : ''}>Medium</option>
+                                                    <option value="lg" ${sticker.size === 'lg' ? 'selected' : ''}>Large</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-[11px] font-bold uppercase tracking-[0.2em] text-sage mb-2">Rotation</label>
+                                                <input type="range" min="-18" max="18" step="3" value="${Number(sticker.rotation) || 0}" oninput="updateDraftCoverSticker(${index}, 'rotation', this.value)" class="w-full accent-[#C5A059] mt-3">
+                                                <p class="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-sage">${Number(sticker.rotation) || 0}°</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('') : '<div class="rounded-xl border border-dashed border-parchmentDark p-4 text-sm font-semibold text-sage">No stickers yet. Add one to start decorating your cover.</div>'}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            lucide.createIcons();
+            attachCoverEditorInteractions();
+        }
+
+        function applyThemeMode(themeMode = userSettings.themeMode) {
+            const bodyEl = document.getElementById('body');
+            if (!bodyEl) return;
+
+            const resolvedTheme = themeMode === 'dark' ? 'dark' : 'light';
+            bodyEl.classList.toggle('theme-dark', resolvedTheme === 'dark');
+            bodyEl.dataset.theme = resolvedTheme;
+            document.documentElement.style.colorScheme = resolvedTheme;
+        }
+
         function loadData() {
             const savedSettings = localStorage.getItem('recipeArchiveSettings');
             if (savedSettings) userSettings = { ...userSettings, ...JSON.parse(savedSettings) };
+
+            userSettings.notebookCover = normalizeNotebookCover(userSettings.notebookCover);
+            applyThemeMode(userSettings.themeMode);
+            indexViewMode = userSettings.indexViewMode === 'book' ? 'book' : 'cards';
 
             if(userSettings.language && userSettings.language !== 'en') {
                 changeGlobalLanguage(userSettings.language);
@@ -852,6 +1856,47 @@
                                     </select>
                                     <p class="text-[10px] text-sage mt-1 italic">Automatically translates the entire app.</p>
                                 </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-3">Theme Mode</label>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3" translate="no">
+                                        <label class="cursor-pointer group">
+                                            <input type="radio" name="settings-theme" value="light" class="sr-only peer" ${userSettings.themeMode !== 'dark' ? 'checked' : ''}>
+                                            <div class="rounded-xl border border-sage border-opacity-20 bg-white p-4 shadow-sm transition-all hover:border-gold peer-checked:border-gold peer-checked:shadow-md peer-checked:-translate-y-0.5">
+                                                <div class="flex items-start justify-between gap-4">
+                                                    <div>
+                                                        <p class="text-sm font-bold text-forest">Light Notebook</p>
+                                                        <p class="mt-1 text-xs font-semibold text-sage">Warm parchment, bright cards, classic archive feel.</p>
+                                                    </div>
+                                                    <i data-lucide="sun-medium" class="w-5 h-5 text-gold"></i>
+                                                </div>
+                                                <div class="mt-4 grid grid-cols-3 gap-2">
+                                                    <span class="h-8 rounded-md border" style="background:#FAFAFA; border-color:#EFEFEF;"></span>
+                                                    <span class="h-8 rounded-md border" style="background:#FFFFFF; border-color:#EFEFEF;"></span>
+                                                    <span class="h-8 rounded-md border" style="background:#F4EFE6; border-color:#E5DED0;"></span>
+                                                </div>
+                                            </div>
+                                        </label>
+
+                                        <label class="cursor-pointer group">
+                                            <input type="radio" name="settings-theme" value="dark" class="sr-only peer" ${userSettings.themeMode === 'dark' ? 'checked' : ''}>
+                                            <div class="rounded-xl border border-sage border-opacity-20 bg-white p-4 shadow-sm transition-all hover:border-gold peer-checked:border-gold peer-checked:shadow-md peer-checked:-translate-y-0.5">
+                                                <div class="flex items-start justify-between gap-4">
+                                                    <div>
+                                                        <p class="text-sm font-bold text-forest">Midnight Kitchen</p>
+                                                        <p class="mt-1 text-xs font-semibold text-sage">Deeper paper tones with softer contrast for night use.</p>
+                                                    </div>
+                                                    <i data-lucide="moon-star" class="w-5 h-5 text-gold"></i>
+                                                </div>
+                                                <div class="mt-4 grid grid-cols-3 gap-2">
+                                                    <span class="h-8 rounded-md border" style="background:#17201D; border-color:#2A3833;"></span>
+                                                    <span class="h-8 rounded-md border" style="background:#1E2925; border-color:#2A3833;"></span>
+                                                    <span class="h-8 rounded-md border" style="background:#29342F; border-color:#39463F;"></span>
+                                                </div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                    <p class="text-[10px] text-sage mt-2 italic">Theme changes are applied instantly after saving.</p>
+                                </div>
                             </div>
 
                             <div class="pt-4 border-t border-accent flex justify-end">
@@ -917,6 +1962,9 @@
 
             const newLang = document.getElementById('settings-language').value;
             userSettings.language = newLang;
+            userSettings.themeMode = document.querySelector('input[name="settings-theme"]:checked')?.value || 'light';
+
+            applyThemeMode(userSettings.themeMode);
             changeGlobalLanguage(newLang);
 
             saveData();
@@ -941,13 +1989,382 @@
         }
 
         function toggleListSearchVisibility() {
-            showListSearch = !showListSearch;
+            if (indexViewMode === 'book') {
+                showListSearch = true;
+                showListFilters = false;
+                indexViewMode = 'cards';
+                userSettings.indexViewMode = 'cards';
+                notebookCoverOpen = false;
+                saveData();
+                renderList();
+                contentDiv.scrollTop = 0;
+                return;
+            }
+
+            const nextVisibility = !showListSearch;
+            showListSearch = nextVisibility;
+            if (nextVisibility) showListFilters = false;
             renderList();
         }
 
         function toggleListFiltersVisibility() {
-            showListFilters = !showListFilters;
+            if (indexViewMode === 'book') {
+                showListFilters = true;
+                showListSearch = false;
+                indexViewMode = 'cards';
+                userSettings.indexViewMode = 'cards';
+                notebookCoverOpen = false;
+                saveData();
+                renderList();
+                contentDiv.scrollTop = 0;
+                return;
+            }
+
+            const nextVisibility = !showListFilters;
+            showListFilters = nextVisibility;
+            if (nextVisibility) showListSearch = false;
             renderList();
+        }
+
+        function setIndexViewMode(mode) {
+            const nextMode = mode === 'book' ? 'book' : 'cards';
+            const enteringBookMode = nextMode === 'book' && indexViewMode !== 'book';
+            indexViewMode = nextMode;
+            userSettings.indexViewMode = nextMode;
+            if (enteringBookMode) notebookCoverOpen = false;
+            if (nextMode === 'book') {
+                showListSearch = false;
+                showListFilters = false;
+            }
+            if (nextMode === 'book' && notebookPageIndex >= currentIndexRecipeIds.length) {
+                notebookPageIndex = 0;
+            }
+            saveData();
+            renderList();
+            contentDiv.scrollTop = 0;
+        }
+
+        function openNotebookCover(skipAnimate = false) {
+            const coverSurface = document.getElementById('notebook-cover-surface');
+            if (!skipAnimate && coverSurface) {
+                coverSurface.style.transition = 'transform 320ms cubic-bezier(0.2, 0.72, 0.18, 1)';
+                coverSurface.style.transform = 'translateX(-18px) rotateY(-162deg)';
+                window.setTimeout(() => openNotebookCover(true), 270);
+                return;
+            }
+
+            notebookCoverOpen = true;
+            renderList();
+            contentDiv.scrollTop = 0;
+        }
+
+        function goToNotebookPage(direction) {
+            if (!currentIndexRecipeIds.length) return;
+            const nextIndex = Math.max(0, Math.min(notebookPageIndex + direction, currentIndexRecipeIds.length - 1));
+            if (nextIndex === notebookPageIndex) return;
+
+            const surface = document.getElementById('notebook-swipe-surface');
+            const flipSheet = document.getElementById('notebook-page-turn-sheet');
+            if (!surface || !flipSheet || surface.dataset.turning === 'true') {
+                notebookPageIndex = nextIndex;
+                renderList();
+                contentDiv.scrollTop = 0;
+                return;
+            }
+
+            surface.dataset.turning = 'true';
+            flipSheet.className = `notebook-page-turn-sheet ${direction > 0 ? 'is-next' : 'is-prev'}`;
+
+            window.requestAnimationFrame(() => {
+                flipSheet.classList.add('turning');
+            });
+
+            window.setTimeout(() => {
+                notebookPageIndex = nextIndex;
+                renderList();
+                contentDiv.scrollTop = 0;
+            }, 380);
+        }
+
+        function attachNotebookInteractions() {
+            const surface = document.getElementById('notebook-swipe-surface');
+            const coverSurface = document.getElementById('notebook-cover-surface');
+
+            if (coverSurface) {
+                let startX = 0;
+                let startY = 0;
+                let pointerId = null;
+                let isDragging = false;
+
+                const resetCover = () => {
+                    coverSurface.style.transition = 'transform 260ms cubic-bezier(0.2, 0.72, 0.18, 1)';
+                    coverSurface.style.transform = '';
+                    window.setTimeout(() => {
+                        coverSurface.style.transition = '';
+                    }, 260);
+                };
+
+                coverSurface.addEventListener('pointerdown', event => {
+                    if (event.pointerType === 'mouse' && event.button !== 0) return;
+                    startX = event.clientX;
+                    startY = event.clientY;
+                    pointerId = event.pointerId;
+                    isDragging = true;
+                    coverSurface.style.transition = '';
+                    coverSurface.setPointerCapture?.(event.pointerId);
+                });
+
+                coverSurface.addEventListener('pointermove', event => {
+                    if (!isDragging || pointerId !== event.pointerId) return;
+
+                    const deltaX = Math.min(0, event.clientX - startX);
+                    const rotateY = Math.max(-160, deltaX * 0.95);
+                    const drift = Math.max(-26, deltaX * 0.12);
+                    coverSurface.style.transform = `translateX(${drift}px) rotateY(${rotateY}deg)`;
+                });
+
+                const finishCoverDrag = event => {
+                    if (!isDragging || pointerId !== event.pointerId) return;
+
+                    isDragging = false;
+                    const deltaX = event.clientX - startX;
+                    const deltaY = event.clientY - startY;
+                    if (deltaX < -90 && Math.abs(deltaX) > Math.abs(deltaY)) {
+                        coverSurface.style.transition = 'transform 300ms cubic-bezier(0.2, 0.72, 0.18, 1)';
+                        coverSurface.style.transform = 'translateX(-18px) rotateY(-162deg)';
+                        window.setTimeout(() => openNotebookCover(true), 260);
+                        return;
+                    }
+                    resetCover();
+                };
+
+                coverSurface.addEventListener('pointerup', finishCoverDrag);
+                coverSurface.addEventListener('pointercancel', finishCoverDrag);
+                coverSurface.addEventListener('lostpointercapture', () => {
+                    isDragging = false;
+                    resetCover();
+                });
+                return;
+            }
+
+            if (!surface) return;
+
+            let startX = 0;
+            let startY = 0;
+            let pointerId = null;
+            let isDragging = false;
+
+            const resetSurface = () => {
+                surface.style.transition = 'transform 220ms ease';
+                surface.style.transform = '';
+                window.setTimeout(() => {
+                    surface.style.transition = '';
+                }, 220);
+            };
+
+            surface.addEventListener('pointerdown', event => {
+                if (event.pointerType === 'mouse' && event.button !== 0) return;
+                startX = event.clientX;
+                startY = event.clientY;
+                pointerId = event.pointerId;
+                isDragging = true;
+                surface.setPointerCapture?.(event.pointerId);
+            });
+
+            surface.addEventListener('pointermove', event => {
+                if (!isDragging || pointerId !== event.pointerId) return;
+
+                const deltaX = event.clientX - startX;
+                const limitedX = Math.max(-52, Math.min(52, deltaX * 0.22));
+                const tilt = Math.max(-3, Math.min(3, deltaX * 0.015));
+
+                surface.style.transform = `translateX(${limitedX}px) rotate(${tilt}deg)`;
+            });
+
+            const finishSwipe = event => {
+                if (!isDragging || pointerId !== event.pointerId) return;
+
+                isDragging = false;
+                const deltaX = event.clientX - startX;
+                const deltaY = event.clientY - startY;
+
+                if (Math.abs(deltaX) > 90 && Math.abs(deltaX) > Math.abs(deltaY)) {
+                    if (deltaX < 0) goToNotebookPage(1);
+                    else goToNotebookPage(-1);
+                    return;
+                }
+
+                resetSurface();
+            };
+
+            surface.addEventListener('pointerup', finishSwipe);
+            surface.addEventListener('pointercancel', finishSwipe);
+            surface.addEventListener('lostpointercapture', () => {
+                isDragging = false;
+                resetSurface();
+            });
+        }
+
+        function buildNotebookIndexView(filteredRecipes, activeFilters) {
+            const recipe = filteredRecipes[notebookPageIndex];
+            if (!recipe) return '';
+
+            const coverConfig = normalizeNotebookCover(userSettings.notebookCover);
+            const totalPages = filteredRecipes.length;
+            const recipeMood = recipe.source === 'published' ? 'Saved from another cook' : 'Written in your own archive';
+            const previewSteps = (recipe.instructions || []).slice(0, 5);
+            const extraSteps = Math.max(0, (recipe.instructions || []).length - previewSteps.length);
+            const previewIngredients = (recipe.ingredients || []).slice(0, 10);
+            const extraIngredients = Math.max(0, (recipe.ingredients || []).length - previewIngredients.length);
+            const hasActiveFilters = activeFilters.length > 0;
+            const marginNote = recipe.personalNotes ? applyMeasurementSystem(recipe.personalNotes) : 'Tap note to add your own handwritten margin note for this page.';
+            const marginNotePreview = marginNote.length > 220 ? `${marginNote.slice(0, 217).trim()}...` : marginNote;
+
+            if (!notebookCoverOpen) {
+                return `
+                    <div class="mb-8 lg:pr-12">
+                        <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                            <div>
+                                <p class="text-[11px] font-bold uppercase tracking-[0.3em] text-sage opacity-80">Notebook mode</p>
+                                <p class="mt-1 text-sm font-semibold text-sage opacity-80">Drag the cover from right to left to open your archive, then flip pages like a real recipe book.</p>
+                            </div>
+                            <button onclick="openNotebookCover()" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-parchmentDark bg-white px-4 text-xs font-bold uppercase tracking-[0.2em] text-sage shadow-sm">
+                                <i data-lucide="book-open" class="h-4 w-4"></i> Open notebook
+                            </button>
+                        </div>
+
+                        <div class="relative pt-6 lg:pr-10">
+                            <div class="notebook-book-frame">
+                                <div class="notebook-cover-shell notebook-book-cover-frame">
+                                    <div id="notebook-cover-surface" class="notebook-book-cover-surface notebook-cover-panel overflow-hidden rounded-[32px] border px-7 py-7 md:px-10 md:py-10" style="${getNotebookCoverPanelStyle(coverConfig)}">
+                                    ${renderNotebookCoverFace(coverConfig, recipe, totalPages, false)}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="mb-8 lg:pr-12">
+                    <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                        <div>
+                            <p class="text-[11px] font-bold uppercase tracking-[0.3em] text-sage opacity-80">Notebook mode</p>
+                            <p class="mt-1 text-sm font-semibold text-sage opacity-80">Turn the page from right to left for the next recipe, or use the arrows to browse your collection. Search and filters switch back to the card view.</p>
+                            ${hasActiveFilters ? `<p class="mt-2 text-[11px] font-bold uppercase tracking-[0.24em] text-gold">Filtered spread: ${activeFilters.length} active filter${activeFilters.length === 1 ? '' : 's'}</p>` : ''}
+                        </div>
+                        <div class="flex flex-wrap items-center justify-end gap-2">
+                            <button onclick="goToNotebookPage(-1)" ${notebookPageIndex === 0 ? 'disabled' : ''} class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-parchmentDark bg-white px-4 text-xs font-bold uppercase tracking-[0.2em] text-sage shadow-sm disabled:cursor-not-allowed disabled:opacity-40">
+                                <i data-lucide="chevron-left" class="h-4 w-4"></i> Prev
+                            </button>
+                            <span class="inline-flex h-11 items-center rounded-xl border border-parchmentDark bg-white px-4 text-xs font-bold uppercase tracking-[0.24em] text-sage shadow-sm">Page ${notebookPageIndex + 1} / ${totalPages}</span>
+                            <button onclick="goToNotebookPage(1)" ${notebookPageIndex === totalPages - 1 ? 'disabled' : ''} class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-parchmentDark bg-white px-4 text-xs font-bold uppercase tracking-[0.2em] text-sage shadow-sm disabled:cursor-not-allowed disabled:opacity-40">
+                                Next <i data-lucide="chevron-right" class="h-4 w-4"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="notebook-book-frame relative">
+                        <div id="notebook-swipe-surface" class="notebook-book-spread-surface notebook-swipe-surface notebook-spread relative overflow-hidden rounded-[28px] border border-sage border-opacity-20 px-4 py-4 shadow-[0_30px_60px_rgba(44,61,46,0.16)] md:px-7 md:py-7">
+                            <div id="notebook-page-turn-sheet" class="notebook-page-turn-sheet"></div>
+                            ${renderNotebookBinding(coverConfig.ringColor, 'spread')}
+                            <div class="pointer-events-none absolute inset-y-6 left-7 hidden w-8 rounded-full border-x border-parchmentDark bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.95)_0,rgba(255,255,255,0.7)_58%,rgba(239,239,239,0.88)_100%)] md:block"></div>
+                            <div class="pointer-events-none absolute inset-y-8 left-[3.65rem] hidden w-px bg-gradient-to-b from-transparent via-sage/20 to-transparent md:block"></div>
+
+                            <div class="grid h-full grid-cols-1 gap-4 md:grid-cols-2">
+                                <section class="notebook-paper rounded-[24px] border border-white border-opacity-70 px-6 py-6 md:h-full">
+                                    <p class="text-[11px] font-bold uppercase tracking-[0.3em] text-sage opacity-80">Recipe page</p>
+                                    <h3 class="mt-2 font-fantasy text-4xl font-bold text-forest leading-[1.02] md:text-5xl">${recipe.title}</h3>
+                                    <div class="notebook-ruled-block mt-4 text-sm font-semibold text-sage">
+                                        <div class="notebook-line-row">${recipeMood}</div>
+                                        <div class="notebook-line-row text-[11px] font-bold uppercase tracking-[0.22em]">
+                                            <span>${recipe.category || 'Recipe'}</span>
+                                            ${recipe.difficulty ? `<span>· ${recipe.difficulty}</span>` : ''}
+                                            ${recipe.country ? `<span>· ${recipe.country}</span>` : ''}
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-5 grid grid-cols-3 gap-5 text-sm font-semibold text-forest">
+                                        <div>
+                                            <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-sage">Prep</p>
+                                            <div class="notebook-line-row border-b-0 text-2xl font-bold">${recipe.prepTime || 0}m</div>
+                                        </div>
+                                        <div>
+                                            <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-sage">Cook</p>
+                                            <div class="notebook-line-row border-b-0 text-2xl font-bold">${recipe.cookTime || 0}m</div>
+                                        </div>
+                                        <div>
+                                            <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-sage">Serves</p>
+                                            <div class="notebook-line-row border-b-0 text-2xl font-bold">${recipe.servings || 0}</div>
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-6">
+                                        <div class="flex items-center justify-between">
+                                            <p class="text-xs font-bold uppercase tracking-[0.28em] text-sage">Ingredients</p>
+                                            <span class="text-[10px] font-bold uppercase tracking-[0.22em] text-sage opacity-75">${recipe.ingredients?.length || 0} total</span>
+                                        </div>
+                                        <ul class="notebook-ruled-block mt-1 text-sm font-semibold text-forest">
+                                            ${previewIngredients.map(ingredient => `<li class="notebook-line-row"><span class="text-gold text-lg">•</span><span class="notebook-line-text">${applyMeasurementSystem(ingredient)}</span></li>`).join('')}
+                                        </ul>
+                                        ${extraIngredients > 0 ? `<p class="pt-3 text-xs font-bold uppercase tracking-[0.22em] text-sage opacity-80">+ ${extraIngredients} more ingredients in the full recipe</p>` : ''}
+                                    </div>
+                                </section>
+
+                                <section class="notebook-paper rounded-[24px] border border-white border-opacity-70 px-6 py-6 md:h-full">
+                                    <div class="flex items-start justify-between gap-4">
+                                        <div>
+                                            <p class="text-[11px] font-bold uppercase tracking-[0.3em] text-sage opacity-80">Recipe story</p>
+                                            <div class="notebook-ruled-block mt-2 text-sm font-semibold text-sage">
+                                                <div class="notebook-line-row">By ${recipe.author || 'Chef'}${recipe.lastOpened ? ` · last opened ${new Date(recipe.lastOpened).toLocaleDateString()}` : ''}</div>
+                                            </div>
+                                        </div>
+                                        <div class="relative w-24 h-24 rounded-2xl border-4 border-white shadow-lg bg-cover bg-center rotate-[3deg]" style="background-image:url('${recipe.profile || defaultPlaceholderProfile}')">
+                                            <div class="absolute -top-2 right-5 h-4 w-10 rounded-full bg-gold bg-opacity-70 blur-[1px]"></div>
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-6">
+                                        <div class="mb-1 flex items-center justify-between gap-3">
+                                            <p class="text-xs font-bold uppercase tracking-[0.28em] text-sage">Instructions</p>
+                                            <span class="text-[10px] font-bold uppercase tracking-[0.22em] text-sage opacity-75">Swipe for next page</span>
+                                        </div>
+                                        <ol class="notebook-ruled-block text-sm font-semibold text-forest">
+                                            ${previewSteps.map((step, index) => `
+                                                <li class="notebook-line-row notebook-line-row--top">
+                                                    <span class="mt-[6px] inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-sage text-white text-[10px] font-bold">${index + 1}</span>
+                                                    <span class="notebook-line-text">${applyMeasurementSystem(step)}</span>
+                                                </li>
+                                            `).join('')}
+                                        </ol>
+                                        ${extraSteps > 0 ? `<p class="pt-3 text-xs font-bold uppercase tracking-[0.22em] text-sage opacity-80">+ ${extraSteps} more steps in the full recipe</p>` : ''}
+                                    </div>
+
+                                    <div class="mt-6">
+                                        <div class="mb-1 flex items-center justify-between gap-3">
+                                            <p class="text-xs font-bold uppercase tracking-[0.28em] text-sage">Margin note</p>
+                                            <button onclick="openNotesEditor(${recipe.id})" class="inline-flex h-9 items-center justify-center gap-2 rounded-full border border-parchmentDark bg-white px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-sage shadow-sm">
+                                                <i data-lucide="sticky-note" class="h-4 w-4 text-gold"></i> Note
+                                            </button>
+                                        </div>
+                                        <div class="notebook-ruled-block text-sm font-semibold text-forest leading-[34px]">${marginNotePreview}</div>
+                                    </div>
+
+                                    <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                        <div class="text-[11px] font-bold uppercase tracking-[0.2em] text-sage">
+                                            ${(recipe.diet || []).length > 0 ? recipe.diet.join(' · ') : 'No diet tags'}
+                                        </div>
+                                        <button onclick="renderDetail(${recipe.id})" class="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-forest px-5 text-xs font-bold uppercase tracking-[0.2em] text-white shadow-md hover:bg-sage">
+                                            <i data-lucide="book-open" class="h-4 w-4"></i> Open Recipe
+                                        </button>
+                                    </div>
+                                </section>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
         }
 
         function renderList() {
@@ -973,11 +2390,19 @@
                 showFavoritesOnly ? 'Favorites only' : ''
             ].filter(Boolean);
 
+            currentIndexRecipeIds = filteredRecipes.map(recipe => recipe.id);
+            if (currentIndexRecipeIds.length === 0) {
+                notebookPageIndex = 0;
+            } else {
+                notebookPageIndex = Math.max(0, Math.min(notebookPageIndex, currentIndexRecipeIds.length - 1));
+            }
+
             const resultLabel = `${filteredRecipes.length} recipe${filteredRecipes.length === 1 ? '' : 's'}`;
             const hasSearchQuery = Boolean(searchQuery.trim());
             const hasActiveListFilters = Boolean(categoryFilter || difficultyFilter || cuisineFilter || showFavoritesOnly || dietFilter.length);
-            const isSearchVisible = showListSearch || hasSearchQuery;
-            const isFilterVisible = showListFilters || hasActiveListFilters;
+            const isNotebookMode = indexViewMode === 'book';
+            const isSearchVisible = !isNotebookMode && (showListSearch || hasSearchQuery);
+            const isFilterVisible = !isNotebookMode && (showListFilters || hasActiveListFilters);
             const hasVisibleControls = isSearchVisible || isFilterVisible;
 
             let html = `
@@ -996,10 +2421,13 @@
                                 <span class="inline-flex items-center gap-2 rounded-full border border-parchmentDark bg-white px-3 py-2 text-xs font-bold text-sage shadow-sm">
                                     <i data-lucide="sliders-horizontal" class="h-4 w-4"></i>${activeFilters.length} active
                                 </span>
-                                <button onclick="toggleListSearchVisibility()" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border shadow-sm transition-all ${isSearchVisible ? 'border-forest bg-forest text-white' : 'border-parchmentDark bg-white text-sage hover:border-gold hover:text-forest'}" title="Toggle search">
+                                <button onclick="setIndexViewMode('${indexViewMode === 'book' ? 'cards' : 'book'}')" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border shadow-sm transition-all ${indexViewMode === 'book' ? 'border-forest bg-forest text-white' : 'border-parchmentDark bg-white text-sage hover:border-gold hover:text-forest'}" title="Toggle notebook mode">
+                                    <i data-lucide="book-open" class="h-5 w-5"></i>
+                                </button>
+                                <button onclick="toggleListSearchVisibility()" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border shadow-sm transition-all ${isSearchVisible ? 'border-forest bg-forest text-white' : 'border-parchmentDark bg-white text-sage hover:border-gold hover:text-forest'}" title="${isNotebookMode ? 'Switch to card view and open search' : 'Toggle search'}">
                                     <i data-lucide="search" class="h-5 w-5"></i>
                                 </button>
-                                <button onclick="toggleListFiltersVisibility()" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border shadow-sm transition-all ${isFilterVisible ? 'border-forest bg-forest text-white' : 'border-parchmentDark bg-white text-sage hover:border-gold hover:text-forest'}" title="Toggle filters">
+                                <button onclick="toggleListFiltersVisibility()" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border shadow-sm transition-all ${isFilterVisible ? 'border-forest bg-forest text-white' : 'border-parchmentDark bg-white text-sage hover:border-gold hover:text-forest'}" title="${isNotebookMode ? 'Switch to card view and open filters' : 'Toggle filters'}">
                                     <i data-lucide="sliders-horizontal" class="h-5 w-5"></i>
                                 </button>
                             </div>
@@ -1110,6 +2538,8 @@
                         <p class="font-fantasy text-2xl text-forest font-bold mb-2">No recipes found.</p>
                         <p class="text-sm opacity-80 font-semibold">Try adjusting your search or add a new one!</p>
                     </div>`;
+            } else if (indexViewMode === 'book') {
+                html += buildNotebookIndexView(filteredRecipes, activeFilters);
             } else {
                 html += '<div class="grid grid-cols-1 gap-6 pb-6 md:grid-cols-2 lg:grid-cols-3">';
                 filteredRecipes.forEach(recipe => {
@@ -1145,6 +2575,9 @@
             }
             contentDiv.innerHTML = html;
             lucide.createIcons();
+            if (indexViewMode === 'book' && filteredRecipes.length > 0) {
+                attachNotebookInteractions();
+            }
         }
 
         async function renderBrowse() {
@@ -1498,6 +2931,10 @@
             saveData();
             closeNotesEditor();
             showToast('Notes saved!', 'check-circle');
+            if (currentView === 'index' && indexViewMode === 'book') {
+                renderList();
+                return;
+            }
             const notesSection = document.getElementById(`notes-section-${recipeId}`);
             if (notesSection) {
                 notesSection.innerHTML = recipe.personalNotes ? `<p class="text-sm text-forest mb-2"><strong>Your notes:</strong> ${recipe.personalNotes}</p>` : '';
