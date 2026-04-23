@@ -1,0 +1,2163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Recipe Archive</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+        <!-- Firebase -->
+        <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+        <!-- Google Sign-In -->
+        <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        parchment: '#FAFAFA',
+                        parchmentDark: '#EFEFEF',
+                        sage: '#7A8B76',
+                        forest: '#2C3D2E',
+                        gold: '#C5A059',
+                        accent: '#F4EFE6'
+                    },
+                    fontFamily: {
+                        fantasy: ['"Cormorant Garamond"', 'serif'],
+                        body: ['"Nunito"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #EFEFEF;
+            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #7A8B76; border-radius: 2px; }
+        
+        .cooking-mode-active #main-header,
+        .cooking-mode-active #main-nav {
+            display: none;
+        }
+        .cooking-mode-active #app-content {
+            font-size: 1.1rem;
+            padding-top: 2rem;
+            max-width: 100%;
+        }
+
+        input[type="file"] { display: none; }
+        .custom-file-upload { display: inline-block; cursor: pointer; }
+        input::-webkit-calendar-picker-indicator { opacity: 0.5; cursor: pointer; }
+
+        body { top: 0px !important; }
+        .skiptranslate iframe, .goog-te-banner-frame { display: none !important; visibility: hidden !important; }
+        #goog-gt-tt { display: none !important; visibility: hidden !important; }
+        .goog-text-highlight { background-color: transparent !important; box-shadow: none !important; }
+    </style>
+</head>
+<body class="font-body text-forest min-h-screen selection:bg-gold selection:text-white transition-all duration-300" id="body">
+
+    <div id="google_translate_element" style="display:none;"></div>
+
+    <div class="w-full max-w-6xl mx-auto flex flex-col min-h-screen relative shadow-2xl bg-parchment overflow-hidden border-x border-parchmentDark">
+        
+        <header id="main-header" class="bg-sage text-parchment p-4 shadow-sm z-10 flex justify-between items-center transition-all sticky top-0" translate="no">
+            <div>
+                <h1 class="text-2xl font-fantasy font-bold tracking-wide flex items-center gap-2">
+                    <i data-lucide="book-open" class="w-6 h-6"></i> Recipe Archive
+                </h1>
+                <p class="text-xs font-body font-semibold opacity-90 text-accent">Your culinary collection</p>
+            </div>
+            <button onclick="renderAddForm()" class="bg-gold text-white px-4 py-2 rounded-sm font-bold shadow-sm hover:bg-yellow-600 transition-colors flex items-center gap-2 md:hidden">
+                <i data-lucide="plus" class="w-4 h-4"></i> Add
+            </button>
+        </header>
+
+                    <!-- PERSONAL NOTES MODAL -->
+                    <div id="notes-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden opacity-0 scale-95 transition-all duration-300 flex items-center justify-center z-50">
+                        <div class="bg-white rounded-md shadow-2xl p-8 max-w-2xl mx-4 w-full">
+                            <h2 class="font-fantasy font-bold text-3xl text-forest mb-4">Edit Your Notes</h2>
+                            <textarea id="notes-textarea" placeholder="Add your personal modifications, tips, or reminders..." class="w-full h-40 p-4 border border-sage rounded-md focus:border-gold outline-none text-forest font-semibold"></textarea>
+                            <div class="flex gap-4 mt-6">
+                                <button onclick="closeNotesEditor()" class="flex-1 bg-sage text-white h-12 rounded-sm font-bold hover:bg-forest transition-colors">
+                                    Cancel
+                                </button>
+                                <button id="notes-save-btn" class="flex-1 bg-gold text-white h-12 rounded-sm font-bold hover:bg-yellow-600 transition-colors">
+                                    <i data-lucide="save" class="w-4 h-4 inline mr-2"></i>Save Notes
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+        <main id="app-content" class="flex-1 overflow-y-auto p-4 md:p-8 space-y-4 transition-all relative"></main>
+
+        <nav id="main-nav" class="sticky bottom-0 w-full bg-white text-sage shadow-[0_-4px_10px_-5px_rgba(0,0,0,0.1)] border-t border-parchmentDark z-20 transition-all">
+            <div class="flex justify-around p-1 md:justify-center md:gap-12">
+                <button data-nav-view="browse" onclick="renderBrowse()" class="flex flex-col items-center p-3 rounded-xl text-sage hover:text-gold transition-colors w-1/4 md:w-auto">
+                    <i data-lucide="compass" class="w-6 h-6 mb-1"></i>
+                    <span class="text-[10px] font-bold uppercase tracking-wider">Browse</span>
+                </button>
+                <button data-nav-view="index" onclick="renderList()" class="flex flex-col items-center p-3 rounded-xl text-sage hover:text-gold transition-colors w-1/4 md:w-auto">
+                    <i data-lucide="library" class="w-6 h-6 mb-1"></i>
+                    <span class="text-[10px] font-bold uppercase tracking-wider">Index</span>
+                </button>
+                <button data-nav-view="add" onclick="renderAddForm()" class="hidden md:flex flex-col items-center p-3 rounded-xl text-sage hover:text-gold transition-colors w-auto">
+                    <i data-lucide="file-plus" class="w-6 h-6 mb-1"></i>
+                    <span class="text-[10px] font-bold uppercase tracking-wider">Add Recipe</span>
+                </button>
+                <button data-nav-view="profile" onclick="renderProfile()" class="flex flex-col items-center p-3 rounded-xl text-sage hover:text-gold transition-colors w-1/4 md:w-auto">
+                    <i data-lucide="user-round" class="w-6 h-6 mb-1"></i>
+                    <span class="text-[10px] font-bold uppercase tracking-wider">Profile</span>
+                </button>
+                <button data-nav-view="settings" onclick="renderSettings()" class="flex flex-col items-center p-3 rounded-xl text-sage hover:text-gold transition-colors w-1/4 md:w-auto">
+                    <i data-lucide="settings-2" class="w-6 h-6 mb-1"></i>
+                    <span class="text-[10px] font-bold uppercase tracking-wider">Settings</span>
+                </button>
+            </div>
+        </nav>
+
+        <div id="toast" class="fixed top-20 left-1/2 transform -translate-x-1/2 bg-forest text-white px-6 py-3 rounded-sm shadow-xl transition-all duration-300 opacity-0 pointer-events-none z-50 text-center text-sm font-bold flex items-center gap-2" translate="no">
+            <i id="toast-icon" data-lucide="info" class="w-5 h-5"></i>
+            <span id="toast-message"></span>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({pageLanguage: 'en', autoDisplay: false}, 'google_translate_element');
+        }
+    </script>
+    <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+
+    <script>
+        // --- 0. GEMINI API SETUP ---
+        const apiKey = ""; // API key is injected by the environment
+
+        async function fetchGeminiAPI(payload) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            const delays = [1000, 2000, 4000, 8000, 16000];
+            
+            for (let i = 0; i < 5; i++) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    return await response.json();
+                } catch (error) {
+                    if (i === 4) throw error;
+                    await new Promise(r => setTimeout(r, delays[i]));
+                }
+            }
+        }
+
+        // --- 1. DATA & LOCAL STORAGE ---
+        const defaultPlaceholderBanner = "https://images.unsplash.com/photo-1495195134817-a1a280040141?auto=format&fit=crop&q=80&w=1000";
+        const defaultPlaceholderProfile = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=200";
+        const inputClass = "w-full h-12 bg-white border border-sage border-opacity-30 rounded-sm focus:border-gold outline-none px-4 text-forest font-semibold text-sm shadow-sm transition-all";
+        const textareaClass = "w-full min-h-[120px] bg-white border border-sage border-opacity-30 rounded-sm focus:border-gold outline-none p-4 text-forest font-semibold text-sm shadow-sm transition-all resize-y";
+
+        let userSettings = {
+            name: "",
+            country: "",
+            bio: "",
+            isPublic: false,
+            profilePic: null,
+            bannerPic: null,
+            email: "",
+            measurementSystem: "Metric", 
+            language: "en",
+            favorites: [],
+            myRecipeRatings: {}
+        };
+
+        let recipes = [];
+        let currentScale = 1;
+        let isCookingMode = false;
+        let searchQuery = "";
+        let showListSearch = false;
+        let showListFilters = false;
+        let browseQuery = "";
+        let categoryFilter = "";
+        let difficultyFilter = "";
+        let dietFilter = [];
+        let cuisineFilter = "";
+        let showFavoritesOnly = false;
+        let draftIngredients = [];
+        let draftSteps = [];
+        let draftProfile = null; 
+
+        const countriesList = [
+            "🇦🇷 Argentina", "🇦🇺 Australia", "🇦🇹 Austria", "🇧🇪 Belgium", "🇧🇷 Brazil", "🇨🇦 Canada", 
+            "🇨🇱 Chile", "🇨🇳 China", "🇨🇴 Colombia", "🇭🇷 Croatia", "🇨🇺 Cuba", "🇨🇿 Czechia", 
+            "🇩🇰 Denmark", "🇪🇬 Egypt", "🇪🇹 Ethiopia", "🇫🇮 Finland", "🇫🇷 France", "🇩🇪 Germany", 
+            "🇬🇷 Greece", "🇭🇺 Hungary", "🇮🇳 India", "🇮🇩 Indonesia", "🇮🇷 Iran", "🇮🇪 Ireland", 
+            "🇮🇱 Israel", "🇮🇹 Italy", "🇯🇲 Jamaica", "🇯🇵 Japan", "🇰🇪 Kenya", "🇱🇧 Lebanon", 
+            "🇲🇾 Malaysia", "🇲🇽 Mexico", "🇲🇦 Morocco", "🇳🇱 Netherlands", "🇳🇿 New Zealand", 
+            "🇳🇬 Nigeria", "🇳🇴 Norway", "🇵🇰 Pakistan", "🇵🇪 Peru", "🇵🇭 Philippines", "🇵🇱 Poland", 
+            "🇵🇹 Portugal", "🇷🇴 Romania", "🇷🇺 Russia", "🇸🇦 Saudi Arabia", "🇸🇬 Singapore", 
+            "🇿🇦 South Africa", "🇰🇷 South Korea", "🇪🇸 Spain", "🇱🇰 Sri Lanka", "🇸🇪 Sweden", 
+            "🇨🇭 Switzerland", "🇸🇾 Syria", "🇹🇼 Taiwan", "🇹🇭 Thailand", "🇹🇷 Turkey", 
+            "🇺🇦 Ukraine", "🇬🇧 United Kingdom", "🇺🇸 United States", "🇻🇳 Vietnam"
+        ];
+
+        function applyMeasurementSystem(text) {
+            if (!userSettings.measurementSystem || userSettings.measurementSystem === 'Metric') return text;
+            let resultText = text;
+            resultText = resultText.replace(/(\d+[\.,]?\d*)\s*(g|gr|gram|grams)\b/gi, (match, numStr) => {
+                let num = parseFloat(numStr.replace(',', '.'));
+                let oz = (num * 0.035274).toFixed(1).replace('.0', '');
+                let extra = "";
+                let lowerText = text.toLowerCase();
+                if (lowerText.includes('flour') || lowerText.includes('bloem')) extra = ` / ~${(num / 120).toFixed(1).replace('.0', '')} cups`;
+                else if (lowerText.includes('sugar') || lowerText.includes('suiker')) extra = ` / ~${(num / 200).toFixed(1).replace('.0', '')} cups`;
+                else if (lowerText.includes('butter') || lowerText.includes('boter')) extra = ` / ~${(num / 14.2).toFixed(1).replace('.0', '')} tbsp`;
+                return `${match} (${oz} oz${extra})`;
+            });
+            resultText = resultText.replace(/(\d+[\.,]?\d*)\s*(ml|milliliter|milliliters)\b/gi, (match, numStr) => {
+                let num = parseFloat(numStr.replace(',', '.'));
+                let flOz = (num * 0.033814).toFixed(1).replace('.0', '');
+                if (num >= 240) return `${match} (${flOz} fl oz / ~${(num / 240).toFixed(1).replace('.0', '')} cups)`;
+                return `${match} (${flOz} fl oz / ~${(num / 15).toFixed(1).replace('.0', '')} tbsp)`;
+            });
+            resultText = resultText.replace(/(\d+[\.,]?\d*)\s*(kg|kilo|kilograms)\b/gi, (match, numStr) => {
+                let num = parseFloat(numStr.replace(',', '.'));
+                return `${match} (${(num * 2.20462).toFixed(1).replace('.0', '')} lbs)`;
+            });
+            resultText = resultText.replace(/(\d+[\.,]?\d*)\s*(c|°c|celsius)\b/gi, (match, numStr) => {
+                let num = parseFloat(numStr.replace(',', '.'));
+                let f = Math.round((num * 9/5) + 32);
+                return `${match} (${f}°F)`;
+            });
+            return resultText;
+        }
+
+        function changeGlobalLanguage(langCode) {
+            const checkExist = setInterval(function() {
+                let combo = document.querySelector('.goog-te-combo');
+                if (combo) {
+                    if (combo.value !== langCode) {
+                        combo.value = langCode;
+                        combo.dispatchEvent(new Event('change'));
+                    }
+                    clearInterval(checkExist);
+                }
+            }, 200);
+        }
+
+        function loadData() {
+            const savedSettings = localStorage.getItem('recipeArchiveSettings');
+            if (savedSettings) userSettings = { ...userSettings, ...JSON.parse(savedSettings) };
+
+            if(userSettings.language && userSettings.language !== 'en') {
+                changeGlobalLanguage(userSettings.language);
+            }
+
+            const savedRecipes = localStorage.getItem('recipeArchiveData');
+            if (savedRecipes) {
+                recipes = JSON.parse(savedRecipes);
+            } else {
+                recipes = [{
+                    id: 1,
+                    title: "Forester's Mushroom Stew",
+                    author: "House Recipe",
+                    source: "local",
+                    category: "Cooking",
+                    country: "🇳🇱 Netherlands",
+                    profile: defaultPlaceholderProfile,
+                    prepTime: 15,
+                    cookTime: 40,
+                    servings: 4,
+                    difficulty: "Easy",
+                    diet: [],
+                    cuisine: "European",
+                    ingredients: ["500g Mushrooms", "4 Potatoes", "2 cloves of Garlic", "100ml Red Wine", "2 Carrots", "1 Onion"],
+                    instructions: [
+                        "Chop all vegetables and mushrooms into rough chunks.",
+                        "Fry the onions until translucent, then add the mushrooms and garlic.",
+                        "Deglaze the pan with red wine.",
+                        "Bake at 180°C or let simmer for 40 minutes."
+                    ],
+                    tips: "Serve with a thick slice of rustic bread! The sauce is amazing when soaked up.",
+                    lastOpened: Date.now(),
+                    checkedIngredients: [],
+                    checkedSteps: [],
+                    personalNotes: ""
+                }];
+                saveData();
+            }
+        }
+
+        function saveData() {
+            localStorage.setItem('recipeArchiveSettings', JSON.stringify(userSettings));
+            localStorage.setItem('recipeArchiveData', JSON.stringify(recipes));
+        }
+
+        // --- PHASE 2: FIREBASE BACKEND ---
+        let currentUser = null;
+        let isAuthenticated = false;
+        let firebaseInitialized = false;
+        let publishedRecipesCache = [];
+
+        function initializeFirebase() {
+            const firebaseConfig = {
+                apiKey: "YOUR_API_KEY",
+                authDomain: "YOUR_AUTH_DOMAIN",
+                projectId: "YOUR_PROJECT_ID",
+                storageBucket: "YOUR_STORAGE_BUCKET",
+                messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+                appId: "YOUR_APP_ID"
+            };
+
+            if (!firebaseConfig.apiKey || firebaseConfig.apiKey === 'YOUR_API_KEY') {
+                return;
+            }
+
+            try {
+                if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+                firebaseInitialized = true;
+
+                firebase.auth().onAuthStateChanged(user => {
+                    currentUser = user;
+                    isAuthenticated = !!user;
+                    if (user) {
+                        userSettings.email = user.email || userSettings.email || '';
+                        userSettings.name = user.displayName || userSettings.name;
+                        userSettings.profilePic = user.photoURL || userSettings.profilePic;
+                        saveData();
+                    }
+                });
+            } catch (error) {
+                console.error('Firebase initialization error:', error);
+            }
+        }
+
+        async function signInWithGoogle() {
+            if (!firebaseInitialized) {
+                showToast('Firebase not configured yet. Add your config first.', 'alert-circle');
+                return;
+            }
+
+            try {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                const result = await firebase.auth().signInWithPopup(provider);
+                currentUser = result.user;
+                isAuthenticated = true;
+                userSettings.email = currentUser.email || userSettings.email || '';
+                userSettings.name = currentUser.displayName || userSettings.name;
+                userSettings.profilePic = currentUser.photoURL || userSettings.profilePic;
+                saveData();
+                await syncToFirestore();
+                showToast(`Welcome, ${currentUser.displayName || 'Chef'}!`, 'check-circle');
+            } catch (error) {
+                showToast(`Auth error: ${error.message}`, 'alert-circle');
+            }
+        }
+
+        async function signOut() {
+            if (!firebaseInitialized) return;
+
+            try {
+                await firebase.auth().signOut();
+                currentUser = null;
+                isAuthenticated = false;
+                showToast('Signed out successfully', 'check-circle');
+                renderList();
+            } catch (error) {
+                showToast(`Sign out error: ${error.message}`, 'alert-circle');
+            }
+        }
+
+        async function syncToFirestore() {
+            if (!isAuthenticated || !firebaseInitialized || !currentUser) return;
+
+            try {
+                const db = firebase.firestore();
+                await db.collection('users').doc(currentUser.uid).set({
+                    email: currentUser.email || '',
+                    displayName: currentUser.displayName || userSettings.name || 'Chef',
+                    photoURL: currentUser.photoURL || userSettings.profilePic || '',
+                    bannerPic: userSettings.bannerPic || '',
+                    country: userSettings.country || '',
+                    bio: userSettings.bio || '',
+                    isPublic: userSettings.isPublic,
+                    updatedAt: new Date()
+                }, { merge: true });
+            } catch (error) {
+                console.error('Firestore sync error:', error);
+            }
+        }
+
+        async function publishRecipe(recipeId) {
+            if (!isAuthenticated || !firebaseInitialized || !currentUser) {
+                showToast('Sign in to publish recipes', 'alert-circle');
+                return;
+            }
+
+            try {
+                const recipe = recipes.find(r => r.id === recipeId);
+                if (!recipe) return;
+                if (recipe.source === 'published' && !isPublishedRecipeOwnedByCurrentUser(recipe)) {
+                    showToast('Only the original author can republish this community recipe.', 'alert-circle');
+                    return;
+                }
+
+                const db = firebase.firestore();
+                const payload = {
+                    ...recipe,
+                    source: 'published',
+                    publishedId: recipe.publishedId || null,
+                    authorEmail: currentUser.email || userSettings.email || '',
+                    authorName: currentUser.displayName || recipe.author || userSettings.name || 'Chef',
+                    authorId: currentUser.uid,
+                    updatedAt: new Date(),
+                    likes: recipe.likes || []
+                };
+
+                if (recipe.publishedId) {
+                    await db.collection('published-recipes').doc(recipe.publishedId).set({
+                        ...payload,
+                        publishedAt: recipe.publishedAt || new Date()
+                    }, { merge: true });
+                } else {
+                    const docRef = await db.collection('published-recipes').add({
+                        ...payload,
+                        publishedAt: new Date()
+                    });
+                    recipe.publishedId = docRef.id;
+                    recipe.publishedAt = new Date();
+                    saveData();
+                }
+
+                showToast('Recipe published successfully!', 'check-circle');
+            } catch (error) {
+                showToast(`Publish error: ${error.message}`, 'alert-circle');
+            }
+        }
+
+        async function loadPublishedRecipes() {
+            if (!firebaseInitialized) return [];
+
+            try {
+                const db = firebase.firestore();
+                const snapshot = await db.collection('published-recipes').orderBy('publishedAt', 'desc').limit(50).get();
+                publishedRecipesCache = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                return publishedRecipesCache;
+            } catch (error) {
+                console.error('Error loading published recipes:', error);
+                return [];
+            }
+        }
+
+        function isPublishedRecipeOwnedByCurrentUser(recipe) {
+            if (!recipe) return false;
+            if (currentUser?.uid && recipe.authorId) return recipe.authorId === currentUser.uid;
+            if (userSettings.email && recipe.authorEmail) return recipe.authorEmail === userSettings.email;
+            return false;
+        }
+
+        function isPublishedRecipeSaved(publishedRecipeId) {
+            return recipes.some(recipe => recipe.source === 'published' && recipe.publishedId === publishedRecipeId);
+        }
+
+        function toggleSavedPublishedRecipe(publishedRecipeId, returnView = 'browse') {
+            const existingIndex = recipes.findIndex(recipe => recipe.source === 'published' && recipe.publishedId === publishedRecipeId);
+
+            if (existingIndex !== -1) {
+                const removedRecipe = recipes[existingIndex];
+                recipes.splice(existingIndex, 1);
+                userSettings.favorites = (userSettings.favorites || []).filter(id => id !== removedRecipe.id);
+                saveData();
+                showToast('Removed from your Index', 'heart-off');
+                if (returnView === 'detail') renderPublishedRecipeDetail(publishedRecipeId);
+                else renderBrowse();
+                return;
+            }
+
+            const publishedRecipe = publishedRecipesCache.find(recipe => recipe.id === publishedRecipeId);
+            if (!publishedRecipe) return;
+
+            recipes.unshift({
+                ...publishedRecipe,
+                id: generateId(),
+                source: 'published',
+                publishedId: publishedRecipe.id,
+                author: publishedRecipe.authorName || publishedRecipe.author || 'Chef',
+                profile: publishedRecipe.profile || defaultPlaceholderProfile,
+                ingredients: [...(publishedRecipe.ingredients || [])],
+                instructions: [...(publishedRecipe.instructions || [])],
+                diet: [...(publishedRecipe.diet || [])],
+                checkedIngredients: [],
+                checkedSteps: [],
+                personalNotes: '',
+                lastOpened: Date.now()
+            });
+
+            saveData();
+            showToast('Saved to your Index', 'heart');
+            if (returnView === 'detail') renderPublishedRecipeDetail(publishedRecipeId);
+            else renderBrowse();
+        }
+
+        function exportAllAsJSON() {
+            const backup = {
+                settings: userSettings,
+                recipes,
+                exportDate: new Date().toISOString()
+            };
+
+            const dataStr = JSON.stringify(backup, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `recipe-archive-backup-${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+            showToast('Backup downloaded!', 'download');
+        }
+
+        function importFromJSON(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const backup = JSON.parse(event.target.result);
+                    if (backup.settings && backup.recipes) {
+                        userSettings = { ...userSettings, ...backup.settings };
+                        recipes = backup.recipes;
+                        saveData();
+                        showToast('Backup restored successfully!', 'check-circle');
+                        renderList();
+                        e.target.value = '';
+                    } else {
+                        showToast('Invalid backup file format', 'alert-circle');
+                    }
+                } catch (err) {
+                    showToast('Error restoring backup', 'x-circle');
+                    console.error(err);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function exportRecipeAsPDF(recipeId) {
+            const recipe = recipes.find(r => r.id === recipeId);
+            if (!recipe) return;
+
+            const htmlContent = `
+                <div style="font-family: 'Cormorant Garamond', serif; padding: 40px; max-width: 800px; color: #2C3D2E;">
+                    <h1 style="font-size: 36px; margin-bottom: 10px; font-weight: bold;">${recipe.title}</h1>
+                    <p style="color: #7A8B76; font-size: 14px; margin-bottom: 20px;">By ${recipe.author} • ${recipe.country || 'Unknown'}</p>
+
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; padding: 15px; background-color: #F4EFE6; border-radius: 8px;">
+                        ${recipe.prepTime ? `<div style="text-align: center;"><strong>${recipe.prepTime}m</strong><br><span style="font-size: 12px; color: #7A8B76;">Prep</span></div>` : ''}
+                        ${recipe.cookTime ? `<div style="text-align: center;"><strong>${recipe.cookTime}m</strong><br><span style="font-size: 12px; color: #7A8B76;">Cook</span></div>` : ''}
+                        ${recipe.servings ? `<div style="text-align: center;"><strong>${recipe.servings}</strong><br><span style="font-size: 12px; color: #7A8B76;">Servings</span></div>` : ''}
+                        ${recipe.difficulty ? `<div style="text-align: center;"><strong>${recipe.difficulty}</strong><br><span style="font-size: 12px; color: #7A8B76;">Difficulty</span></div>` : ''}
+                    </div>
+
+                    <h2 style="font-size: 24px; margin-top: 25px; margin-bottom: 15px; font-weight: bold; border-bottom: 2px solid #C5A059; padding-bottom: 10px;">Ingredients</h2>
+                    <ul style="list-style: none; padding: 0;">
+                        ${(recipe.ingredients || []).map(ing => `<li style="padding: 8px 0; border-bottom: 1px solid #EFEFEF;">• ${applyMeasurementSystem(ing)}</li>`).join('')}
+                    </ul>
+
+                    <h2 style="font-size: 24px; margin-top: 25px; margin-bottom: 15px; font-weight: bold; border-bottom: 2px solid #C5A059; padding-bottom: 10px;">Instructions</h2>
+                    <ol style="padding-left: 20px;">
+                        ${(recipe.instructions || []).map(step => `<li style="padding: 10px 0; line-height: 1.6;">${applyMeasurementSystem(step)}</li>`).join('')}
+                    </ol>
+
+                    ${recipe.tips ? `
+                    <h2 style="font-size: 24px; margin-top: 25px; margin-bottom: 15px; font-weight: bold; border-bottom: 2px solid #C5A059; padding-bottom: 10px;">Chef's Notes</h2>
+                    <p style="line-height: 1.6;">${applyMeasurementSystem(recipe.tips)}</p>
+                    ` : ''}
+
+                    ${recipe.personalNotes ? `
+                    <h2 style="font-size: 24px; margin-top: 25px; margin-bottom: 15px; font-weight: bold; border-bottom: 2px solid #C5A059; padding-bottom: 10px;">Your Notes</h2>
+                    <p style="line-height: 1.6;">${applyMeasurementSystem(recipe.personalNotes)}</p>
+                    ` : ''}
+                </div>
+            `;
+
+            const element = document.createElement('div');
+            element.innerHTML = htmlContent;
+
+            const opt = {
+                margin: 10,
+                filename: `${recipe.title}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+            };
+
+            html2pdf().set(opt).from(element).save();
+            showToast('PDF downloaded!', 'download');
+        }
+
+        const contentDiv = document.getElementById('app-content');
+        const toastEl = document.getElementById('toast');
+        const toastMessage = document.getElementById('toast-message');
+        let currentView = 'index';
+
+        function setActiveNav(view) {
+            currentView = view;
+            document.querySelectorAll('[data-nav-view]').forEach(button => {
+                const isActive = button.dataset.navView === view;
+                button.classList.toggle('bg-accent', isActive);
+                button.classList.toggle('bg-opacity-40', isActive);
+                button.classList.toggle('text-forest', isActive);
+                button.classList.toggle('shadow-sm', isActive);
+                button.classList.toggle('hover:text-gold', !isActive);
+            });
+        }
+
+        function showToast(message, iconName = 'check-circle') {
+            document.getElementById('toast-icon').setAttribute('data-lucide', iconName);
+            toastMessage.textContent = message;
+            lucide.createIcons();
+            toastEl.classList.remove('opacity-0', '-translate-y-4');
+            setTimeout(() => toastEl.classList.add('opacity-0', '-translate-y-4'), 3000);
+        }
+
+        function generateId() { return recipes.length > 0 ? Math.max(...recipes.map(r => r.id)) + 1 : 1; }
+
+        function toggleCookingMode() {
+            isCookingMode = !isCookingMode;
+            document.getElementById('body').classList.toggle('cooking-mode-active');
+            const btnText = document.getElementById('focus-btn-text');
+            const btnIcon = document.getElementById('focus-btn-icon');
+            
+            if(isCookingMode) {
+                showToast('Start Cooking Mode', 'chef-hat');
+                if(btnText) btnText.textContent = "Exit Cooking";
+                if(btnIcon) btnIcon.setAttribute('data-lucide', 'x-circle');
+            } else {
+                showToast('Back to Archive', 'layout-template');
+                if(btnText) btnText.textContent = "Start Cooking";
+                if(btnIcon) btnIcon.setAttribute('data-lucide', 'chef-hat');
+            }
+            lucide.createIcons();
+        }
+
+        function handleImageUpload(event, targetElementId, targetVarName, isUserSetting = false) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const base64 = e.target.result;
+                    document.getElementById(targetElementId).style.backgroundImage = `url(${base64})`;
+                    document.getElementById(targetElementId).innerHTML = ''; 
+                    if(isUserSetting) userSettings[targetVarName] = base64;
+                    else window[targetVarName] = base64;
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function check12HourReset(recipe) {
+            const now = Date.now();
+            if (recipe.lastOpened && (now - recipe.lastOpened > 12 * 60 * 60 * 1000)) {
+                recipe.checkedIngredients = [];
+                recipe.checkedSteps = [];
+            }
+            recipe.lastOpened = now;
+            saveData();
+        }
+
+        function toggleItemCheck(recipeId, type, index, element) {
+            const recipe = recipes.find(r => r.id === recipeId);
+            if (!recipe) return;
+            if(!recipe.checkedIngredients) recipe.checkedIngredients = [];
+            if(!recipe.checkedSteps) recipe.checkedSteps = [];
+
+            const arr = type === 'ingredient' ? recipe.checkedIngredients : recipe.checkedSteps;
+            const pos = arr.indexOf(index);
+            if (pos === -1) arr.push(index);
+            else arr.splice(pos, 1);
+
+            saveData();
+            element.classList.toggle('line-through');
+            element.classList.toggle('opacity-40');
+            const icon = element.querySelector('.check-icon');
+            if (element.classList.contains('line-through')) icon.classList.remove('opacity-0');
+            else icon.classList.add('opacity-0');
+        }
+
+        // --- VIEWS ---
+        function renderProfile() {
+            isCookingMode = false;
+            document.getElementById('body').classList.remove('cooking-mode-active');
+            setActiveNav('profile');
+
+            const bannerBg = userSettings.bannerPic || defaultPlaceholderBanner;
+            const profileBg = userSettings.profilePic || defaultPlaceholderProfile;
+            const createdRecipes = recipes.filter(recipe => recipe.source !== 'published').length;
+            const savedRecipes = recipes.filter(recipe => recipe.source === 'published').length;
+            const publishedRecipes = recipes.filter(recipe => recipe.publishedId).length;
+
+            contentDiv.innerHTML = `
+                <div class="max-w-4xl mx-auto space-y-6">
+                    <div class="bg-white rounded-sm shadow-sm border border-parchmentDark overflow-hidden">
+                        <div class="h-44 bg-cover bg-center relative" style="background-image: url('${bannerBg}')">
+                            <div class="absolute inset-0 bg-gradient-to-t from-forest/60 to-transparent"></div>
+                        </div>
+                        <div class="px-6 md:px-8 pb-8">
+                            <div class="flex flex-col md:flex-row md:items-end gap-5 -mt-12 relative z-10">
+                                <div class="w-24 h-24 rounded-full border-4 border-white shadow-xl bg-cover bg-center bg-white" style="background-image: url('${profileBg}')"></div>
+                                <div class="pt-2">
+                                    <h2 class="font-fantasy font-bold text-4xl text-forest">${userSettings.name || 'Your Profile'}</h2>
+                                    <p class="text-sm font-bold uppercase tracking-[0.24em] text-sage mt-1">${userSettings.country || 'Set your country'}</p>
+                                    <p class="mt-3 text-sm font-semibold text-forest opacity-80 max-w-2xl">${userSettings.bio || 'Add a short bio to tell people what you love to cook.'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-white rounded-sm border border-parchmentDark p-5 shadow-sm">
+                            <p class="text-xs font-bold uppercase tracking-[0.24em] text-sage">Created</p>
+                            <p class="mt-2 text-3xl font-fantasy font-bold text-forest">${createdRecipes}</p>
+                            <p class="text-sm font-semibold text-sage">Recipes you authored</p>
+                        </div>
+                        <div class="bg-white rounded-sm border border-parchmentDark p-5 shadow-sm">
+                            <p class="text-xs font-bold uppercase tracking-[0.24em] text-sage">Saved</p>
+                            <p class="mt-2 text-3xl font-fantasy font-bold text-forest">${savedRecipes}</p>
+                            <p class="text-sm font-semibold text-sage">Recipes liked from Browse</p>
+                        </div>
+                        <div class="bg-white rounded-sm border border-parchmentDark p-5 shadow-sm">
+                            <p class="text-xs font-bold uppercase tracking-[0.24em] text-sage">Published</p>
+                            <p class="mt-2 text-3xl font-fantasy font-bold text-forest">${publishedRecipes}</p>
+                            <p class="text-sm font-semibold text-sage">Live community recipes</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 md:p-8 rounded-sm shadow-sm border border-parchmentDark">
+                        <h3 class="font-fantasy font-bold text-3xl mb-6 text-forest border-b border-accent pb-4 flex items-center gap-2">
+                            <i data-lucide="user-round-cog" class="w-7 h-7 text-gold"></i> Profile Details
+                        </h3>
+
+                        <form onsubmit="saveProfile(event)" class="space-y-6">
+                            <div class="mb-10 relative">
+                                <label class="custom-file-upload w-full block mb-2">
+                                    <span class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Profile Banner</span>
+                                    <input type="file" accept="image/*" onchange="handleImageUpload(event, 'profile-banner-preview', 'bannerPic', true)">
+                                    <div id="profile-banner-preview" class="w-full h-36 rounded-sm bg-cover bg-center border border-parchmentDark flex items-center justify-center group" style="background-image: url('${bannerBg}')">
+                                        <div class="bg-white bg-opacity-80 px-3 py-1 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 text-xs font-bold text-forest">
+                                            <i data-lucide="upload" class="w-4 h-4"></i> Change Banner
+                                        </div>
+                                    </div>
+                                </label>
+
+                                <label class="custom-file-upload absolute -bottom-8 left-6 z-10 block">
+                                    <input type="file" accept="image/*" onchange="handleImageUpload(event, 'profile-avatar-preview', 'profilePic', true)">
+                                    <div id="profile-avatar-preview" class="w-24 h-24 rounded-full bg-cover bg-center border-4 border-white shadow-md flex items-center justify-center group" style="background-image: url('${profileBg}')">
+                                        <div class="bg-white bg-opacity-80 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"><i data-lucide="camera" class="w-5 h-5 text-forest"></i></div>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <div class="pt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Chef Name</label>
+                                    <input type="text" id="profile-name" value="${userSettings.name}" placeholder="Gordon Ramsay" class="${inputClass}">
+                                </div>
+                                <div>
+                                    <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Default Country</label>
+                                    <input type="text" id="profile-country" value="${userSettings.country}" list="countries-list" placeholder="e.g. 🇮🇹 Italy" class="${inputClass}">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Short Bio</label>
+                                <textarea id="profile-bio" placeholder="Tell us about your cooking style..." class="${textareaClass}">${userSettings.bio}</textarea>
+                            </div>
+
+                            <div class="bg-accent bg-opacity-30 p-4 rounded-sm border border-sage border-opacity-20 flex justify-between items-center gap-4">
+                                <div>
+                                    <h4 class="font-bold text-forest flex items-center gap-2"><i data-lucide="globe" class="w-4 h-4 text-gold"></i> Public Profile</h4>
+                                    <p class="text-xs text-sage mt-1 font-semibold">Allow other users to visit your profile.</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="profile-public" class="sr-only peer" ${userSettings.isPublic ? 'checked' : ''}>
+                                    <div class="w-11 h-6 bg-parchmentDark peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sage"></div>
+                                </label>
+                            </div>
+
+                            <div class="pt-6 border-t border-accent mt-4 flex justify-end">
+                                <button type="submit" class="bg-forest text-white h-12 px-8 rounded-sm font-bold shadow-md hover:bg-sage transition-colors flex items-center justify-center gap-2 uppercase tracking-wider text-sm min-w-[150px]">
+                                    <i data-lucide="save" class="w-4 h-4"></i> Save Profile
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                <datalist id="countries-list">${countriesList.map(c => `<option value="${c}"></option>`).join('')}</datalist>
+            `;
+            lucide.createIcons();
+        }
+
+        async function saveProfile(e) {
+            e.preventDefault();
+            userSettings.name = document.getElementById('profile-name').value;
+            userSettings.country = document.getElementById('profile-country').value;
+            userSettings.bio = document.getElementById('profile-bio').value;
+            userSettings.isPublic = document.getElementById('profile-public').checked;
+            saveData();
+            await syncToFirestore();
+            showToast('Profile saved successfully!', 'user-check');
+            renderProfile();
+        }
+
+        function renderSettings() {
+            isCookingMode = false;
+            document.getElementById('body').classList.remove('cooking-mode-active');
+            setActiveNav('settings');
+
+            contentDiv.innerHTML = `
+                <div class="max-w-4xl mx-auto space-y-6">
+                    <div class="bg-white p-6 md:p-8 rounded-sm shadow-sm border border-parchmentDark">
+                        <h2 class="font-fantasy font-bold text-3xl mb-6 text-forest border-b border-accent pb-4 flex items-center gap-2">
+                            <i data-lucide="settings-2" class="w-8 h-8 text-gold"></i> Settings
+                        </h2>
+
+                        <form onsubmit="saveSettings(event)" class="space-y-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Measurement System</label>
+                                    <select id="settings-measurement" class="${inputClass}">
+                                        <option value="Metric" ${userSettings.measurementSystem === 'Metric' ? 'selected' : ''}>Metric (Grams, ML, °C)</option>
+                                        <option value="Imperial" ${userSettings.measurementSystem === 'Imperial' ? 'selected' : ''}>Imperial (Ounces, Cups, °F)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Display Language</label>
+                                    <select id="settings-language" class="${inputClass}">
+                                        <option value="en" ${userSettings.language === 'en' ? 'selected' : ''}>English (Original)</option>
+                                        <option value="nl" ${userSettings.language === 'nl' ? 'selected' : ''}>Nederlands (Dutch)</option>
+                                        <option value="es" ${userSettings.language === 'es' ? 'selected' : ''}>Español (Spanish)</option>
+                                        <option value="fr" ${userSettings.language === 'fr' ? 'selected' : ''}>Français (French)</option>
+                                        <option value="de" ${userSettings.language === 'de' ? 'selected' : ''}>Deutsch (German)</option>
+                                        <option value="it" ${userSettings.language === 'it' ? 'selected' : ''}>Italiano (Italian)</option>
+                                    </select>
+                                    <p class="text-[10px] text-sage mt-1 italic">Automatically translates the entire app.</p>
+                                </div>
+                            </div>
+
+                            <div class="pt-4 border-t border-accent flex justify-end">
+                                <button type="submit" class="bg-forest text-white h-12 px-8 rounded-sm font-bold shadow-md hover:bg-sage transition-colors flex items-center justify-center gap-2 uppercase tracking-wider text-sm min-w-[150px]">
+                                    <i data-lucide="save" class="w-4 h-4"></i> Save Settings
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="bg-white p-6 md:p-8 rounded-sm shadow-sm border border-parchmentDark">
+                        <h3 class="font-fantasy font-bold text-3xl mb-6 text-forest border-b border-accent pb-4 flex items-center gap-2">
+                            <i data-lucide="database" class="w-8 h-8 text-gold"></i> Backup & Restore
+                        </h3>
+                        <p class="text-sm text-sage mb-6 font-semibold">Keep your recipes safe by creating regular backups.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <button onclick="exportAllAsJSON()" class="bg-gold text-white h-12 px-8 rounded-sm font-bold shadow-md hover:bg-yellow-600 transition-colors flex items-center justify-center gap-2 uppercase tracking-wider text-sm">
+                                <i data-lucide="download" class="w-4 h-4"></i> Download Backup
+                            </button>
+
+                            <label class="bg-forest text-white h-12 px-8 rounded-sm font-bold shadow-md hover:bg-sage transition-colors flex items-center justify-center gap-2 uppercase tracking-wider text-sm cursor-pointer">
+                                <i data-lucide="upload" class="w-4 h-4"></i> Restore Backup
+                                <input type="file" accept=".json" onchange="importFromJSON(event)" style="display: none;">
+                            </label>
+                        </div>
+                        <p class="text-[10px] text-sage mt-4 italic">Backups contain all your recipes, favorites, ratings, and settings in JSON format.</p>
+                    </div>
+
+                    <div class="bg-white p-6 md:p-8 rounded-sm shadow-sm border border-parchmentDark">
+                        <h3 class="font-fantasy font-bold text-3xl mb-6 text-forest border-b border-accent pb-4 flex items-center gap-2">
+                            <i data-lucide="cloud" class="w-8 h-8 text-gold"></i> Cloud Sync & Publishing
+                        </h3>
+
+                        <div class="space-y-4">
+                            ${isAuthenticated ? `
+                                <div class="bg-sage bg-opacity-10 p-4 rounded-sm border border-sage flex items-center gap-3">
+                                    <i data-lucide="check-circle" class="w-6 h-6 text-forest"></i>
+                                    <div>
+                                        <p class="font-bold text-forest">Signed In</p>
+                                        <p class="text-sm text-sage">${currentUser?.email || userSettings.email || 'Cloud Account'}</p>
+                                    </div>
+                                </div>
+                                <button onclick="signOut()" class="w-full bg-red-500 text-white h-12 rounded-sm font-bold hover:bg-red-600 transition-colors flex items-center justify-center gap-2 uppercase tracking-wider text-sm">
+                                    <i data-lucide="log-out" class="w-4 h-4"></i> Sign Out
+                                </button>
+                            ` : `
+                                <p class="text-sm text-sage mb-4">Sign in to publish recipes, browse community recipes, and sync across devices.</p>
+                                <button onclick="signInWithGoogle()" class="w-full bg-gold text-white h-12 rounded-sm font-bold hover:bg-yellow-600 transition-colors flex items-center justify-center gap-2 uppercase tracking-wider text-sm">
+                                    <i data-lucide="lock" class="w-4 h-4"></i> Sign In with Google
+                                </button>
+                                <p class="text-[10px] text-sage italic mt-4">By signing in, you enable cloud syncing and community publishing features.</p>
+                            `}
+                        </div>
+                    </div>
+                </div>
+            `;
+            lucide.createIcons();
+        }
+
+        function saveSettings(e) {
+            e.preventDefault();
+            userSettings.measurementSystem = document.getElementById('settings-measurement').value;
+
+            const newLang = document.getElementById('settings-language').value;
+            userSettings.language = newLang;
+            changeGlobalLanguage(newLang);
+
+            saveData();
+            showToast('Settings saved successfully!', 'settings-2');
+            renderSettings();
+        }
+
+        function toggleDietFilterOption(value) {
+            if (dietFilter.includes(value)) dietFilter = dietFilter.filter(item => item !== value);
+            else dietFilter = [...dietFilter, value];
+            renderList();
+        }
+
+        function resetRecipeFilters() {
+            searchQuery = "";
+            categoryFilter = "";
+            difficultyFilter = "";
+            dietFilter = [];
+            cuisineFilter = "";
+            showFavoritesOnly = false;
+            renderList();
+        }
+
+        function toggleListSearchVisibility() {
+            showListSearch = !showListSearch;
+            renderList();
+        }
+
+        function toggleListFiltersVisibility() {
+            showListFilters = !showListFilters;
+            renderList();
+        }
+
+        function renderList() {
+            isCookingMode = false;
+            document.getElementById('body').classList.remove('cooking-mode-active');
+            setActiveNav('index');
+            const filteredRecipes = recipes.filter(r => {
+                const matchesSearch = r.title.toLowerCase().includes(searchQuery.toLowerCase()) || r.ingredients.some(i => i.toLowerCase().includes(searchQuery.toLowerCase()));
+                const matchesCategory = categoryFilter === "" || r.category === categoryFilter;
+                const matchesDifficulty = difficultyFilter === "" || r.difficulty === difficultyFilter;
+                const matchesDiet = dietFilter.length === 0 || (r.diet && r.diet.some(d => dietFilter.includes(d)));
+                const matchesCuisine = cuisineFilter === "" || (r.cuisine && r.cuisine.toLowerCase() === cuisineFilter.toLowerCase());
+                const matchesFavorite = !showFavoritesOnly || userSettings.favorites?.includes(r.id);
+                return matchesSearch && matchesCategory && matchesDifficulty && matchesDiet && matchesCuisine && matchesFavorite;
+            });
+
+            const activeFilters = [
+                searchQuery.trim() ? `Search: ${searchQuery.trim()}` : '',
+                categoryFilter ? `Category: ${categoryFilter}` : '',
+                difficultyFilter ? `Level: ${difficultyFilter}` : '',
+                cuisineFilter ? `Cuisine: ${cuisineFilter}` : '',
+                ...dietFilter.map(item => `Diet: ${item}`),
+                showFavoritesOnly ? 'Favorites only' : ''
+            ].filter(Boolean);
+
+            const resultLabel = `${filteredRecipes.length} recipe${filteredRecipes.length === 1 ? '' : 's'}`;
+            const hasSearchQuery = Boolean(searchQuery.trim());
+            const hasActiveListFilters = Boolean(categoryFilter || difficultyFilter || cuisineFilter || showFavoritesOnly || dietFilter.length);
+            const isSearchVisible = showListSearch || hasSearchQuery;
+            const isFilterVisible = showListFilters || hasActiveListFilters;
+            const hasVisibleControls = isSearchVisible || isFilterVisible;
+
+            let html = `
+                <div class="mb-8 overflow-hidden rounded-2xl border border-parchmentDark bg-white shadow-lg">
+                    <div class="border-b border-parchmentDark bg-gradient-to-r from-accent via-white to-parchment px-5 py-5">
+                        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                            <div>
+                                <p class="text-[11px] font-bold uppercase tracking-[0.32em] text-sage opacity-80">Your saved collection</p>
+                                <h2 class="font-fantasy text-3xl font-bold text-forest">Index your own and liked recipes</h2>
+                                <p class="mt-1 text-sm font-semibold text-sage opacity-80">This is your saved area for recipes you created and recipes you liked from Browse.</p>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <span class="inline-flex items-center gap-2 rounded-full border border-parchmentDark bg-white px-3 py-2 text-xs font-bold text-sage shadow-sm">
+                                    <i data-lucide="book-copy" class="h-4 w-4"></i>${resultLabel}
+                                </span>
+                                <span class="inline-flex items-center gap-2 rounded-full border border-parchmentDark bg-white px-3 py-2 text-xs font-bold text-sage shadow-sm">
+                                    <i data-lucide="sliders-horizontal" class="h-4 w-4"></i>${activeFilters.length} active
+                                </span>
+                                <button onclick="toggleListSearchVisibility()" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border shadow-sm transition-all ${isSearchVisible ? 'border-forest bg-forest text-white' : 'border-parchmentDark bg-white text-sage hover:border-gold hover:text-forest'}" title="Toggle search">
+                                    <i data-lucide="search" class="h-5 w-5"></i>
+                                </button>
+                                <button onclick="toggleListFiltersVisibility()" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border shadow-sm transition-all ${isFilterVisible ? 'border-forest bg-forest text-white' : 'border-parchmentDark bg-white text-sage hover:border-gold hover:text-forest'}" title="Toggle filters">
+                                    <i data-lucide="sliders-horizontal" class="h-5 w-5"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    ${hasVisibleControls ? `
+                        <div class="space-y-5 p-5">
+                            ${isSearchVisible ? `
+                                <div class="relative">
+                                    <i data-lucide="search" class="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-sage opacity-70"></i>
+                                    <input type="text" placeholder="Search by title, ingredient, or occasion..." value="${searchQuery}" oninput="searchQuery = this.value; renderList()" class="w-full h-14 rounded-xl border border-accent bg-parchment px-12 text-base font-semibold text-forest shadow-sm outline-none transition-all focus:border-gold focus:bg-white">
+                                </div>
+                            ` : ''}
+
+                            ${isFilterVisible ? `
+                                <div class="space-y-5">
+                                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                                        <div class="space-y-2">
+                                            <label class="block text-[11px] font-bold uppercase tracking-[0.28em] text-sage opacity-80">Category</label>
+                                            <div class="relative">
+                                                <select onchange="categoryFilter = this.value; renderList()" class="h-14 w-full appearance-none rounded-xl border border-sage border-opacity-20 bg-white px-4 pr-11 text-sm font-semibold text-forest shadow-sm outline-none transition-all focus:border-gold focus:shadow-md">
+                                                    <option value="">All categories</option>
+                                                    <option value="Baking" ${categoryFilter === 'Baking' ? 'selected' : ''}>Baking</option>
+                                                    <option value="Cooking" ${categoryFilter === 'Cooking' ? 'selected' : ''}>Cooking</option>
+                                                    <option value="Dessert" ${categoryFilter === 'Dessert' ? 'selected' : ''}>Dessert</option>
+                                                    <option value="Drink" ${categoryFilter === 'Drink' ? 'selected' : ''}>Drink</option>
+                                                </select>
+                                                <i data-lucide="chevron-down" class="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-sage"></i>
+                                            </div>
+                                        </div>
+
+                                        <div class="space-y-2">
+                                            <label class="block text-[11px] font-bold uppercase tracking-[0.28em] text-sage opacity-80">Difficulty</label>
+                                            <div class="relative">
+                                                <select onchange="difficultyFilter = this.value; renderList()" class="h-14 w-full appearance-none rounded-xl border border-sage border-opacity-20 bg-white px-4 pr-11 text-sm font-semibold text-forest shadow-sm outline-none transition-all focus:border-gold focus:shadow-md">
+                                                    <option value="">All levels</option>
+                                                    <option value="Easy" ${difficultyFilter === 'Easy' ? 'selected' : ''}>Easy</option>
+                                                    <option value="Medium" ${difficultyFilter === 'Medium' ? 'selected' : ''}>Medium</option>
+                                                    <option value="Hard" ${difficultyFilter === 'Hard' ? 'selected' : ''}>Hard</option>
+                                                </select>
+                                                <i data-lucide="chevron-down" class="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-sage"></i>
+                                            </div>
+                                        </div>
+
+                                        <div class="space-y-2">
+                                            <label class="block text-[11px] font-bold uppercase tracking-[0.28em] text-sage opacity-80">Cuisine</label>
+                                            <div class="relative">
+                                                <select onchange="cuisineFilter = this.value; renderList()" class="h-14 w-full appearance-none rounded-xl border border-sage border-opacity-20 bg-white px-4 pr-11 text-sm font-semibold text-forest shadow-sm outline-none transition-all focus:border-gold focus:shadow-md">
+                                                    <option value="">All cuisines</option>
+                                                    <option value="European" ${cuisineFilter === 'European' ? 'selected' : ''}>European</option>
+                                                    <option value="Asian" ${cuisineFilter === 'Asian' ? 'selected' : ''}>Asian</option>
+                                                    <option value="Italian" ${cuisineFilter === 'Italian' ? 'selected' : ''}>Italian</option>
+                                                    <option value="Mediterranean" ${cuisineFilter === 'Mediterranean' ? 'selected' : ''}>Mediterranean</option>
+                                                    <option value="American" ${cuisineFilter === 'American' ? 'selected' : ''}>American</option>
+                                                    <option value="Mexican" ${cuisineFilter === 'Mexican' ? 'selected' : ''}>Mexican</option>
+                                                </select>
+                                                <i data-lucide="chevron-down" class="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-sage"></i>
+                                            </div>
+                                        </div>
+
+                                        <div class="space-y-2">
+                                            <label class="block text-[11px] font-bold uppercase tracking-[0.28em] text-sage opacity-80">Quick view</label>
+                                            <button onclick="showFavoritesOnly = !showFavoritesOnly; renderList()" class="flex h-14 w-full items-center justify-between rounded-xl border px-4 text-sm font-semibold shadow-sm transition-all ${showFavoritesOnly ? 'border-forest bg-forest text-white shadow-md' : 'border-sage border-opacity-20 bg-white text-forest hover:border-gold hover:shadow-md'}">
+                                                <span class="flex items-center gap-2">
+                                                    <i data-lucide="heart" class="h-4 w-4 ${showFavoritesOnly ? 'fill-current' : ''}"></i>
+                                                    ${showFavoritesOnly ? 'Favorites only' : 'Show favorites'}
+                                                </span>
+                                                <i data-lucide="chevron-right" class="h-4 w-4 opacity-60"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="rounded-xl border border-accent bg-accent bg-opacity-40 p-4">
+                                        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                            <div>
+                                                <p class="text-[11px] font-bold uppercase tracking-[0.28em] text-sage opacity-80">Diet preferences</p>
+                                                <p class="mt-1 text-sm font-semibold text-sage">Tap one or more filters to narrow the list.</p>
+                                            </div>
+                                            <button onclick="resetRecipeFilters()" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sage border-opacity-20 bg-white px-4 text-xs font-bold uppercase tracking-[0.2em] text-sage shadow-sm transition-all hover:border-gold hover:text-forest">
+                                                <i data-lucide="rotate-ccw" class="h-4 w-4"></i>Reset all
+                                            </button>
+                                        </div>
+
+                                        <div class="mt-4 flex flex-wrap gap-2">
+                                            <button type="button" onclick="toggleDietFilterOption('Vegan')" class="rounded-full border px-4 py-2 text-sm font-bold transition-all ${dietFilter.includes('Vegan') ? 'border-forest bg-forest text-white shadow-sm' : 'border-sage border-opacity-20 bg-white text-sage hover:border-gold hover:text-forest'}">Vegan</button>
+                                            <button type="button" onclick="toggleDietFilterOption('Vegetarian')" class="rounded-full border px-4 py-2 text-sm font-bold transition-all ${dietFilter.includes('Vegetarian') ? 'border-forest bg-forest text-white shadow-sm' : 'border-sage border-opacity-20 bg-white text-sage hover:border-gold hover:text-forest'}">Vegetarian</button>
+                                            <button type="button" onclick="toggleDietFilterOption('Gluten-free')" class="rounded-full border px-4 py-2 text-sm font-bold transition-all ${dietFilter.includes('Gluten-free') ? 'border-forest bg-forest text-white shadow-sm' : 'border-sage border-opacity-20 bg-white text-sage hover:border-gold hover:text-forest'}">Gluten-free</button>
+                                        </div>
+
+                                        ${activeFilters.length > 0 ? `
+                                            <div class="mt-4 flex flex-wrap gap-2 border-t border-sage border-opacity-10 pt-4">
+                                                ${activeFilters.map(filter => `<span class="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-sage shadow-sm border border-parchmentDark">${filter}</span>`).join('')}
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+
+            if (filteredRecipes.length === 0) {
+                html += `
+                    <div class="text-center mt-10 p-8 glass-panel rounded-sm border border-parchmentDark">
+                        <i data-lucide="package-open" class="w-16 h-16 mx-auto mb-4 text-sage opacity-50"></i>
+                        <p class="font-fantasy text-2xl text-forest font-bold mb-2">No recipes found.</p>
+                        <p class="text-sm opacity-80 font-semibold">Try adjusting your search or add a new one!</p>
+                    </div>`;
+            } else {
+                html += '<div class="grid grid-cols-1 gap-6 pb-6 md:grid-cols-2 lg:grid-cols-3">';
+                filteredRecipes.forEach(recipe => {
+                    html += `
+                        <div onclick="renderDetail(${recipe.id})" class="h-full bg-white rounded-md shadow-sm hover:shadow-xl transition-all cursor-pointer border border-parchmentDark group overflow-hidden flex flex-col">
+                            <div class="w-full h-48 bg-cover bg-center" style="background-image: url('${recipe.profile || defaultPlaceholderProfile}')"></div>
+                            <div class="flex flex-1 flex-col p-5">
+                                <div>
+                                    <h3 class="min-h-[4rem] font-fantasy font-bold text-2xl text-forest leading-tight group-hover:text-gold transition-colors">${recipe.title}</h3>
+                                </div>
+                                <p class="text-xs text-sage mt-2 font-semibold flex items-center gap-1"><i data-lucide="user" class="w-3 h-3"></i> ${recipe.author}</p>
+                                <div class="flex min-h-[1.25rem] flex-wrap gap-2 mt-3 text-[10px] font-semibold text-sage">
+                                    ${recipe.prepTime ? `<span class="flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> ${recipe.prepTime}m prep</span>` : ''}
+                                    ${recipe.cookTime ? `<span class="flex items-center gap-1"><i data-lucide="flame" class="w-3 h-3"></i> ${recipe.cookTime}m cook</span>` : ''}
+                                    ${recipe.servings ? `<span class="flex items-center gap-1"><i data-lucide="users" class="w-3 h-3"></i> ${recipe.servings}</span>` : ''}
+                                </div>
+                                <div class="mt-4">
+                                    <div class="flex min-h-[2rem] flex-wrap content-start gap-2">
+                                        <span class="text-[10px] bg-accent text-sage font-bold px-2 py-1 rounded-sm uppercase tracking-wider border border-sage border-opacity-20">${recipe.category || 'Misc'}</span>
+                                        ${recipe.difficulty ? `<span class="text-[10px] bg-gold bg-opacity-20 text-sage font-bold px-2 py-1 rounded-sm">${recipe.difficulty}</span>` : ''}
+                                        ${recipe.country ? `<span class="text-[10px] bg-accent text-sage font-bold px-2 py-1 rounded-sm uppercase tracking-wider border border-sage border-opacity-20">${recipe.country}</span>` : ''}
+                                        ${recipe.source === 'published' ? `<span class="text-[10px] bg-forest bg-opacity-10 text-forest font-bold px-2 py-1 rounded-sm uppercase tracking-wider border border-forest border-opacity-10">Saved</span>` : ''}
+                                    </div>
+                                    <div class="mt-2 flex min-h-[1.5rem] flex-wrap content-start gap-1">
+                                        ${recipe.diet && recipe.diet.length > 0 ? recipe.diet.map(d => `<span class="text-[9px] bg-sage bg-opacity-10 text-sage font-bold px-1.5 py-0.5 rounded">${d}</span>`).join('') : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+            contentDiv.innerHTML = html;
+            lucide.createIcons();
+        }
+
+        async function renderBrowse() {
+            isCookingMode = false;
+            document.getElementById('body').classList.remove('cooking-mode-active');
+            setActiveNav('browse');
+
+            const remoteRecipes = firebaseInitialized ? await loadPublishedRecipes() : [];
+            const normalizedQuery = browseQuery.trim().toLowerCase();
+            const filteredPublishedRecipes = remoteRecipes.filter(recipe => {
+                if (!normalizedQuery) return true;
+                return [recipe.title, recipe.authorName, recipe.author, recipe.cuisine, ...(recipe.ingredients || [])]
+                    .filter(Boolean)
+                    .some(value => value.toLowerCase().includes(normalizedQuery));
+            });
+
+            let html = `
+                <div class="mb-8 overflow-hidden rounded-2xl border border-parchmentDark bg-white shadow-lg">
+                    <div class="border-b border-parchmentDark bg-gradient-to-r from-accent via-white to-parchment px-5 py-5">
+                        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                            <div>
+                                <p class="text-[11px] font-bold uppercase tracking-[0.32em] text-sage opacity-80">Community recipes</p>
+                                <h2 class="font-fantasy text-3xl font-bold text-forest">Browse what everyone is cooking</h2>
+                                <p class="mt-1 text-sm font-semibold text-sage opacity-80">Explore published recipes from all users and save the ones you love into your Index.</p>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <span class="inline-flex items-center gap-2 rounded-full border border-parchmentDark bg-white px-3 py-2 text-xs font-bold text-sage shadow-sm">
+                                    <i data-lucide="globe-2" class="h-4 w-4"></i>${filteredPublishedRecipes.length} published
+                                </span>
+                                <span class="inline-flex items-center gap-2 rounded-full border border-parchmentDark bg-white px-3 py-2 text-xs font-bold text-sage shadow-sm">
+                                    <i data-lucide="heart" class="h-4 w-4"></i>${recipes.filter(recipe => recipe.source === 'published').length} saved
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-5 p-5">
+                        <div class="relative">
+                            <i data-lucide="search" class="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-sage opacity-70"></i>
+                            <input type="text" placeholder="Search by title, author, ingredient, or cuisine..." value="${browseQuery}" oninput="browseQuery = this.value; renderBrowse()" class="w-full h-14 rounded-xl border border-accent bg-parchment px-12 text-base font-semibold text-forest shadow-sm outline-none transition-all focus:border-gold focus:bg-white">
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            if (!firebaseInitialized) {
+                html += `
+                    <div class="text-center mt-10 p-8 glass-panel rounded-sm border border-parchmentDark bg-white">
+                        <i data-lucide="cloud-off" class="w-16 h-16 mx-auto mb-4 text-sage opacity-50"></i>
+                        <p class="font-fantasy text-2xl text-forest font-bold mb-2">Browse needs cloud setup.</p>
+                        <p class="text-sm opacity-80 font-semibold mb-4">Open Settings and connect Firebase to browse published recipes from everyone.</p>
+                        <button onclick="renderSettings()" class="bg-forest text-white h-12 px-6 rounded-sm font-bold hover:bg-sage transition-colors inline-flex items-center gap-2 uppercase tracking-wider text-sm">
+                            <i data-lucide="settings-2" class="w-4 h-4"></i> Open Settings
+                        </button>
+                    </div>
+                `;
+            } else if (filteredPublishedRecipes.length === 0) {
+                html += `
+                    <div class="text-center mt-10 p-8 glass-panel rounded-sm border border-parchmentDark bg-white">
+                        <i data-lucide="chef-hat" class="w-16 h-16 mx-auto mb-4 text-sage opacity-50"></i>
+                        <p class="font-fantasy text-2xl text-forest font-bold mb-2">No published recipes yet.</p>
+                        <p class="text-sm opacity-80 font-semibold">Be the first to publish one from your own collection.</p>
+                    </div>
+                `;
+            } else {
+                html += '<div class="grid grid-cols-1 gap-6 pb-6 md:grid-cols-2 lg:grid-cols-3">';
+                filteredPublishedRecipes.forEach(recipe => {
+                    const saved = isPublishedRecipeSaved(recipe.id);
+                    const owned = isPublishedRecipeOwnedByCurrentUser(recipe);
+                    html += `
+                        <div onclick="renderPublishedRecipeDetail('${recipe.id}')" class="h-full bg-white rounded-md shadow-sm hover:shadow-xl transition-all cursor-pointer border border-parchmentDark group overflow-hidden relative flex flex-col">
+                            <div class="absolute right-4 top-4 z-10">
+                                ${owned ? `
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-sage shadow-md">Yours</span>
+                                ` : `
+                                    <button onclick="event.stopPropagation(); toggleSavedPublishedRecipe('${recipe.id}')" class="w-11 h-11 rounded-full border border-white bg-white ${saved ? 'text-red-500' : 'text-sage'} shadow-md flex items-center justify-center hover:scale-105 transition-all">
+                                        <i data-lucide="heart" class="w-5 h-5 ${saved ? 'fill-current' : ''}"></i>
+                                    </button>
+                                `}
+                            </div>
+                            <div class="w-full h-48 bg-cover bg-center" style="background-image: url('${recipe.profile || defaultPlaceholderProfile}')"></div>
+                            <div class="flex flex-1 flex-col p-5">
+                                <div>
+                                    <h3 class="min-h-[4rem] font-fantasy font-bold text-2xl text-forest leading-tight group-hover:text-gold transition-colors">${recipe.title}</h3>
+                                </div>
+                                <p class="text-xs text-sage mt-2 font-semibold flex items-center gap-1"><i data-lucide="user" class="w-3 h-3"></i> ${recipe.authorName || recipe.author || 'Chef'}</p>
+                                <div class="flex min-h-[1.25rem] flex-wrap gap-2 mt-3 text-[10px] font-semibold text-sage">
+                                    ${recipe.prepTime ? `<span class="flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> ${recipe.prepTime}m prep</span>` : ''}
+                                    ${recipe.cookTime ? `<span class="flex items-center gap-1"><i data-lucide="flame" class="w-3 h-3"></i> ${recipe.cookTime}m cook</span>` : ''}
+                                    ${recipe.servings ? `<span class="flex items-center gap-1"><i data-lucide="users" class="w-3 h-3"></i> ${recipe.servings}</span>` : ''}
+                                </div>
+                                <div class="mt-4">
+                                    <div class="flex min-h-[2rem] flex-wrap content-start gap-2">
+                                        <span class="text-[10px] bg-accent text-sage font-bold px-2 py-1 rounded-sm uppercase tracking-wider border border-sage border-opacity-20">${recipe.category || 'Misc'}</span>
+                                        ${recipe.difficulty ? `<span class="text-[10px] bg-gold bg-opacity-20 text-sage font-bold px-2 py-1 rounded-sm">${recipe.difficulty}</span>` : ''}
+                                        ${recipe.cuisine ? `<span class="text-[10px] bg-accent text-sage font-bold px-2 py-1 rounded-sm uppercase tracking-wider border border-sage border-opacity-20">${recipe.cuisine}</span>` : ''}
+                                    </div>
+                                    <div class="mt-2 flex min-h-[1.5rem] flex-wrap content-start gap-1">
+                                        ${recipe.diet && recipe.diet.length > 0 ? recipe.diet.map(d => `<span class="text-[9px] bg-sage bg-opacity-10 text-sage font-bold px-1.5 py-0.5 rounded">${d}</span>`).join('') : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+
+            contentDiv.innerHTML = html;
+            lucide.createIcons();
+        }
+
+        function renderPublishedRecipeDetail(publishedRecipeId) {
+            const recipe = publishedRecipesCache.find(item => item.id === publishedRecipeId);
+            if (!recipe) {
+                showToast('Recipe not found in Browse', 'alert-circle');
+                renderBrowse();
+                return;
+            }
+
+            setActiveNav('browse');
+
+            const saved = isPublishedRecipeSaved(recipe.id);
+            const owned = isPublishedRecipeOwnedByCurrentUser(recipe);
+            const headerBg = recipe.profile || defaultPlaceholderProfile;
+
+            contentDiv.innerHTML = `
+                <div class="bg-white rounded-sm shadow-sm mb-6 border border-parchmentDark relative w-full overflow-hidden">
+                    <div class="absolute top-4 left-4 right-4 flex justify-between z-10 pointer-events-none">
+                        <button onclick="renderBrowse()" class="pointer-events-auto bg-forest text-white w-14 h-14 flex items-center justify-center rounded-sm shadow-xl hover:bg-sage transition-all hover:scale-105 border-2 border-white"><i data-lucide="arrow-left" class="w-6 h-6"></i></button>
+                        ${owned ? `<span class="pointer-events-auto inline-flex items-center rounded-full bg-white px-4 py-3 text-xs font-bold uppercase tracking-[0.24em] text-sage shadow-xl border border-white">Published by you</span>` : `<button onclick="toggleSavedPublishedRecipe('${recipe.id}', 'detail')" class="pointer-events-auto bg-white ${saved ? 'text-red-500' : 'text-sage'} px-5 h-14 rounded-sm font-bold flex items-center gap-2 shadow-xl hover:bg-accent transition-all border-2 border-white uppercase tracking-wider text-xs"><i data-lucide="heart" class="w-5 h-5 ${saved ? 'fill-current' : ''}"></i>${saved ? 'Saved to Index' : 'Save to Index'}</button>`}
+                    </div>
+
+                    <div class="w-full h-48 md:h-64 relative overflow-hidden bg-forest">
+                        <div class="absolute inset-0 bg-cover bg-center opacity-40 blur-sm scale-110" style="background-image: url('${headerBg}')"></div>
+                        <div class="absolute inset-0 bg-gradient-to-t from-forest to-transparent opacity-80"></div>
+                        <div class="absolute bottom-0 left-0 w-full p-6 md:p-10 flex flex-col md:flex-row items-center md:items-end gap-6 text-center md:text-left">
+                            <div class="w-32 h-32 md:w-40 md:h-40 rounded-sm border-4 border-white shadow-2xl bg-cover bg-center flex-shrink-0 z-10 transform translate-y-12 md:translate-y-16" style="background-image: url('${recipe.profile || defaultPlaceholderProfile}')"></div>
+                            <div class="text-white z-10 pb-2 md:pb-0">
+                                <h2 class="font-fantasy font-bold text-4xl md:text-5xl mb-2 text-shadow-sm drop-shadow-md">${recipe.title}</h2>
+                                <div class="flex items-center justify-center md:justify-start gap-4 text-xs md:text-sm font-bold uppercase tracking-wider opacity-90">
+                                    <span class="flex items-center gap-1"><i data-lucide="user" class="w-4 h-4"></i> ${recipe.authorName || recipe.author || 'Chef'}</span><span>|</span><span class="flex items-center gap-1">${recipe.country || 'Community'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="h-16 md:h-20 w-full bg-white"></div>
+
+                    <div class="p-6 md:p-10">
+                        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8 p-4 bg-accent bg-opacity-30 rounded-md border border-sage border-opacity-10">
+                            ${recipe.prepTime ? `<div class="text-center"><div class="flex justify-center mb-2"><i data-lucide="clock" class="w-5 h-5 text-gold"></i></div><div class="text-xs uppercase font-bold text-sage">Prep</div><div class="text-lg font-bold text-forest">${recipe.prepTime}m</div></div>` : ''}
+                            ${recipe.cookTime ? `<div class="text-center"><div class="flex justify-center mb-2"><i data-lucide="flame" class="w-5 h-5 text-gold"></i></div><div class="text-xs uppercase font-bold text-sage">Cook</div><div class="text-lg font-bold text-forest">${recipe.cookTime}m</div></div>` : ''}
+                            ${recipe.servings ? `<div class="text-center"><div class="flex justify-center mb-2"><i data-lucide="users" class="w-5 h-5 text-gold"></i></div><div class="text-xs uppercase font-bold text-sage">Servings</div><div class="text-lg font-bold text-forest">${recipe.servings}</div></div>` : ''}
+                            ${recipe.difficulty ? `<div class="text-center"><div class="flex justify-center mb-2"><i data-lucide="zap" class="w-5 h-5 text-gold"></i></div><div class="text-xs uppercase font-bold text-sage">Difficulty</div><div class="text-lg font-bold text-forest">${recipe.difficulty}</div></div>` : ''}
+                            ${recipe.cuisine ? `<div class="text-center"><div class="flex justify-center mb-2"><i data-lucide="globe" class="w-5 h-5 text-gold"></i></div><div class="text-xs uppercase font-bold text-sage">Cuisine</div><div class="text-lg font-bold text-forest">${recipe.cuisine}</div></div>` : ''}
+                        </div>
+                        ${recipe.diet && recipe.diet.length > 0 ? `<div class="mb-6 flex flex-wrap gap-2"><span class="text-xs uppercase font-bold text-sage">Diet:</span>${recipe.diet.map(d => `<span class="text-[10px] bg-gold bg-opacity-20 text-sage font-bold px-2 py-1 rounded-sm">${d}</span>`).join('')}</div>` : ''}
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
+                            <div class="md:col-span-1 bg-accent bg-opacity-30 p-6 rounded-md border border-sage border-opacity-10 h-fit">
+                                <h3 class="font-bold font-fantasy text-2xl flex items-center text-forest mb-6 pb-3 border-b border-sage border-opacity-20"><i data-lucide="shopping-basket" class="w-6 h-6 mr-2 text-gold"></i> Ingredients</h3>
+                                <ul class="text-sm space-y-2">
+                                    ${(recipe.ingredients || []).map(ing => `<li class="flex items-center bg-white rounded-md shadow-sm border border-transparent p-3"><span class="text-forest font-semibold text-sm leading-snug">${applyMeasurementSystem(ing)}</span></li>`).join('')}
+                                </ul>
+                            </div>
+
+                            <div class="md:col-span-2">
+                                <h3 class="font-bold font-fantasy text-3xl mb-6 flex items-center text-forest border-b border-accent pb-3"><i data-lucide="list-ordered" class="w-7 h-7 mr-3 text-gold"></i> Instructions</h3>
+                                <ol class="space-y-4">
+                                    ${(recipe.instructions || []).map((step, index) => `
+                                        <li class="flex gap-4 items-start p-4 rounded-md border border-sage border-opacity-10 bg-white">
+                                            <span class="flex items-center justify-center w-8 h-8 rounded-sm bg-sage text-white font-bold text-sm shadow-sm flex-shrink-0">${index + 1}</span>
+                                            <p class="flex-1 text-forest font-medium text-base leading-relaxed pt-1">${applyMeasurementSystem(step)}</p>
+                                        </li>
+                                    `).join('')}
+                                </ol>
+                            </div>
+                        </div>
+
+                        ${recipe.tips ? `
+                            <div class="mt-12 w-full bg-sage bg-opacity-10 p-6 md:p-8 rounded-md border-l-4 border-gold shadow-inner">
+                                <h3 class="font-bold font-fantasy text-2xl mb-4 flex items-center text-forest"><i data-lucide="lightbulb" class="w-6 h-6 mr-2 text-gold"></i> Chef's Notes</h3>
+                                <p class="text-base font-semibold text-forest leading-relaxed">${applyMeasurementSystem(recipe.tips)}</p>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+            lucide.createIcons();
+        }
+
+        async function fetchAIChefSuggestion(recipeId) {
+            const recipe = recipes.find(r => r.id === recipeId);
+            if (!recipe) return;
+
+            const btn = document.getElementById('btn-ai-suggest');
+            const icon = document.getElementById('ai-suggest-icon');
+            const box = document.getElementById('ai-suggestion-box');
+            const text = document.getElementById('ai-suggestion-text');
+
+            icon.classList.remove('lucide-sparkles');
+            icon.classList.add('lucide-loader-2', 'animate-spin');
+            btn.disabled = true;
+
+            const payload = {
+                contents: [{ parts: [{ text: `Act as an expert Chef. Give a short, creative 2-sentence serving suggestion or drink/wine pairing for the recipe "${recipe.title}" which contains these ingredients: ${recipe.ingredients.join(', ')}.` }] }],
+                systemInstruction: { parts: [{ text: "You are a master culinary AI. Keep it brief, inspiring, and professional." }] }
+            };
+
+            try {
+                const response = await fetchGeminiAPI(payload);
+                const suggestion = response.candidates?.[0]?.content?.parts?.[0]?.text || "Enjoy your wonderful meal!";
+                
+                text.textContent = suggestion;
+                box.classList.remove('hidden');
+                btn.classList.add('hidden'); // Hide button after fetching
+            } catch (err) {
+                showToast("The AI Chef is currently busy. Try again later.", "alert-triangle");
+            } finally {
+                icon.classList.remove('lucide-loader-2', 'animate-spin');
+                icon.classList.add('lucide-sparkles');
+                btn.disabled = false;
+                lucide.createIcons();
+            }
+        }
+
+        // --- TIMER FUNCTIONS ---
+        let timerInterval = null;
+        let timerElement = null;
+
+        function startStepTimer(minutes) {
+            if (!Number.isInteger(minutes) || minutes <= 0) {
+                showToast('Enter valid time in minutes', 'alert-circle');
+                return;
+            }
+
+            let secondsLeft = minutes * 60;
+            const modal = document.getElementById('timer-modal');
+            const display = document.getElementById('timer-display');
+            const finalBtn = document.getElementById('timer-final-btn');
+
+            if (modal) modal.classList.remove('hidden', 'opacity-0', 'scale-95');
+
+            function updateDisplay() {
+                const mins = Math.floor(secondsLeft / 60);
+                const secs = secondsLeft % 60;
+                if (display) {
+                    display.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                }
+            }
+
+            updateDisplay();
+
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                secondsLeft--;
+                updateDisplay();
+
+                if (secondsLeft === 0) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                    if (modal) {
+                        modal.classList.add('hidden');
+                    }
+                    showToast('Time\'s up!', 'bell');
+                    
+                    // Play sound if available
+                    try {
+                        const beep = new AudioContext();
+                        const osc = beep.createOscillator();
+                        osc.connect(beep.destination);
+                        osc.frequency.value = 800;
+                        osc.start();
+                        setTimeout(() => osc.stop(), 100);
+                    } catch (e) {}
+                }
+            }, 1000);
+        }
+
+        function closeTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            const modal = document.getElementById('timer-modal');
+            if (modal) modal.classList.add('hidden', 'opacity-0', 'scale-95');
+        }
+
+        // --- FAVORITES & RATINGS ---
+        function toggleFavorite(recipeId) {
+            if (!userSettings.favorites) userSettings.favorites = [];
+            const index = userSettings.favorites.indexOf(recipeId);
+            if (index === -1) {
+                userSettings.favorites.push(recipeId);
+                showToast('Added to favorites!', 'heart');
+            } else {
+                userSettings.favorites.splice(index, 1);
+                showToast('Removed from favorites', 'x-circle');
+            }
+            saveData();
+            const btn = document.getElementById(`fav-btn-${recipeId}`);
+            if (btn) {
+                btn.classList.toggle('text-red-500');
+                btn.classList.toggle('text-sage');
+                lucide.createIcons();
+            }
+        }
+
+        function setRating(recipeId, stars) {
+            if (!userSettings.myRecipeRatings) userSettings.myRecipeRatings = {};
+            userSettings.myRecipeRatings[recipeId] = stars;
+            saveData();
+            updateRatingDisplay(recipeId);
+            showToast(`Rated ${stars} stars!`, 'star');
+        }
+
+        function updateRatingDisplay(recipeId) {
+            const rating = userSettings.myRecipeRatings?.[recipeId] || 0;
+            document.querySelectorAll(`.rating-star-${recipeId}`).forEach((star, idx) => {
+                if (idx < rating) {
+                    star.classList.remove('opacity-30');
+                } else {
+                    star.classList.add('opacity-30');
+                }
+            });
+        }
+        // --- PERSONAL NOTES ---
+        function openNotesEditor(recipeId) {
+            const recipe = recipes.find(r => r.id === recipeId);
+            if (!recipe) return;
+            
+            const currentNotes = recipe.personalNotes || '';
+            const modal = document.getElementById('notes-modal');
+            const textarea = document.getElementById('notes-textarea');
+            const saveBtn = document.getElementById('notes-save-btn');
+            
+            textarea.value = currentNotes;
+            modal.classList.remove('hidden', 'opacity-0', 'scale-95');
+            saveBtn.onclick = () => savePersonalNotes(recipeId);
+        }
+        
+        function closeNotesEditor() {
+            const modal = document.getElementById('notes-modal');
+            modal.classList.add('hidden', 'opacity-0', 'scale-95');
+        }
+        
+        function savePersonalNotes(recipeId) {
+            const recipe = recipes.find(r => r.id === recipeId);
+            if (!recipe) return;
+            
+            const textarea = document.getElementById('notes-textarea');
+            recipe.personalNotes = textarea.value;
+            saveData();
+            closeNotesEditor();
+            showToast('Notes saved!', 'check-circle');
+            const notesSection = document.getElementById(`notes-section-${recipeId}`);
+            if (notesSection) {
+                notesSection.innerHTML = recipe.personalNotes ? `<p class="text-sm text-forest mb-2"><strong>Your notes:</strong> ${recipe.personalNotes}</p>` : '';
+            }
+        }
+        function renderDetail(id) {
+            const recipe = recipes.find(r => r.id === id);
+            if (!recipe) return;
+
+            setActiveNav('index');
+            check12HourReset(recipe);
+            currentScale = 1;
+
+            const headerBg = recipe.profile || defaultPlaceholderProfile;
+            const isSavedCommunityRecipe = recipe.source === 'published';
+            const recipeLocationLabel = isSavedCommunityRecipe ? 'Saved from Browse' : 'Created by you';
+
+            contentDiv.innerHTML = `
+                <div class="bg-white rounded-sm shadow-sm mb-6 border border-parchmentDark relative w-full overflow-hidden">
+                    <div class="absolute top-4 left-4 right-4 flex justify-between z-10 pointer-events-none">
+                        <button onclick="renderList()" class="pointer-events-auto bg-forest text-white w-14 h-14 flex items-center justify-center rounded-sm shadow-xl hover:bg-sage transition-all hover:scale-105 border-2 border-white" translate="no"><i data-lucide="arrow-left" class="w-6 h-6"></i></button>
+                        <button onclick="toggleCookingMode()" class="pointer-events-auto bg-gold text-white px-6 h-14 rounded-sm font-bold flex items-center gap-2 shadow-xl hover:bg-yellow-600 transition-all hover:scale-105 uppercase tracking-wider border-2 border-white" translate="no">
+                            <i id="focus-btn-icon" data-lucide="chef-hat" class="w-5 h-5"></i> <span id="focus-btn-text">Start Cooking</span>
+                        </button>
+                    </div>
+
+                    <div class="w-full h-48 md:h-64 relative overflow-hidden bg-forest">
+                        <div class="absolute inset-0 bg-cover bg-center opacity-40 blur-sm scale-110" style="background-image: url('${headerBg}')"></div>
+                        <div class="absolute inset-0 bg-gradient-to-t from-forest to-transparent opacity-80"></div>
+                        <div class="absolute bottom-0 left-0 w-full p-6 md:p-10 flex flex-col md:flex-row items-center md:items-end gap-6 text-center md:text-left">
+                            <div class="w-32 h-32 md:w-40 md:h-40 rounded-sm border-4 border-white shadow-2xl bg-cover bg-center flex-shrink-0 z-10 transform translate-y-12 md:translate-y-16" style="background-image: url('${headerBg}')"></div>
+                            <div class="text-white z-10 pb-2 md:pb-0">
+                                <p class="text-[11px] font-bold uppercase tracking-[0.32em] opacity-80">${recipeLocationLabel}</p>
+                                <h2 class="font-fantasy font-bold text-4xl md:text-5xl mb-2 text-shadow-sm drop-shadow-md">${recipe.title}</h2>
+                                <div class="flex items-center justify-center md:justify-start gap-4 text-xs md:text-sm font-bold uppercase tracking-wider opacity-90 flex-wrap">
+                                    <span class="flex items-center gap-1"><i data-lucide="user" class="w-4 h-4"></i> ${recipe.author}</span>
+                                    <span>|</span>
+                                    <span class="flex items-center gap-1"><i data-lucide="map-pinned" class="w-4 h-4"></i> ${recipe.country || 'Unknown'}</span>
+                                    ${recipe.publishedId ? `<span>|</span><span class="flex items-center gap-1"><i data-lucide="heart" class="w-4 h-4"></i> Community save</span>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="h-16 md:h-20 w-full bg-white"></div>
+
+                    <div class="p-6 md:p-10">
+                        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8 p-4 bg-accent bg-opacity-30 rounded-md border border-sage border-opacity-10">
+                            ${recipe.prepTime ? `<div class="text-center"><div class="flex justify-center mb-2"><i data-lucide="clock" class="w-5 h-5 text-gold"></i></div><div class="text-xs uppercase font-bold text-sage">Prep</div><div class="text-lg font-bold text-forest">${recipe.prepTime}m</div></div>` : ''}
+                            ${recipe.cookTime ? `<div class="text-center"><div class="flex justify-center mb-2"><i data-lucide="flame" class="w-5 h-5 text-gold"></i></div><div class="text-xs uppercase font-bold text-sage">Cook</div><div class="text-lg font-bold text-forest">${recipe.cookTime}m</div></div>` : ''}
+                            ${recipe.servings ? `<div class="text-center"><div class="flex justify-center mb-2"><i data-lucide="users" class="w-5 h-5 text-gold"></i></div><div class="text-xs uppercase font-bold text-sage">Servings</div><div class="text-lg font-bold text-forest">${recipe.servings}</div></div>` : ''}
+                            ${recipe.difficulty ? `<div class="text-center"><div class="flex justify-center mb-2"><i data-lucide="zap" class="w-5 h-5 text-gold"></i></div><div class="text-xs uppercase font-bold text-sage">Difficulty</div><div class="text-lg font-bold text-forest">${recipe.difficulty}</div></div>` : ''}
+                            ${recipe.cuisine ? `<div class="text-center"><div class="flex justify-center mb-2"><i data-lucide="globe" class="w-5 h-5 text-gold"></i></div><div class="text-xs uppercase font-bold text-sage">Cuisine</div><div class="text-lg font-bold text-forest">${recipe.cuisine}</div></div>` : ''}
+                        </div>
+
+                        <div class="mb-8 flex flex-wrap items-center gap-2">
+                            <span class="text-[10px] bg-white text-sage font-bold px-2.5 py-1.5 rounded-sm uppercase tracking-[0.24em] border border-parchmentDark">${recipe.category || 'Recipe'}</span>
+                            ${recipe.diet && recipe.diet.length > 0 ? recipe.diet.map(d => `<span class="text-[10px] bg-gold bg-opacity-20 text-sage font-bold px-2.5 py-1.5 rounded-sm uppercase tracking-[0.16em]">${d}</span>`).join('') : ''}
+                            ${recipe.publishedId ? `<span class="text-[10px] bg-forest bg-opacity-10 text-forest font-bold px-2.5 py-1.5 rounded-sm uppercase tracking-[0.16em] border border-forest border-opacity-10">Saved community recipe</span>` : ''}
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
+                            <div class="md:col-span-1 bg-accent bg-opacity-30 p-6 rounded-md border border-sage border-opacity-10 h-fit">
+                                <div class="flex justify-between items-center mb-6 pb-3 border-b border-sage border-opacity-20 gap-4">
+                                    <h3 class="font-bold font-fantasy text-2xl flex items-center text-forest"><i data-lucide="shopping-basket" class="w-6 h-6 mr-2 text-gold"></i> Ingredients</h3>
+                                    <div class="flex items-center bg-white rounded-sm shadow-sm border border-parchmentDark h-10" translate="no">
+                                        <button onclick="updateScale(-0.5, ${recipe.id})" class="w-8 h-full flex items-center justify-center text-sage hover:text-forest font-bold">-</button>
+                                        <span id="scale-display" class="font-bold text-forest text-sm min-w-[3rem] text-center border-x border-parchmentDark h-full flex items-center justify-center">${currentScale}x</span>
+                                        <button onclick="updateScale(0.5, ${recipe.id})" class="w-8 h-full flex items-center justify-center text-sage hover:text-forest font-bold">+</button>
+                                    </div>
+                                </div>
+                                <ul id="ingredients-list" class="text-sm space-y-2">
+                                    ${generateIngredientsHTML(recipe)}
+                                </ul>
+                            </div>
+
+                            <div class="md:col-span-2">
+                                <h3 class="font-bold font-fantasy text-3xl mb-6 flex items-center text-forest border-b border-accent pb-3"><i data-lucide="list-ordered" class="w-7 h-7 mr-3 text-gold"></i> Instructions</h3>
+                                <ol class="space-y-4">
+                                    ${(recipe.instructions || []).map((step, index) => {
+                                        const isChecked = recipe.checkedSteps?.includes(index);
+                                        const checkedClass = isChecked ? 'line-through opacity-40' : '';
+                                        const iconClass = isChecked ? '' : 'opacity-0';
+                                        const finalStep = applyMeasurementSystem(step);
+
+                                        return `
+                                            <li class="flex gap-4 items-start p-4 rounded-md transition-all duration-300 hover:bg-accent hover:bg-opacity-30 border border-transparent hover:border-sage hover:border-opacity-20 ${checkedClass} group">
+                                                <div class="flex-shrink-0 relative">
+                                                    <span onclick="toggleItemCheck(${recipe.id}, 'step', ${index}, this.closest('li'))" class="flex items-center justify-center w-8 h-8 rounded-sm bg-sage text-white font-bold text-sm shadow-sm cursor-pointer hover:bg-forest transition-colors">${index + 1}</span>
+                                                    <div class="absolute -top-1 -right-1 bg-gold rounded-full p-0.5 text-white shadow-sm check-icon transition-opacity ${iconClass}"><i data-lucide="check" class="w-3 h-3"></i></div>
+                                                </div>
+                                                <p onclick="toggleItemCheck(${recipe.id}, 'step', ${index}, this.closest('li'))" class="flex-1 text-forest font-medium text-base leading-relaxed pt-1 cursor-pointer">${finalStep}</p>
+                                                <button type="button" onclick="const mins = prompt('Timer (minutes):', '5'); if (mins) startStepTimer(parseInt(mins, 10))" class="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-gold hover:text-sage p-2" title="Start timer">
+                                                    <i data-lucide="timer" class="w-5 h-5"></i>
+                                                </button>
+                                            </li>
+                                        `;
+                                    }).join('')}
+                                </ol>
+                            </div>
+                        </div>
+
+                        ${recipe.tips ? `
+                            <div class="mt-12 w-full bg-sage bg-opacity-10 p-6 md:p-8 rounded-md border-l-4 border-gold shadow-inner">
+                                <h3 class="font-bold font-fantasy text-2xl mb-4 flex items-center text-forest"><i data-lucide="lightbulb" class="w-6 h-6 mr-2 text-gold"></i> Chef's Notes & Secrets</h3>
+                                <p class="text-base font-semibold text-forest leading-relaxed">${applyMeasurementSystem(recipe.tips)}</p>
+                            </div>
+                        ` : ''}
+
+                        <div id="ai-suggestion-box" class="mt-8 bg-gradient-to-r from-accent to-parchment p-6 md:p-8 rounded-md border border-gold shadow-sm hidden">
+                            <h3 class="font-bold font-fantasy text-2xl mb-2 flex items-center text-forest">
+                                <i data-lucide="sparkles" class="w-6 h-6 mr-2 text-gold"></i> AI Chef's Suggestion
+                            </h3>
+                            <p id="ai-suggestion-text" class="text-base font-semibold text-forest leading-relaxed"></p>
+                        </div>
+
+                        <div class="mt-12 flex flex-col md:flex-row justify-center items-stretch md:items-center border-t border-accent pt-8 gap-4">
+                            <button onclick="shareRecipe(${recipe.id})" class="bg-forest text-white h-12 px-8 rounded-sm font-bold shadow-md hover:bg-sage transition-colors flex items-center justify-center gap-2 text-sm uppercase tracking-wider w-full md:w-auto" translate="no">
+                                <i data-lucide="share-2" class="w-4 h-4"></i> Share Recipe
+                            </button>
+                            <button onclick="exportRecipeAsPDF(${recipe.id})" class="bg-gold text-white h-12 px-8 rounded-sm font-bold shadow-md hover:bg-yellow-600 transition-colors flex items-center justify-center gap-2 text-sm uppercase tracking-wider w-full md:w-auto" translate="no">
+                                <i data-lucide="download" class="w-4 h-4"></i> Export PDF
+                            </button>
+                            ${isSavedCommunityRecipe ? '' : `
+                                <button onclick="publishRecipe(${recipe.id})" class="bg-forest text-white h-12 px-8 rounded-sm font-bold shadow-md hover:bg-sage transition-colors flex items-center justify-center gap-2 text-sm uppercase tracking-wider w-full md:w-auto" translate="no">
+                                    <i data-lucide="cloud-upload" class="w-4 h-4"></i> Publish
+                                </button>
+                            `}
+                            <button id="btn-ai-suggest" onclick="fetchAIChefSuggestion(${recipe.id})" class="bg-gold text-white h-12 px-8 rounded-sm font-bold shadow-md hover:bg-yellow-600 transition-colors flex items-center justify-center gap-2 text-sm uppercase tracking-wider w-full md:w-auto" translate="no">
+                                <i id="ai-suggest-icon" data-lucide="sparkles" class="w-4 h-4"></i> AI Pairing ✨
+                            </button>
+                        </div>
+
+                        <div class="mt-12 p-6 bg-accent bg-opacity-20 rounded-md border border-sage border-opacity-10 flex flex-col md:flex-row items-center justify-between gap-4">
+                            <div class="flex items-center gap-4">
+                                <button id="fav-btn-${recipe.id}" onclick="toggleFavorite(${recipe.id})" class="flex items-center gap-2 text-sage hover:text-red-500 transition-colors p-3 hover:bg-white rounded-md ${userSettings.favorites?.includes(recipe.id) ? 'text-red-500' : ''}">
+                                    <i data-lucide="heart" class="w-6 h-6"></i>
+                                    <span class="font-bold">Favorite</span>
+                                </button>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <span class="text-xs uppercase font-bold text-sage mr-2">Your Rating:</span>
+                                ${[1, 2, 3, 4, 5].map(star => `<button type="button" onclick="setRating(${recipe.id}, ${star})" class="rating-star-${recipe.id} transition-all hover:scale-110 ${(userSettings.myRecipeRatings?.[recipe.id] || 0) >= star ? 'opacity-100' : 'opacity-30'}"><i data-lucide="star" class="w-5 h-5 text-gold fill-current"></i></button>`).join('')}
+                            </div>
+                        </div>
+
+                        <div class="mt-8 p-6 bg-sage bg-opacity-5 rounded-md border border-sage border-opacity-10">
+                            <div class="flex items-center justify-between mb-3">
+                                <h3 class="font-bold font-fantasy text-lg flex items-center text-forest"><i data-lucide="sticky-note" class="w-5 h-5 mr-2 text-gold"></i> Your Notes</h3>
+                                <button onclick="openNotesEditor(${recipe.id})" class="text-sage hover:text-gold transition-colors p-2">
+                                    <i data-lucide="edit" class="w-5 h-5"></i>
+                                </button>
+                            </div>
+                            <div id="notes-section-${recipe.id}">
+                                ${recipe.personalNotes ? `<p class="text-sm text-forest">${recipe.personalNotes}</p>` : '<p class="text-xs text-sage italic">Click edit to add your personal notes and modifications...</p>'}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="timer-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden opacity-0 scale-95 transition-all duration-300 flex items-center justify-center z-50" translate="no">
+                        <div class="bg-white rounded-md shadow-2xl p-8 text-center max-w-sm mx-4">
+                            <h2 class="font-fantasy font-bold text-3xl text-forest mb-4">Timer</h2>
+                            <div class="bg-gold bg-opacity-10 p-8 rounded-md mb-6 border border-gold">
+                                <div id="timer-display" class="text-6xl font-bold text-forest font-mono">00:00</div>
+                            </div>
+                            <div class="flex gap-4">
+                                <button onclick="closeTimer()" class="flex-1 bg-forest text-white h-12 rounded-sm font-bold hover:bg-sage transition-colors">
+                                    <i data-lucide="x" class="w-4 h-4 inline mr-2"></i>Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            lucide.createIcons();
+        }
+
+        function updateScale(amount, recipeId) {
+            currentScale += amount;
+            if (currentScale < 0.25) currentScale = 0.25; 
+            if (currentScale > 10) currentScale = 10;    
+            const recipe = recipes.find(r => r.id === recipeId);
+            document.getElementById('ingredients-list').innerHTML = generateIngredientsHTML(recipe);
+            document.getElementById('scale-display').textContent = `${currentScale}x`;
+            lucide.createIcons();
+        }
+
+        function generateIngredientsHTML(recipe) {
+            return recipe.ingredients.map((ing, index) => {
+                const scaledIng = ing.replace(/(\d+[\.,]?\d*)/g, (match) => {
+                    const num = parseFloat(match.replace(',', '.'));
+                    let result = (num * currentScale);
+                    return (result % 1 === 0 ? result : result.toFixed(1)).toString().replace('.', ',');
+                });
+                const finalIng = applyMeasurementSystem(scaledIng);
+                const isChecked = recipe.checkedIngredients?.includes(index);
+                const checkedClass = isChecked ? 'line-through opacity-40' : '';
+                const iconClass = isChecked ? '' : 'opacity-0';
+
+                return `
+                    <li onclick="toggleItemCheck(${recipe.id}, 'ingredient', ${index}, this)" class="flex items-center cursor-pointer transition-all duration-300 p-3 bg-white rounded-md shadow-sm border border-transparent hover:border-sage ${checkedClass}">
+                        <div class="w-6 h-6 rounded-sm border-2 border-gold flex items-center justify-center mr-3 flex-shrink-0 text-gold transition-colors bg-white">
+                            <i data-lucide="check" class="check-icon w-4 h-4 transition-opacity ${iconClass}"></i>
+                        </div>
+                        <span class="text-forest font-semibold text-sm leading-snug">${finalIng}</span>
+                    </li>
+                `;
+            }).join('');
+        }
+
+        async function triggerMagicGenerator() {
+            const input = document.getElementById('ai-ingredients-input').value;
+            if (!input.trim()) {
+                showToast("Please enter some ingredients first!", "alert-circle");
+                return;
+            }
+
+            const btn = document.getElementById('btn-magic-generate');
+            const loader = document.getElementById('ai-loading');
+            
+            btn.disabled = true;
+            btn.classList.add('opacity-50');
+            loader.classList.remove('hidden');
+
+            const payload = {
+                contents: [{ parts: [{ text: `Generate a recipe using these ingredients: ${input}. Keep the language strictly in English. Return valid JSON.` }] }],
+                systemInstruction: { parts: [{ text: "You are an expert Chef. Create a realistic, tasty recipe from the provided ingredients." }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            title: { type: "STRING", description: "Creative recipe title" },
+                            category: { type: "STRING", description: "Either: Cooking, Baking, Dessert, Drink" },
+                            country: { type: "STRING", description: "Country of origin, e.g. Italy, France, USA" },
+                            prepTime: { type: "INTEGER", description: "Preparation time in minutes" },
+                            cookTime: { type: "INTEGER", description: "Cooking time in minutes" },
+                            servings: { type: "INTEGER", description: "Number of servings, usually 4" },
+                            difficulty: { type: "STRING", description: "Either: Easy, Medium, Hard" },
+                            cuisine: { type: "STRING", description: "Cuisine type, e.g. Italian, Asian, Mediterranean" },
+                            diet: { type: "ARRAY", items: { type: "STRING" }, description: "Applicable diet tags from: Vegan, Vegetarian, Gluten-free" },
+                            ingredients: { type: "ARRAY", items: { type: "STRING" } },
+                            instructions: { type: "ARRAY", items: { type: "STRING" } },
+                            tips: { type: "STRING" }
+                        }
+                    }
+                }
+            };
+
+            try {
+                const response = await fetchGeminiAPI(payload);
+                const jsonText = response.candidates?.[0]?.content?.parts?.[0]?.text;
+                const recipeData = JSON.parse(jsonText);
+
+                document.getElementById('r-title').value = recipeData.title || "";
+                
+                // Ensure valid category
+                const catElement = document.getElementById('r-category');
+                const validCategories = Array.from(catElement.options).map(o => o.value);
+                if(validCategories.includes(recipeData.category)) {
+                    catElement.value = recipeData.category;
+                }
+
+                if(recipeData.country) {
+                    document.getElementById('r-country').value = recipeData.country;
+                }
+
+                applyRecipeDetailFields(recipeData);
+
+                document.getElementById('r-tips').value = recipeData.tips || "";
+
+                draftIngredients = recipeData.ingredients || [];
+                draftSteps = recipeData.instructions || [];
+
+                renderDraftIngredients();
+                renderDraftSteps();
+                
+                showToast("✨ Magic Recipe Generated!", "sparkles");
+            } catch (err) {
+                console.error(err);
+                showToast("AI Chef failed to generate recipe. Try again.", "alert-triangle");
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50');
+                loader.classList.add('hidden');
+            }
+        }
+
+        function renderAddForm() {
+            isCookingMode = false;
+            document.getElementById('body').classList.remove('cooking-mode-active');
+            setActiveNav('add');
+            draftIngredients = [];
+            draftSteps = [];
+            draftProfile = null;
+
+            contentDiv.innerHTML = `
+                <div class="bg-white p-6 md:p-10 rounded-sm shadow-sm mb-6 border border-parchmentDark max-w-4xl mx-auto">
+                    
+                    <!-- AI MAGIC GENERATOR FEATURE ✨ -->
+                    <div class="bg-gradient-to-r from-accent to-gold/20 p-6 rounded-md border border-gold mb-10 shadow-sm relative overflow-hidden" translate="no">
+                        <div class="absolute -right-4 -top-4 text-6xl opacity-10 pointer-events-none">✨</div>
+                        <h3 class="font-fantasy font-bold text-2xl text-forest mb-2 flex items-center gap-2">
+                            <i data-lucide="sparkles" class="w-6 h-6 text-gold"></i> AI Magic Generator
+                        </h3>
+                        <p class="text-sm text-forest mb-4 font-semibold">Empty fridge? Tell us what ingredients you have, and our AI Chef will create a complete recipe for you!</p>
+                        <div class="flex flex-col md:flex-row gap-2">
+                            <input type="text" id="ai-ingredients-input" placeholder="e.g., chicken, broccoli, rice..." class="${inputClass} flex-1 !border-gold/50">
+                            <button type="button" onclick="triggerMagicGenerator()" id="btn-magic-generate" class="bg-forest text-white h-12 px-6 rounded-sm font-bold shadow-md hover:bg-sage transition-colors flex items-center justify-center gap-2 whitespace-nowrap uppercase tracking-wider text-xs">
+                                <span>Generate Recipe</span> <i data-lucide="sparkles" class="w-4 h-4 text-gold"></i>
+                            </button>
+                        </div>
+                        <div id="ai-loading" class="hidden mt-4 text-sm font-bold text-sage flex items-center gap-2">
+                            <i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> The AI Chef is thinking...
+                        </div>
+                    </div>
+
+                    <h2 class="font-fantasy font-bold text-3xl mb-8 text-forest border-b border-accent pb-4 flex items-center gap-2"><i data-lucide="file-plus-2" class="w-8 h-8 text-gold"></i> Create Recipe</h2>
+                    
+                    <form id="add-recipe-form" class="space-y-8" onsubmit="saveRecipe(event)">
+                        <div class="flex flex-col items-center mb-8 bg-accent bg-opacity-30 p-6 rounded-md border border-sage border-opacity-10">
+                            <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-4">Meal Presentation Photo</label>
+                            <label class="custom-file-upload">
+                                <input type="file" accept="image/*" onchange="handleImageUpload(event, 'profile-preview', 'draftProfile', false)">
+                                <div id="profile-preview" class="w-40 h-40 border-2 border-dashed border-sage rounded-sm flex flex-col items-center justify-center bg-white hover:bg-accent transition-colors bg-cover bg-center text-sage shadow-inner">
+                                    <i data-lucide="camera" class="w-8 h-8 mb-2"></i><span class="text-xs font-bold uppercase tracking-wider">Upload</span>
+                                </div>
+                            </label>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-accent bg-opacity-30 rounded-md border border-sage border-opacity-10">
+                            <div class="md:col-span-2"><label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Recipe Title</label><input type="text" id="r-title" required class="${inputClass}"></div>
+                            <div><label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Author</label><input type="text" id="r-author" value="${userSettings.name}" class="${inputClass}"></div>
+                            <div>
+                                <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Category</label>
+                                <select id="r-category" required class="${inputClass}">
+                                    <option value="Cooking">Cooking</option><option value="Baking">Baking</option>
+                                    <option value="Dessert">Dessert</option><option value="Drink">Drink</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Country / Origin</label>
+                                <input type="text" id="r-country" list="countries-list" placeholder="Typ of selecteer een land..." value="${userSettings.country}" class="${inputClass}">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div>
+                                <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-3 flex items-center gap-2 border-b border-accent pb-2"><i data-lucide="shopping-basket" class="w-4 h-4"></i> Ingredients</label>
+                                <ul id="draft-ingredients-list" class="mb-3 space-y-2"></ul>
+                                <div class="flex gap-2">
+                                    <input type="text" id="new-ingredient" placeholder="e.g. 500g Flour" onkeypress="if(event.key === 'Enter') { event.preventDefault(); addDraftIngredient(); }" class="${inputClass} flex-1">
+                                    <button type="button" onclick="addDraftIngredient()" class="bg-sage text-white w-12 h-12 rounded-sm font-bold flex items-center justify-center hover:bg-forest transition-colors shadow-sm"><i data-lucide="plus" class="w-5 h-5"></i></button>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-3 flex items-center gap-2 border-b border-accent pb-2"><i data-lucide="list-ordered" class="w-4 h-4"></i> Instructions</label>
+                                <ul id="draft-steps-list" class="mb-3 space-y-2"></ul>
+                                <div class="flex gap-2 items-start">
+                                    <textarea id="new-step" placeholder="Describe the next step..." class="${textareaClass} flex-1 !min-h-[48px] !h-12 py-3"></textarea>
+                                    <button type="button" onclick="addDraftStep()" class="bg-sage text-white w-12 h-12 rounded-sm font-bold flex items-center justify-center hover:bg-forest transition-colors shadow-sm"><i data-lucide="plus" class="w-5 h-5"></i></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div><label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2 flex items-center gap-2"><i data-lucide="lightbulb" class="w-4 h-4"></i> Chef's Notes</label><textarea id="r-tips" placeholder="Secret ingredient..." class="${textareaClass}"></textarea></div>
+
+                        <div class="rounded-md border border-sage border-opacity-10 bg-accent bg-opacity-20 overflow-hidden">
+                            <button type="button" onclick="toggleRecipeDetails()" class="w-full flex items-center justify-between gap-4 p-5 text-left hover:bg-white hover:bg-opacity-50 transition-colors">
+                                <div>
+                                    <p id="recipe-details-toggle-label" class="text-sm font-bold uppercase tracking-[0.24em] text-sage">Details</p>
+                                    <p id="recipe-details-toggle-hint" class="mt-1 text-sm font-semibold text-forest opacity-80">Optional metadata for timing, cuisine, servings and diet.</p>
+                                </div>
+                                <div class="flex items-center gap-3 text-sage">
+                                    <span class="hidden md:inline text-xs font-bold uppercase tracking-[0.24em] opacity-70">Auto-fill ready</span>
+                                    <i id="recipe-details-toggle-icon" data-lucide="chevron-down" class="w-5 h-5 transition-transform duration-200"></i>
+                                </div>
+                            </button>
+
+                            <div id="recipe-details-panel" class="hidden border-t border-sage border-opacity-10 p-5 md:p-6 space-y-6 bg-white bg-opacity-70">
+                                <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                    <div>
+                                        <p class="text-xs font-bold uppercase tracking-[0.24em] text-sage">Recipe Details</p>
+                                        <p class="mt-1 text-sm font-semibold text-forest opacity-80">Let AI estimate the details from your ingredients, instructions and chef's notes, then fine-tune anything yourself.</p>
+                                    </div>
+                                    <button type="button" id="btn-autofill-details" onclick="autoFillRecipeDetails()" class="bg-forest text-white h-11 px-5 rounded-sm font-bold shadow-md hover:bg-sage transition-colors flex items-center justify-center gap-2 uppercase tracking-wider text-xs whitespace-nowrap">
+                                        <i id="autofill-details-icon" data-lucide="sparkles" class="w-4 h-4 text-gold"></i> Auto-fill
+                                    </button>
+                                </div>
+
+                                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                    <div>
+                                        <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Prep Time (min)</label>
+                                        <input type="number" id="r-prepTime" min="0" max="1440" placeholder="15" class="${inputClass}">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Cook Time (min)</label>
+                                        <input type="number" id="r-cookTime" min="0" max="1440" placeholder="30" class="${inputClass}">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Servings</label>
+                                        <input type="number" id="r-servings" min="1" max="20" value="4" class="${inputClass}">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Difficulty</label>
+                                        <select id="r-difficulty" class="${inputClass}">
+                                            <option value="">Select</option>
+                                            <option value="Easy">Easy</option>
+                                            <option value="Medium">Medium</option>
+                                            <option value="Hard">Hard</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Cuisine Type</label>
+                                        <input type="text" id="r-cuisine" placeholder="e.g. Italian, Asian..." class="${inputClass}">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Diet Options</label>
+                                        <div class="space-y-2 text-sm">
+                                            <label class="flex items-center gap-2 cursor-pointer">
+                                                <input type="checkbox" class="diet-checkbox" value="Vegan"> Vegan
+                                            </label>
+                                            <label class="flex items-center gap-2 cursor-pointer">
+                                                <input type="checkbox" class="diet-checkbox" value="Vegetarian"> Vegetarian
+                                            </label>
+                                            <label class="flex items-center gap-2 cursor-pointer">
+                                                <input type="checkbox" class="diet-checkbox" value="Gluten-free"> Gluten-free
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <p class="text-xs text-sage font-semibold italic">AI suggestions are only a starting point. Every field stays fully editable before you save.</p>
+                            </div>
+                        </div>
+
+                        <div class="pt-8 flex justify-between items-center border-t border-accent mt-4">
+                            <button type="button" onclick="renderList()" class="h-12 px-6 text-sage hover:text-forest font-bold transition-colors text-sm uppercase tracking-wider" translate="no">Cancel</button>
+                            <button type="submit" class="bg-gold text-white h-12 px-8 rounded-sm font-bold shadow-md hover:bg-yellow-600 transition-colors flex items-center justify-center gap-2 uppercase tracking-wider text-sm min-w-[150px]" translate="no"><i data-lucide="save" class="w-4 h-4"></i> Save</button>
+                        </div>
+                    </form>
+                </div>
+                <datalist id="countries-list">${countriesList.map(c => `<option value="${c}"></option>`).join('')}</datalist>
+            `;
+            lucide.createIcons();
+            renderDraftIngredients();
+            renderDraftSteps();
+        }
+
+        function addDraftIngredient() {
+            const input = document.getElementById('new-ingredient');
+            if(input.value.trim() === '') return;
+            draftIngredients.push(input.value.trim());
+            input.value = '';
+            renderDraftIngredients();
+        }
+
+        function removeDraftIngredient(index) { draftIngredients.splice(index, 1); renderDraftIngredients(); }
+
+        function renderDraftIngredients() {
+            document.getElementById('draft-ingredients-list').innerHTML = draftIngredients.map((ing, i) => `
+                <li class="flex justify-between items-center bg-white min-h-[48px] px-4 rounded-sm border border-parchmentDark shadow-sm text-sm font-semibold text-forest">
+                    <span class="flex items-center gap-2"><div class="w-1.5 h-1.5 bg-gold rounded-full"></div> ${ing}</span>
+                    <button type="button" onclick="removeDraftIngredient(${i})" class="text-red-400 hover:text-red-600 p-2"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                </li>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function setRecipeDetailsVisibility(isVisible) {
+            const panel = document.getElementById('recipe-details-panel');
+            const label = document.getElementById('recipe-details-toggle-label');
+            const hint = document.getElementById('recipe-details-toggle-hint');
+            const icon = document.getElementById('recipe-details-toggle-icon');
+
+            if (!panel || !label || !hint || !icon) return;
+
+            panel.classList.toggle('hidden', !isVisible);
+            label.textContent = isVisible ? 'Hide Details' : 'Details';
+            hint.textContent = isVisible ? 'Optional metadata, all editable below.' : 'Optional metadata for timing, cuisine, servings and diet.';
+            icon.classList.toggle('rotate-180', isVisible);
+        }
+
+        function toggleRecipeDetails() {
+            const panel = document.getElementById('recipe-details-panel');
+            if (!panel) return;
+            setRecipeDetailsVisibility(panel.classList.contains('hidden'));
+        }
+
+        function applyRecipeDetailFields(recipeData) {
+            if (recipeData.prepTime !== undefined && recipeData.prepTime !== null) {
+                document.getElementById('r-prepTime').value = recipeData.prepTime;
+            }
+            if (recipeData.cookTime !== undefined && recipeData.cookTime !== null) {
+                document.getElementById('r-cookTime').value = recipeData.cookTime;
+            }
+            if (recipeData.servings !== undefined && recipeData.servings !== null) {
+                document.getElementById('r-servings').value = recipeData.servings;
+            }
+            if (recipeData.difficulty) {
+                const difficultyElement = document.getElementById('r-difficulty');
+                const validDifficulties = Array.from(difficultyElement.options).map(option => option.value);
+                if (validDifficulties.includes(recipeData.difficulty)) difficultyElement.value = recipeData.difficulty;
+            }
+            if (recipeData.cuisine) {
+                document.getElementById('r-cuisine').value = recipeData.cuisine;
+            }
+            if (Array.isArray(recipeData.diet)) {
+                document.querySelectorAll('.diet-checkbox').forEach(checkbox => {
+                    checkbox.checked = recipeData.diet.includes(checkbox.value);
+                });
+            }
+            setRecipeDetailsVisibility(true);
+        }
+
+        async function autoFillRecipeDetails() {
+            if (draftIngredients.length === 0) {
+                showToast('Add ingredients first so AI has something to work with.', 'alert-circle');
+                return;
+            }
+
+            if (draftSteps.length === 0) {
+                showToast('Add at least one instruction so AI can estimate the details.', 'alert-circle');
+                return;
+            }
+
+            const btn = document.getElementById('btn-autofill-details');
+            const icon = document.getElementById('autofill-details-icon');
+            const notes = document.getElementById('r-tips').value.trim();
+            const title = document.getElementById('r-title').value.trim();
+
+            btn.disabled = true;
+            btn.classList.add('opacity-60');
+            if (icon) icon.classList.add('animate-spin');
+
+            const payload = {
+                contents: [{ parts: [{ text: `Infer recipe details from this draft recipe.\nTitle: ${title || 'Untitled recipe'}\nIngredients: ${draftIngredients.join(', ')}\nInstructions: ${draftSteps.join(' | ')}\nChef notes: ${notes || 'None provided'}\nReturn practical, user-editable estimates.` }] }],
+                systemInstruction: { parts: [{ text: 'You are an expert chef. Infer reasonable recipe metadata from the provided draft. Use only these difficulty values: Easy, Medium, Hard. Use only these diet values when applicable: Vegan, Vegetarian, Gluten-free. If a diet value does not apply, omit it.' }] },
+                generationConfig: {
+                    responseMimeType: 'application/json',
+                    responseSchema: {
+                        type: 'OBJECT',
+                        properties: {
+                            prepTime: { type: 'INTEGER', description: 'Preparation time in minutes' },
+                            cookTime: { type: 'INTEGER', description: 'Cooking time in minutes' },
+                            servings: { type: 'INTEGER', description: 'Estimated number of servings' },
+                            difficulty: { type: 'STRING', description: 'Either Easy, Medium, or Hard' },
+                            cuisine: { type: 'STRING', description: 'Cuisine type such as Italian, Asian, Mediterranean, American, Mexican, European' },
+                            diet: { type: 'ARRAY', items: { type: 'STRING' } }
+                        }
+                    }
+                }
+            };
+
+            try {
+                const response = await fetchGeminiAPI(payload);
+                const jsonText = response.candidates?.[0]?.content?.parts?.[0]?.text;
+                const details = JSON.parse(jsonText);
+                applyRecipeDetailFields(details);
+                showToast('AI filled the details. You can tweak everything before saving.', 'sparkles');
+            } catch (error) {
+                console.error(error);
+                showToast('AI could not infer the details right now. Try again.', 'alert-triangle');
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-60');
+                if (icon) icon.classList.remove('animate-spin');
+            }
+        }
+
+        function addDraftStep() {
+            const input = document.getElementById('new-step');
+            if(input.value.trim() === '') return;
+            draftSteps.push(input.value.trim());
+            input.value = '';
+            renderDraftSteps();
+        }
+
+        function removeDraftStep(index) { draftSteps.splice(index, 1); renderDraftSteps(); }
+
+        function renderDraftSteps() {
+            document.getElementById('draft-steps-list').innerHTML = draftSteps.map((step, i) => `
+                <li class="flex justify-between items-start bg-white p-3 rounded-sm border border-parchmentDark shadow-sm text-sm font-medium text-forest gap-3">
+                    <span class="bg-sage text-white w-6 h-6 flex items-center justify-center rounded-sm text-xs font-bold flex-shrink-0 mt-0.5">${i + 1}</span>
+                    <span class="flex-1 pt-0.5">${step}</span>
+                    <button type="button" onclick="removeDraftStep(${i})" class="text-red-400 hover:text-red-600 p-1 flex-shrink-0"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                </li>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function saveRecipe(event) {
+            event.preventDefault();
+            if (draftIngredients.length === 0) { showToast('Add at least one ingredient!', 'alert-circle'); return; }
+            if (draftSteps.length === 0) { showToast('Add at least one step!', 'alert-circle'); return; }
+
+            const dietCheckboxes = document.querySelectorAll('.diet-checkbox:checked');
+            const selectedDiet = Array.from(dietCheckboxes).map(cb => cb.value);
+
+            recipes.push({
+                id: generateId(),
+                title: document.getElementById('r-title').value,
+                author: document.getElementById('r-author').value || 'Unknown',
+                source: 'local',
+                category: document.getElementById('r-category').value,
+                country: document.getElementById('r-country').value,
+                profile: draftProfile || defaultPlaceholderProfile,
+                prepTime: parseInt(document.getElementById('r-prepTime').value) || 0,
+                cookTime: parseInt(document.getElementById('r-cookTime').value) || 0,
+                servings: parseInt(document.getElementById('r-servings').value) || 4,
+                difficulty: document.getElementById('r-difficulty').value || '',
+                diet: selectedDiet,
+                cuisine: document.getElementById('r-cuisine').value || '',
+                ingredients: [...draftIngredients],
+                instructions: [...draftSteps],
+                tips: document.getElementById('r-tips').value,
+                lastOpened: Date.now(),
+                checkedIngredients: [],
+                checkedSteps: [],
+                personalNotes: ""
+            });
+            saveData();
+            showToast('Recipe successfully added!', 'check-circle');
+            searchQuery = ""; categoryFilter = "";
+            renderList();
+            contentDiv.scrollTop = 0;
+        }
+
+        function shareRecipe(id) {
+            const recipe = recipes.find(r => r.id === id);
+            if (!recipe) return;
+            const shareText = `Check out this recipe: ${recipe.title}!\n\nIngredients:\n- ${recipe.ingredients.join('\n- ')}\n\nLet's cook!`;
+            if (navigator.share) navigator.share({ title: recipe.title, text: shareText }).catch(() => copyToClipboard(shareText));
+            else copyToClipboard(shareText);
+        }
+
+        function copyToClipboard(text) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try { document.execCommand('copy'); showToast('Copied to clipboard!', 'copy'); } 
+            catch (err) { showToast('Copy failed.', 'x-circle'); }
+            document.body.removeChild(textArea);
+        }
+
+        loadData();
+        
+                // Initialize Firebase if available (Phase 2)
+                if (typeof firebase !== 'undefined') {
+                    try {
+                        initializeFirebase();
+                    } catch (error) {
+                        console.log("Firebase SDK not loaded - local mode only");
+                    }
+                }
+        renderList();
+    </script>
+</body>
+</html>
