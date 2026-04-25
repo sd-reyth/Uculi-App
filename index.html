@@ -1111,6 +1111,7 @@
         };
 
         let recipes = [];
+        let userFamilies = [];
         let currentScale = 1;
         let isCookingMode = false;
         let searchQuery = "";
@@ -2032,6 +2033,7 @@
                         userSettings.name = user.displayName || userSettings.name;
                         userSettings.profilePic = user.photoURL || userSettings.profilePic;
                         saveData();
+                        setTimeout(() => checkFamilyRemovals(), 1000);
                     }
                 });
             } catch (error) {
@@ -2827,6 +2829,55 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- New My Families Section -->
+                    <div class="bg-white rounded-sm shadow-sm border border-parchmentDark p-6 md:p-8">
+                        <div class="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 class="font-serif text-2xl font-bold text-forest">My Families</h3>
+                                <p class="text-sm text-sage mt-1">Collaborate on recipe books (Max 3)</p>
+                            </div>
+                            <div class="flex gap-3">
+                                <button onclick="showJoinFamilyModal()" class="bg-parchment border border-parchmentDark text-forest hover:bg-parchmentDark px-4 py-2 rounded-sm text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 uppercase tracking-wider">
+                                    <i data-lucide="log-in" class="w-4 h-4"></i> Join
+                                </button>
+                                <button onclick="showCreateFamilyModal()" class="bg-forest text-white hover:bg-sage px-4 py-2 rounded-sm text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 uppercase tracking-wider">
+                                    <i data-lucide="plus" class="w-4 h-4"></i> Create
+                                </button>
+                            </div>
+                        </div>
+                        
+                        ${userFamilies && userFamilies.length > 0 ? `
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                ${userFamilies.map(family => {
+                                    const isRemoved = family.removedMembers && family.removedMembers.some(m => m.userId === currentUser?.uid);
+                                    return `
+                                        <div onclick="showFamilyDetails('${family.id}')" class="border border-parchmentDark rounded-md p-4 cursor-pointer hover:bg-parchment transition-colors relative ${isRemoved ? 'opacity-70' : ''}">
+                                            <div class="flex items-center justify-between mb-2">
+                                                <div class="flex items-center gap-2">
+                                                    <h4 class="font-bold text-lg text-forest">${family.name}</h4>
+                                                    <span class="text-[10px] px-2 py-0.5 bg-parchmentDark text-sage rounded-full font-bold">#${family.tag}</span>
+                                                </div>
+                                                ${isRemoved ? `<span class="text-[10px] uppercase font-bold text-coral bg-coral/10 outline outline-1 outline-coral/20 px-2 py-1 rounded-sm">Read-only</span>` : ''}
+                                            </div>
+                                            <div class="flex items-center gap-4 text-sm text-sage">
+                                                <span class="flex items-center gap-1"><i data-lucide="users" class="w-4 h-4"></i> ${family.memberIds ? family.memberIds.length : 0} members</span>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        ` : `
+                            <div class="text-center py-10 border-2 border-dashed border-parchmentDark rounded-md bg-parchment">
+                                <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm border border-parchmentDark">
+                                    <i data-lucide="users" class="text-sage w-6 h-6"></i>
+                                </div>
+                                <p class="text-forest font-bold mb-1">No families yet</p>
+                                <p class="text-sage text-sm">Create or join a family to start collaborating.</p>
+                            </div>
+                        `}
+                    </div>
+
                 </div>
             `;
             lucide.createIcons();
@@ -3063,9 +3114,33 @@
                             `}
                         </div>
                     </div>
+                    
+                    <!-- App Info Section -->
+                    <div class="bg-white p-6 md:p-8 rounded-sm shadow-sm border border-parchmentDark">
+                        <button onclick="showAppInfo()" class="bg-forest text-white h-12 px-8 rounded-sm font-bold shadow-md hover:bg-sage transition-colors flex items-center justify-center gap-2 uppercase tracking-wider text-sm w-full md:w-auto">
+                            <i data-lucide="info" class="w-4 h-4"></i> App Info
+                        </button>
+                    </div>
+
                 </div>
             `;
             lucide.createIcons();
+        }
+
+        function showAppInfo() {
+            createModal('App Info & Family Recipe Books', `
+                <div class="space-y-4 text-inkDark p-4 max-h-[70vh] overflow-y-auto w-[650px] max-w-[90vw]">
+                    <h3 class="font-serif font-bold text-lg mb-2">Family Recipe Books</h3>
+                    <p class="text-sm">Welcome to Family Recipe Books! You can create or join up to 3 families. Recipes shared with families become collaborative and are saved with a 5-step version history.</p>
+                    <ul class="text-sm list-disc pl-5 space-y-1 my-2">
+                        <li><strong>Rights:</strong> All active members can edit family recipes.</li>
+                        <li><strong>Limit:</strong> Maximum 3 families per user.</li>
+                        <li><strong>History:</strong> The last 5 edits of a recipe are saved automatically.</li>
+                        <li><strong>If you are removed:</strong> You will get a 30-day grace period to view and download (PDF) your recipes, or duplicate them to your personal account. After that, you lose access!</li>
+                    </ul>
+                    <p class="text-sm font-bold text-coral">We highly encourage you to use the PDF export feature regularly to backup your favorite recipes!</p>
+                </div>
+            `, [{ text: 'Close', primary: true, onClick: () => closeModal() }]);
         }
 
         function saveSettings(e) {
@@ -4349,6 +4424,321 @@
             if (modal) modal.classList.add('hidden', 'opacity-0', 'scale-95');
         }
 
+        function createModal(title, contentHTML, buttons = []) {
+            const modalId = 'dynamic-modal-' + Date.now();
+            const modalHtml = `
+                <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-60 hidden opacity-0 transition-opacity z-[100] flex items-center justify-center p-4">
+                    <div class="bg-white rounded-sm shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-parchmentDark scale-95 transition-transform" id="${modalId}-content">
+                        <div class="p-4 md:p-6 border-b border-parchmentDark flex items-center justify-between bg-parchment shrink-0">
+                            <h2 class="font-serif font-bold text-xl md:text-2xl text-forest">${title}</h2>
+                            <button onclick="closeModal('${modalId}')" class="text-sage hover:text-coral transition-colors p-1">
+                                <i data-lucide="x" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                        <div class="p-4 md:p-6 overflow-y-auto grow">
+                            ${contentHTML}
+                        </div>
+                        ${buttons.length ? `
+                        <div class="p-4 md:p-6 border-t border-parchmentDark bg-parchment shrink-0 flex items-center justify-end gap-3 flex-wrap">
+                            ${buttons.map((btn, idx) => {
+                                const clickFn = btn.onClick || btn.onclick;
+                                if (clickFn) window[`dynamic-modal-btn-${modalId}-${idx}`] = clickFn;
+                                return `
+                                    <button onclick="${clickFn ? `window['dynamic-modal-btn-${modalId}-${idx}']()` : `closeModal('${modalId}')`}" 
+                                        class="px-5 py-2.5 rounded-sm font-bold shadow-sm transition-colors uppercase tracking-wider text-sm ${btn.primary ? 'bg-forest text-white hover:bg-sage' : (btn.danger ? 'bg-white border border-coral text-coral hover:bg-coral hover:text-white' : 'bg-white border border-parchmentDark text-forest hover:bg-parchmentDark')}">
+                                        ${btn.text}
+                                    </button>
+                                `;
+                            }).join('')}
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+            lucide.createIcons();
+            
+            const modal = document.getElementById(modalId);
+            const content = document.getElementById(`${modalId}-content`);
+            
+            requestAnimationFrame(() => {
+                modal.classList.remove('hidden');
+                requestAnimationFrame(() => {
+                    modal.classList.remove('opacity-0');
+                    content.classList.remove('scale-95');
+                });
+            });
+
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) closeModal(modalId);
+            });
+        }
+
+        function closeModal(modalId) {
+            const modals = document.querySelectorAll('[id^="dynamic-modal-"]');
+            const targetModal = modalId ? document.getElementById(modalId) : modals[modals.length - 1];
+            
+            if (targetModal) {
+                const content = document.getElementById(`${targetModal.id}-content`);
+                targetModal.classList.add('opacity-0');
+                if (content) content.classList.add('scale-95');
+                
+                setTimeout(() => {
+                    targetModal.remove();
+                }, 300);
+            }
+        }
+
+        // --- FAMILY RECIPE BOOKS ---
+        function showCreateFamilyModal() {
+            if (!isAuthenticated) return showToast('Please sign in to create a family.', 'alert-circle', true);
+            const activeFamilies = userFamilies.filter(f => !f.removedMembers || !f.removedMembers.some(m => m.userId === currentUser.uid));
+            if (activeFamilies.length >= 3) {
+                return showToast('You can only be an active member of 3 families at once.', 'alert-circle', true);
+            }
+
+            createModal('Create Family Book', `
+                <div class="space-y-4 text-inkDark">
+                    <p class="text-sm text-sage mb-4">Create a new family to share recipes with your real or chosen family. You will be the admin.</p>
+                    <div>
+                        <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-1">Family Name</label>
+                        <input type="text" id="new-family-name" placeholder="e.g. Smith Family" class="w-full bg-parchment border border-parchmentDark rounded-sm px-4 py-3 outline-none focus:border-sage transition-colors text-forest font-bold" maxlength="25">
+                    </div>
+                    <div>
+                        <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-1">Secret Pincode</label>
+                        <input type="text" id="new-family-pin" placeholder="Enter a 4-8 digit pin" class="w-full bg-parchment border border-parchmentDark rounded-sm px-4 py-3 outline-none focus:border-sage transition-colors text-forest font-bold" maxlength="8">
+                        <p class="text-[10px] text-sage mt-1">Users will need this pin to join the family.</p>
+                    </div>
+                </div>
+            `, [
+                { text: 'Cancel', onClick: () => closeModal() },
+                { text: 'Create Family', primary: true, onClick: () => {
+                    const name = document.getElementById('new-family-name').value.trim();
+                    const pin = document.getElementById('new-family-pin').value.trim();
+                    if (!name || !pin) return showToast('Please fill out all fields.', 'alert-circle', true);
+                    if (pin.length < 4) return showToast('Pincode must be at least 4 characters.', 'alert-circle', true);
+                    submitCreateFamily(name, pin);
+                    closeModal();
+                }}
+            ]);
+        }
+
+        function showJoinFamilyModal() {
+            if (!isAuthenticated) return showToast('Please sign in to join a family.', 'alert-circle', true);
+            
+            const activeFamilies = userFamilies.filter(f => !f.removedMembers || !f.removedMembers.some(m => m.userId === currentUser.uid));
+            if (activeFamilies.length >= 3) {
+                return showToast('You can only be an active member of 3 families at once.', 'alert-circle', true);
+            }
+
+            createModal('Join Family Book', `
+                <div class="space-y-4 text-inkDark">
+                    <p class="text-sm text-sage mb-4">Join an existing family book using their exact name, tag, and pincode.</p>
+                    <div class="flex gap-2">
+                        <div class="flex-grow">
+                            <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-1">Family Name</label>
+                            <input type="text" id="join-family-name" placeholder="e.g. Smith" class="w-full bg-parchment border border-parchmentDark rounded-sm px-4 py-3 outline-none focus:border-sage transition-colors text-forest font-bold">
+                        </div>
+                        <div class="w-24">
+                            <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-1">Tag #</label>
+                            <input type="text" id="join-family-tag" placeholder="1234" class="w-full bg-parchment border border-parchmentDark rounded-sm px-4 py-3 outline-none focus:border-sage transition-colors text-forest font-bold" maxlength="4">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-1">Secret Pincode</label>
+                        <input type="text" id="join-family-pin" placeholder="Enter the family pin" class="w-full bg-parchment border border-parchmentDark rounded-sm px-4 py-3 outline-none focus:border-sage transition-colors text-forest font-bold" maxlength="8">
+                    </div>
+                </div>
+            `, [
+                { text: 'Cancel', onClick: () => closeModal() },
+                { text: 'Join Family', primary: true, onClick: () => {
+                    const name = document.getElementById('join-family-name').value.trim();
+                    const tag = document.getElementById('join-family-tag').value.trim();
+                    const pin = document.getElementById('join-family-pin').value.trim();
+                    
+                    if (!name || !tag || !pin) return showToast('Please fill out all fields.', 'alert-circle', true);
+                    submitJoinFamily(name, tag, pin);
+                    closeModal();
+                }}
+            ]);
+        }
+
+        async function submitCreateFamily(name, pin) {
+            showToast('Creating family...', 'loader');
+            const tag = Math.floor(1000 + Math.random() * 9000).toString();
+            
+            const newFamily = {
+                id: 'fam_' + Date.now(),
+                name: name,
+                tag: tag,
+                pinCode: pin,
+                creatorId: currentUser.uid,
+                memberIds: [currentUser.uid],
+                removedMembers: []
+            };
+            
+            userFamilies.push(newFamily);
+            showToast('Family created! Invite others with tag #' + tag, 'check');
+            renderProfile(); 
+        }
+
+        async function submitJoinFamily(name, tag, pin) {
+            showToast('Joining family feature will reconnect on Firebase.', 'cloud-off');
+        }
+
+        function showFamilyDetails(familyId) {
+            const family = userFamilies.find(f => f.id === familyId);
+            if (!family) return;
+
+            const isRemoved = family.removedMembers && family.removedMembers.some(m => m.userId === currentUser?.uid);
+            const isCreator = family.creatorId === currentUser?.uid;
+
+            const membersHtml = family.memberIds.map(uid => `
+                <div class="flex items-center justify-between p-3 border-b border-parchmentDark last:border-0 hover:bg-white transition-colors group">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-forest text-white flex items-center justify-center font-bold text-xs uppercase">
+                            ${uid === currentUser?.uid ? 'ME' : 'U'}
+                        </div>
+                        <div>
+                            <p class="font-bold text-forest text-sm">${uid === currentUser?.uid ? 'You' : 'Family Member'}</p>
+                            <p class="text-[10px] text-sage uppercase tracking-wider">${uid === family.creatorId ? 'Admin' : 'Member'}</p>
+                        </div>
+                    </div>
+                    ${(isCreator && uid !== currentUser?.uid) ? `
+                        <button onclick="removeFamilyMember('${family.id}', '${uid}')" class="text-sage opacity-0 group-hover:opacity-100 hover:text-coral transition-all p-1.5 rounded-sm" title="Remove Member">
+                            <i data-lucide="user-minus" class="w-4 h-4"></i>
+                        </button>
+                    ` : ''}
+                </div>
+            `).join('');
+
+            createModal(`${family.name} <span class="text-sage font-normal text-sm opacity-60">#${family.tag}</span>`, `
+                <div class="space-y-6 text-inkDark max-h-[60vh] overflow-y-auto w-[650px] max-w-[90vw]">
+                    ${isRemoved ? `
+                        <div class="bg-coral text-white p-4 rounded-sm flex gap-3 text-sm shadow-sm mb-6 border border-coral/20">
+                            <i data-lucide="alert-triangle" class="w-5 h-5 shrink-0 mt-0.5"></i>
+                            <div>
+                                <p class="font-bold mb-1">You are no longer an active member.</p>
+                                <p class="opacity-90">You have read-only access to this family's recipes to back them up via PDF export. This access will expire automatically 30 days after removal.</p>
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    <div>
+                        <h4 class="text-xs uppercase tracking-wide font-bold text-sage mb-3 flex justify-between items-end">
+                            <span>Members (${family.memberIds.length})</span>
+                            ${isCreator ? '<span class="text-[10px] font-normal opacity-70">You can manage members</span>' : ''}
+                        </h4>
+                        <div class="bg-parchment rounded-sm border border-parchmentDark">
+                            ${membersHtml}
+                        </div>
+                    </div>
+
+                    ${!isRemoved ? `
+                        <div class="bg-white p-5 border border-parchmentDark rounded-sm shadow-sm">
+                            <h4 class="text-xs uppercase tracking-wide font-bold text-sage mb-2 flex items-center justify-between">
+                                Invite Others
+                                <i data-lucide="share-2" class="w-3.5 h-3.5"></i>
+                            </h4>
+                            <p class="text-sm text-forest opacity-80 mb-4">Share your exact family name, tag, and pincode so loved ones can search and join your book. They will need all three parts.</p>
+                            <button onclick="shareFamilyInvite('${family.name}', '${family.tag}', '${family.pinCode || 'Hidden'}')" class="w-full bg-forest text-white hover:bg-sage h-12 rounded-sm font-bold shadow-md transition-colors flex items-center justify-center gap-2 uppercase tracking-wider text-[13px]">
+                                Share Invite Link
+                            </button>
+                        </div>
+                    ` : ''}
+                </div>
+            `, [
+                { text: 'Close', onClick: () => closeModal() },
+                (!isRemoved && !isCreator) ? { text: 'Leave Family', danger: true, onClick: () => handleLeaveFamily(family.id) } : null
+            ].filter(Boolean));
+        }
+
+        async function shareFamilyInvite(name, tag, pin) {
+            const shareText = `Cook with me on Uculi!\n\nSearch my family book in the Profile section.\nFamily: ${name}\nTag: #${tag}\nPincode: ${pin}`;
+            
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: 'Join our Recipe Book',
+                        text: shareText
+                    });
+                } catch (err) {
+                    console.log('Share failed:', err);
+                }
+            } else {
+                navigator.clipboard.writeText(shareText);
+                showToast('Invite copied to clipboard!', 'clipboard-copy');
+            }
+        }
+
+        async function removeFamilyMember(familyId, userId) {
+            if (!confirm('Are you sure you want to remove this member? They will have a 30-day grace period to download their shared recipes before losing access permanently.')) return;
+            
+            const fam = userFamilies.find(f => f.id === familyId);
+            if (fam) {
+                fam.memberIds = fam.memberIds.filter(id => id !== userId);
+                if (!fam.removedMembers) fam.removedMembers = [];
+                fam.removedMembers.push({
+                    userId: userId,
+                    removedAt: Date.now(),
+                    acknowledged: false
+                });
+                
+                showToast('Member removed successfully.', 'user-minus');
+                closeModal();
+                showFamilyDetails(familyId); // refresh
+                renderProfile();
+            }
+        }
+
+        async function handleLeaveFamily(familyId) {
+            if (!confirm('Are you sure you want to leave this family? You will instantly lose access to all family recipes, and all your recipes shared to this family will be withdrawn.')) return;
+
+            const fam = userFamilies.find(f => f.id === familyId);
+            if (fam) {
+                fam.memberIds = fam.memberIds.filter(id => id !== currentUser.uid);
+                showToast('Left family successfully.', 'log-out');
+                closeModal();
+                renderProfile();
+            }
+        }
+
+        // --- BACKGROUND CHECKS ---
+        function checkFamilyRemovals() {
+            if (!currentUser) return;
+            
+            // Look for any unacknowledged removals
+            const unacknowledged = [];
+            userFamilies.forEach(fam => {
+                if (fam.removedMembers) {
+                    const entry = fam.removedMembers.find(m => m.userId === currentUser.uid && !m.acknowledged);
+                    if (entry) unacknowledged.push({ fam, entry });
+                }
+            });
+
+            if (unacknowledged.length > 0) {
+                const names = unacknowledged.map(u => u.fam.name).join(', ');
+                createModal('Family Membership Update', `
+                    <div class="space-y-4">
+                        <div class="bg-coral text-white p-4 rounded-sm flex gap-3 text-sm shadow-sm mb-2 border border-coral/20">
+                            <i data-lucide="alert-triangle" class="w-6 h-6 shrink-0 mt-0.5"></i>
+                            <div>
+                                <p class="font-bold text-lg mb-1">You were removed</p>
+                                <p class="opacity-90 leading-relaxed">You have been removed from the following family group(s): <strong>${names}</strong>.</p>
+                            </div>
+                        </div>
+                        <p class="text-sm text-forest font-semibold mt-4">You have a 30-day grace period from the date of removal to view and download (PDF) your favorite shared recipes, or duplicate them to your own account. After 30 days, your access will be permanently revoked.</p>
+                        <p class="text-sm text-sage mt-2">Any recipes that you originally created and shared to this family have automatically been withdrawn from the group and return solely to you.</p>
+                    </div>
+                `, [{ text: 'I Understand', primary: true, onClick: () => {
+                    unacknowledged.forEach(u => u.entry.acknowledged = true);
+                    closeModal();
+                }}]);
+            }
+        }
+
         // --- FAVORITES & RATINGS ---
         function toggleFavorite(recipeId) {
             const recipe = recipes.find(r => r.id === recipeId);
@@ -5274,3 +5664,6 @@
     </script>
 </body>
 </html>
+
+
+
