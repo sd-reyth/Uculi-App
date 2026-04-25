@@ -694,6 +694,21 @@
 
         const initialPublishedVersionCode = 100;
         const dietOptions = ['Vegan', 'Vegetarian', 'Pescatarian', 'Gluten-free', 'Dairy-free', 'Nut-free', 'Egg-free', 'Soy-free', 'Halal', 'Kosher', 'Low-carb', 'Keto', 'Paleo'];
+        const dietDescriptions = {
+            'Vegan': 'No animal products whatsoever — excludes meat, fish, dairy, eggs, and honey.',
+            'Vegetarian': 'No meat or fish, but may include dairy and eggs.',
+            'Pescatarian': 'No meat, but fish and seafood are allowed alongside plant-based foods.',
+            'Gluten-free': 'Contains no gluten — safe for people with coeliac disease or gluten sensitivity.',
+            'Dairy-free': 'Contains no milk, cheese, butter, cream, or other dairy products.',
+            'Nut-free': 'Contains no tree nuts or peanuts — suitable for those with nut allergies.',
+            'Egg-free': 'Contains no eggs or egg-derived ingredients.',
+            'Soy-free': 'Contains no soy or soy-derived ingredients such as tofu or edamame.',
+            'Halal': 'Prepared according to Islamic dietary law — no pork or alcohol.',
+            'Kosher': 'Prepared according to Jewish dietary law — no mixing of meat and dairy.',
+            'Low-carb': 'Significantly reduced carbohydrate content, typically under 100g of carbs per day.',
+            'Keto': 'Very low carb and high fat diet designed to induce a state of ketosis.',
+            'Paleo': 'Based on foods presumed to be available to pre-agricultural humans — no grains, legumes, or processed foods.',
+        };
         const supportedDietOptionsText = dietOptions.join(', ');
 
         function applyMeasurementSystem(text) {
@@ -2835,9 +2850,17 @@
             const isSearchVisible = !isNotebookMode && (showListSearch || hasSearchQuery);
             const isFilterVisible = !isNotebookMode && (showListFilters || hasActiveListFilters);
             const hasVisibleControls = isSearchVisible || isFilterVisible;
-            const dietFilterButtonsMarkup = dietOptions.map(option => `
-                <button type="button" onclick="toggleDietFilterOption('${option}')" class="rounded-full border px-4 py-2 text-sm font-bold transition-all ${dietFilter.includes(option) ? 'border-forest bg-forest text-white shadow-sm' : 'border-sage border-opacity-20 bg-white text-sage hover:border-gold hover:text-forest'}">${option}</button>
-            `).join('');
+            const dietFilterButtonsMarkup = dietOptions.map(option => {
+                const isActive = dietFilter.includes(option);
+                const desc = dietDescriptions[option] || '';
+                return `<span class="relative inline-flex items-center gap-1 group">
+                    <button type="button" onclick="toggleDietFilterOption('${option}')" class="rounded-full border px-4 py-2 text-sm font-bold transition-all ${isActive ? 'border-forest bg-forest text-white shadow-sm' : 'border-sage border-opacity-20 bg-white text-sage hover:border-gold hover:text-forest'}">${option}</button>
+                    <button type="button" tabindex="-1" class="flex-shrink-0 ${isActive ? 'text-white/70 hover:text-white' : 'text-sage/50 hover:text-gold'} transition-colors" aria-label="About ${option}">
+                        <i data-lucide="info" class="w-3.5 h-3.5"></i>
+                        <span class="pointer-events-none absolute bottom-full right-0 mb-2 w-52 rounded-md border border-parchmentDark bg-white p-2.5 text-xs font-normal text-forest shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-30 leading-relaxed text-left">${desc}</span>
+                    </button>
+                </span>`;
+            }).join('');
 
             let html = `
                 <div class="mb-8 overflow-hidden rounded-2xl border border-parchmentDark bg-white shadow-lg">
@@ -3782,11 +3805,16 @@
             const publishSubmitLabel = recipeToEdit
                 ? (recipeToEdit.publishedId ? (isRecipePublishedLive(recipeToEdit) ? 'Save & Update Publish' : 'Save & Republish') : 'Save & Publish')
                 : 'Save & Publish';
-            const dietOptionsMarkup = dietOptions.map(option => `
-                <label class="flex items-center gap-2 cursor-pointer rounded-sm border border-parchmentDark bg-white px-3 py-2 font-semibold text-forest shadow-sm transition-all hover:border-gold hover:text-sage">
-                    <input type="checkbox" class="diet-checkbox" value="${option}"> ${option}
-                </label>
-            `).join('');
+            const dietOptionsMarkup = dietOptions.map(option => {
+                const desc = dietDescriptions[option] || '';
+                return `<label class="relative flex items-center gap-2 cursor-pointer rounded-sm border border-parchmentDark bg-white px-3 py-2 font-semibold text-forest shadow-sm transition-all hover:border-gold hover:text-sage group">
+                    <input type="checkbox" class="diet-checkbox" value="${option}"> <span class="flex-1">${option}</span>
+                    <span class="ml-auto flex-shrink-0 text-sage/40 hover:text-gold transition-colors" title="${desc}">
+                        <i data-lucide="info" class="w-3.5 h-3.5 pointer-events-none"></i>
+                        <span class="pointer-events-none absolute bottom-full right-2 mb-2 w-52 rounded-md border border-parchmentDark bg-white p-2.5 text-xs font-normal text-forest shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-30 leading-relaxed text-left">${desc}</span>
+                    </span>
+                </label>`;
+            }).join('');
 
             contentDiv.innerHTML = `
                 <div class="bg-white p-6 md:p-10 rounded-sm shadow-sm mb-6 border border-parchmentDark max-w-4xl mx-auto">
