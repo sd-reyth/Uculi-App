@@ -3471,12 +3471,11 @@
                 : (nextUnfinishedStepIndex === -1
                     ? `All ${instructionCount} steps are checked off. You can re-read from step 1 or uncheck a step to continue.`
                     : `${remainingStepCount} step${remainingStepCount === 1 ? '' : 's'} left. Next up: ${escapeHTML(nextStepPreview)}`);
+            const focusSecondaryActionClass = 'inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-parchmentDark bg-white px-4 text-[11px] font-bold uppercase tracking-[0.16em] shadow-sm transition-all';
+            const focusPrimaryActionClass = 'inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-gold bg-gold px-4 text-[11px] font-bold uppercase tracking-[0.16em] text-white shadow-sm transition-all hover:border-yellow-600 hover:bg-yellow-600 disabled:cursor-not-allowed disabled:opacity-60';
             const primarySupportAction = canEditExistingRecipe
-                ? `<button onclick="renderAddForm(${recipe.id})" class="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-parchmentDark bg-white px-5 text-xs font-bold uppercase tracking-[0.18em] text-forest shadow-sm transition-all hover:border-gold hover:text-sage" translate="no"><i data-lucide="pencil-line" class="h-4 w-4 text-gold"></i>Edit recipe</button>`
-                : `<button onclick="renderPublishedRecipeDetail('${recipe.publishedId}')" class="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-parchmentDark bg-white px-5 text-xs font-bold uppercase tracking-[0.18em] text-forest shadow-sm transition-all hover:border-gold hover:text-sage"><i data-lucide="external-link" class="h-4 w-4 text-gold"></i>${savedRecipeIsOutdated ? 'Open latest' : 'Browse original'}</button>`;
-            const primaryPublishAction = !isSavedCommunityRecipe
-                ? `<button onclick="publishRecipe(${recipe.id})" class="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-forest bg-forest px-5 text-xs font-bold uppercase tracking-[0.18em] text-white shadow-sm transition-all hover:bg-sage hover:border-sage"><i data-lucide="${recipeIsLive ? 'cloud-upload' : 'cloud'}" class="h-4 w-4"></i>${publishActionLabel}</button>`
-                : '';
+                ? `<button onclick="renderAddForm(${recipe.id})" class="${focusSecondaryActionClass} text-forest hover:border-gold hover:text-sage" translate="no"><i data-lucide="pencil-line" class="h-4 w-4 text-gold"></i>Edit recipe</button>`
+                : `<button onclick="renderPublishedRecipeDetail('${recipe.publishedId}')" class="${focusSecondaryActionClass} text-forest hover:border-gold hover:text-sage"><i data-lucide="external-link" class="h-4 w-4 text-gold"></i>${savedRecipeIsOutdated ? 'Open latest' : 'Browse original'}</button>`;
 
             if (isSavedCommunityRecipe) {
                 queuePublishedRecipeStatusRefresh(recipe.id, recipe.publishedId);
@@ -3507,19 +3506,18 @@
 
                     <div class="detail-content-shell p-6 md:p-10">
                         <div class="detail-cooking-focus mb-8 rounded-2xl border border-parchmentDark bg-gradient-to-r from-white via-parchment to-accent p-5 shadow-sm">
-                            <div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-                                <div class="space-y-2">
+                            <div class="flex flex-col gap-5">
+                                <div class="space-y-2 max-w-3xl">
                                     <p class="text-[11px] font-bold uppercase tracking-[0.28em] text-sage opacity-80">Cook without hunting through the page</p>
                                     <h3 class="font-fantasy text-2xl font-bold text-forest">Focused cooking flow</h3>
                                     <p class="text-sm font-semibold leading-relaxed text-sage">${cookingSummary}</p>
                                 </div>
-                                <div class="flex flex-wrap gap-3">
-                                    <button onclick="renderList()" class="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-parchmentDark bg-white px-5 text-xs font-bold uppercase tracking-[0.18em] text-sage shadow-sm transition-all hover:border-gold hover:text-forest" translate="no"><i data-lucide="arrow-left" class="h-4 w-4"></i>Back to index</button>
-                                    <button onclick="toggleCookingMode(${recipe.id})" class="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-gold bg-gold px-5 text-xs font-bold uppercase tracking-[0.18em] text-white shadow-sm transition-all hover:border-yellow-600 hover:bg-yellow-600 disabled:cursor-not-allowed disabled:opacity-60" ${instructionCount === 0 ? 'disabled' : ''} translate="no">
+                                <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                                    <button onclick="renderList()" class="${focusSecondaryActionClass} text-sage hover:border-gold hover:text-forest" translate="no"><i data-lucide="arrow-left" class="h-4 w-4"></i>Back to index</button>
+                                    ${primarySupportAction}
+                                    <button onclick="toggleCookingMode(${recipe.id})" class="${focusPrimaryActionClass} sm:col-span-2 lg:col-span-1" ${instructionCount === 0 ? 'disabled' : ''} translate="no">
                                         <i id="focus-btn-icon" data-lucide="chef-hat" class="h-4 w-4"></i><span id="focus-btn-text">Start Cooking</span>
                                     </button>
-                                    ${primarySupportAction}
-                                    ${primaryPublishAction}
                                 </div>
                             </div>
                         </div>
