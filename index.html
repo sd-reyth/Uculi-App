@@ -58,6 +58,27 @@
             transition: background-color 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
         }
 
+        #app-content {
+            padding-bottom: 1rem;
+        }
+
+        @media (max-width: 767px) {
+            #app-content {
+                padding-bottom: calc(6.5rem + env(safe-area-inset-bottom, 0px));
+            }
+
+            #main-nav {
+                position: fixed;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                z-index: 40;
+                padding-bottom: env(safe-area-inset-bottom, 0px);
+                background: rgba(255, 255, 255, 0.96);
+                backdrop-filter: blur(14px);
+            }
+        }
+
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #7A8B76; border-radius: 2px; }
@@ -665,6 +686,8 @@
         let categoryFilter = "";
         let difficultyFilter = "";
         let dietFilter = [];
+        let showDietFilters = false;
+        let showDietGuide = false;
         let cuisineFilter = "";
         let collectionScopeFilter = "all";
         let showFavoritesOnly = false;
@@ -708,6 +731,21 @@
             'Low-carb': 'Significantly reduced carbohydrate content, typically under 100g of carbs per day.',
             'Keto': 'Very low carb and high fat diet designed to induce a state of ketosis.',
             'Paleo': 'Based on foods presumed to be available to pre-agricultural humans — no grains, legumes, or processed foods.',
+        };
+        const dietCompatibilityMap = {
+            'Vegan': ['Vegan', 'Vegetarian', 'Pescatarian', 'Dairy-free', 'Egg-free'],
+            'Vegetarian': ['Vegetarian', 'Pescatarian'],
+            'Pescatarian': ['Pescatarian'],
+            'Gluten-free': ['Gluten-free'],
+            'Dairy-free': ['Dairy-free'],
+            'Nut-free': ['Nut-free'],
+            'Egg-free': ['Egg-free'],
+            'Soy-free': ['Soy-free'],
+            'Halal': ['Halal'],
+            'Kosher': ['Kosher'],
+            'Low-carb': ['Low-carb'],
+            'Keto': ['Keto', 'Low-carb'],
+            'Paleo': ['Paleo']
         };
         const supportedDietOptionsText = dietOptions.join(', ');
 
@@ -2398,27 +2436,55 @@
             renderList();
         }
 
+        function toggleDietFiltersVisibility() {
+            showDietFilters = !showDietFilters;
+            if (!showDietFilters) showDietGuide = false;
+            renderList();
+        }
+
+        function toggleDietGuide() {
+            showDietGuide = !showDietGuide;
+            renderList();
+        }
+
+        function getRecipeDietCoverage(recipe) {
+            const coverage = new Set();
+            (recipe?.diet || []).filter(Boolean).forEach(tag => {
+                const supportedTag = dietOptions.find(option => option.toLowerCase() === String(tag).toLowerCase()) || tag;
+                (dietCompatibilityMap[supportedTag] || [supportedTag]).forEach(mappedTag => coverage.add(mappedTag));
+            });
+            return coverage;
+        }
+
+        function doesRecipeMatchDietFilters(recipe) {
+            if (dietFilter.length === 0) return true;
+            const coverage = getRecipeDietCoverage(recipe);
+            return dietFilter.every(selectedDiet => coverage.has(selectedDiet));
+        }
+
         function resetRecipeFilters() {
             searchQuery = "";
             categoryFilter = "";
             difficultyFilter = "";
             dietFilter = [];
+            showDietFilters = false;
+            showDietGuide = false;
             cuisineFilter = "";
             collectionScopeFilter = 'all';
             showFavoritesOnly = false;
             renderList();
         }
 
+        function normalizeCollectionScopeFilter(scope = collectionScopeFilter) {
+            return ['mine', 'saved'].includes(scope) ? scope : 'all';
+        }
+
         function getCollectionScopeLabel(scope = collectionScopeFilter) {
-            switch (scope) {
+            switch (normalizeCollectionScopeFilter(scope)) {
                 case 'mine':
-                    return 'Created by you';
+                    return 'Mine';
                 case 'saved':
-                    return 'Saved from Browse';
-                case 'live':
-                    return 'Published live';
-                case 'attention':
-                    return 'Needs attention';
+                    return 'Saved';
                 default:
                     return 'All recipes';
             }
@@ -2432,15 +2498,11 @@
         }
 
         function doesRecipeMatchCollectionScope(recipe) {
-            switch (collectionScopeFilter) {
+            switch (normalizeCollectionScopeFilter(collectionScopeFilter)) {
                 case 'mine':
                     return recipe?.source !== 'published';
                 case 'saved':
                     return recipe?.source === 'published';
-                case 'live':
-                    return recipe?.source !== 'published' && isRecipePublishedLive(recipe);
-                case 'attention':
-                    return recipeNeedsAttention(recipe);
                 default:
                     return true;
             }
@@ -2450,6 +2512,8 @@
             if (indexViewMode === 'book') {
                 showListSearch = true;
                 showListFilters = false;
+                showDietFilters = false;
+                showDietGuide = false;
                 indexViewMode = 'cards';
                 userSettings.indexViewMode = 'cards';
                 notebookCoverOpen = false;
@@ -2461,7 +2525,11 @@
 
             const nextVisibility = !showListSearch;
             showListSearch = nextVisibility;
-            if (nextVisibility) showListFilters = false;
+            if (nextVisibility) {
+                showListFilters = false;
+                showDietFilters = false;
+                showDietGuide = false;
+            }
             renderList();
         }
 
@@ -2469,6 +2537,8 @@
             if (indexViewMode === 'book') {
                 showListFilters = true;
                 showListSearch = false;
+                showDietFilters = false;
+                showDietGuide = false;
                 indexViewMode = 'cards';
                 userSettings.indexViewMode = 'cards';
                 notebookCoverOpen = false;
@@ -2480,7 +2550,12 @@
 
             const nextVisibility = !showListFilters;
             showListFilters = nextVisibility;
-            if (nextVisibility) showListSearch = false;
+            if (nextVisibility) {
+                showListSearch = false;
+            } else {
+                showDietFilters = false;
+                showDietGuide = false;
+            }
             renderList();
         }
 
@@ -2493,6 +2568,8 @@
             if (nextMode === 'book') {
                 showListSearch = false;
                 showListFilters = false;
+                showDietFilters = false;
+                showDietGuide = false;
             }
             if (nextMode === 'book' && notebookPageIndex >= currentIndexRecipeIds.length) {
                 notebookPageIndex = 0;
@@ -2800,26 +2877,18 @@
             setActiveNav('index');
             ensurePublishedRecipesCacheLoaded();
 
+            collectionScopeFilter = normalizeCollectionScopeFilter(collectionScopeFilter);
+
             const collectionScopeCounts = {
-                all: recipes.length,
                 mine: recipes.filter(recipe => recipe.source !== 'published').length,
-                saved: recipes.filter(recipe => recipe.source === 'published').length,
-                live: recipes.filter(recipe => recipe.source !== 'published' && isRecipePublishedLive(recipe)).length,
-                attention: recipes.filter(recipeNeedsAttention).length
+                saved: recipes.filter(recipe => recipe.source === 'published').length
             };
-            const collectionScopeButtons = [
-                { value: 'all', label: 'All', icon: 'layers-3', count: collectionScopeCounts.all },
-                { value: 'mine', label: 'Mine', icon: 'notebook-pen', count: collectionScopeCounts.mine },
-                { value: 'saved', label: 'Saved', icon: 'heart-handshake', count: collectionScopeCounts.saved },
-                { value: 'live', label: 'Live', icon: 'cloud', count: collectionScopeCounts.live },
-                { value: 'attention', label: 'Attention', icon: 'alert-circle', count: collectionScopeCounts.attention }
-            ];
 
             const filteredRecipes = recipes.filter(r => {
                 const matchesSearch = r.title.toLowerCase().includes(searchQuery.toLowerCase()) || r.ingredients.some(i => i.toLowerCase().includes(searchQuery.toLowerCase()));
                 const matchesCategory = categoryFilter === "" || r.category === categoryFilter;
                 const matchesDifficulty = difficultyFilter === "" || r.difficulty === difficultyFilter;
-                const matchesDiet = dietFilter.length === 0 || (r.diet && r.diet.some(d => dietFilter.includes(d)));
+                const matchesDiet = doesRecipeMatchDietFilters(r);
                 const matchesCuisine = cuisineFilter === "" || (r.cuisine && r.cuisine.toLowerCase() === cuisineFilter.toLowerCase());
                 const matchesFavorite = !showFavoritesOnly || isRecipeFavorited(r);
                 const matchesCollectionScope = doesRecipeMatchCollectionScope(r);
@@ -2827,7 +2896,7 @@
             });
 
             const activeFilters = [
-                collectionScopeFilter !== 'all' ? `Collection: ${getCollectionScopeLabel()}` : '',
+                collectionScopeFilter !== 'all' ? `Source: ${getCollectionScopeLabel()}` : '',
                 searchQuery.trim() ? `Search: ${searchQuery.trim()}` : '',
                 categoryFilter ? `Category: ${categoryFilter}` : '',
                 difficultyFilter ? `Level: ${difficultyFilter}` : '',
@@ -2844,23 +2913,43 @@
             }
 
             const resultLabel = `${filteredRecipes.length} recipe${filteredRecipes.length === 1 ? '' : 's'}`;
-            const hasSearchQuery = Boolean(searchQuery.trim());
-            const hasActiveListFilters = Boolean(categoryFilter || difficultyFilter || cuisineFilter || showFavoritesOnly || dietFilter.length);
+            const hasActiveListFilters = Boolean(collectionScopeFilter !== 'all' || categoryFilter || difficultyFilter || cuisineFilter || showFavoritesOnly || dietFilter.length);
             const isNotebookMode = indexViewMode === 'book';
-            const isSearchVisible = !isNotebookMode && (showListSearch || hasSearchQuery);
-            const isFilterVisible = !isNotebookMode && (showListFilters || hasActiveListFilters);
-            const hasVisibleControls = isSearchVisible || isFilterVisible;
+            const isSearchVisible = !isNotebookMode && showListSearch;
+            const isFilterVisible = !isNotebookMode && showListFilters;
+            const activeFiltersMarkup = activeFilters.length > 0 ? `
+                <div class="border-b border-parchmentDark bg-white px-5 py-4">
+                    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="text-[11px] font-bold uppercase tracking-[0.28em] text-sage opacity-80">Active</span>
+                            ${activeFilters.map(filter => `<span class="rounded-full bg-accent px-3 py-1.5 text-xs font-bold text-sage shadow-sm border border-parchmentDark">${filter}</span>`).join('')}
+                        </div>
+                        <button onclick="resetRecipeFilters()" class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-parchmentDark bg-white px-4 text-[11px] font-bold uppercase tracking-[0.18em] text-sage shadow-sm transition-all hover:border-gold hover:text-forest">
+                            <i data-lucide="rotate-ccw" class="h-4 w-4"></i>Clear filters
+                        </button>
+                    </div>
+                </div>
+            ` : '';
+            const sourceFilterButtonsMarkup = [
+                { value: 'mine', label: 'Mine', icon: 'notebook-pen', count: collectionScopeCounts.mine },
+                { value: 'saved', label: 'Saved', icon: 'heart-handshake', count: collectionScopeCounts.saved }
+            ].map(scope => {
+                const isActive = collectionScopeFilter === scope.value;
+                const nextScope = isActive ? 'all' : scope.value;
+                return `<button type="button" onclick="collectionScopeFilter='${nextScope}'; renderList()" class="inline-flex h-11 items-center gap-2 rounded-xl border px-4 text-xs font-bold uppercase tracking-[0.18em] shadow-sm transition-all ${isActive ? 'border-forest bg-forest text-white' : 'border-parchmentDark bg-white text-sage hover:border-gold hover:text-forest'}"><i data-lucide="${scope.icon}" class="h-4 w-4"></i>${scope.label} <span class="rounded-full ${isActive ? 'bg-white bg-opacity-20 text-white' : 'bg-accent text-sage'} px-2 py-0.5 text-[10px]">${scope.count}</span></button>`;
+            }).join('');
+            const selectedDietSummary = dietFilter.length === 0
+                ? 'Optional'
+                : (dietFilter.length === 1 ? dietFilter[0] : `${dietFilter.length} selected`);
             const dietFilterButtonsMarkup = dietOptions.map(option => {
                 const isActive = dietFilter.includes(option);
                 const desc = dietDescriptions[option] || '';
-                return `<span class="relative inline-flex items-center gap-1 group">
-                    <button type="button" onclick="toggleDietFilterOption('${option}')" class="rounded-full border px-4 py-2 text-sm font-bold transition-all ${isActive ? 'border-forest bg-forest text-white shadow-sm' : 'border-sage border-opacity-20 bg-white text-sage hover:border-gold hover:text-forest'}">${option}</button>
-                    <button type="button" tabindex="-1" class="flex-shrink-0 ${isActive ? 'text-white/70 hover:text-white' : 'text-sage/50 hover:text-gold'} transition-colors" aria-label="About ${option}">
-                        <i data-lucide="info" class="w-3.5 h-3.5"></i>
-                        <span class="pointer-events-none absolute bottom-full right-0 mb-2 w-52 rounded-md border border-parchmentDark bg-white p-2.5 text-xs font-normal text-forest shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-30 leading-relaxed text-left">${desc}</span>
-                    </button>
-                </span>`;
+                return `<button type="button" onclick="toggleDietFilterOption('${option}')" aria-label="${option}: ${desc}" class="rounded-full border px-4 py-2 text-sm font-bold transition-all ${isActive ? 'border-forest bg-forest text-white shadow-sm' : 'border-sage border-opacity-20 bg-white text-sage hover:border-gold hover:text-forest'}">${option}</button>`;
             }).join('');
+            const dietGuideMarkup = dietOptions.map(option => `<div class="rounded-xl border border-sage border-opacity-10 bg-white p-3 shadow-sm">
+                <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-forest">${option}</p>
+                <p class="mt-2 text-xs font-semibold leading-relaxed text-sage">${dietDescriptions[option] || ''}</p>
+            </div>`).join('');
 
             let html = `
                 <div class="mb-8 overflow-hidden rounded-2xl border border-parchmentDark bg-white shadow-lg">
@@ -2869,15 +2958,12 @@
                             <div>
                                 <p class="text-[11px] font-bold uppercase tracking-[0.32em] text-sage opacity-80">Your saved collection</p>
                                 <h2 class="font-fantasy text-3xl font-bold text-forest">Index your own and liked recipes</h2>
-                                <p class="mt-1 text-sm font-semibold text-sage opacity-80">Keep your private drafts, live publications, and saved Browse recipes clearly separated.</p>
-                            </div>
-                            <div class="flex flex-wrap gap-2">
-                                <span class="inline-flex items-center gap-2 rounded-full border border-parchmentDark bg-white px-3 py-2 text-xs font-bold text-sage shadow-sm">
+                                <p class="mt-1 text-sm font-semibold text-sage opacity-80">Search, filter, and open your own recipes and saved Browse finds from one place.</p>
+                                <p class="mt-3 inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.22em] text-sage opacity-80">
                                     <i data-lucide="book-copy" class="h-4 w-4"></i>${resultLabel}
-                                </span>
-                                <span class="inline-flex items-center gap-2 rounded-full border border-parchmentDark bg-white px-3 py-2 text-xs font-bold text-sage shadow-sm">
-                                    <i data-lucide="sliders-horizontal" class="h-4 w-4"></i>${activeFilters.length} active
-                                </span>
+                                </p>
+                            </div>
+                            <div class="flex flex-wrap items-center justify-end gap-2">
                                 <div class="inline-flex rounded-xl border border-parchmentDark bg-white p-1 shadow-sm">
                                     <button onclick="setIndexViewMode('cards')" class="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-bold uppercase tracking-[0.16em] transition-all ${indexViewMode === 'cards' ? 'bg-forest text-white shadow-sm' : 'text-sage hover:text-forest'}">
                                         <i data-lucide="layout-grid" class="h-4 w-4"></i>Cards
@@ -2886,33 +2972,19 @@
                                         <i data-lucide="book-open" class="h-4 w-4"></i>Notebook
                                     </button>
                                 </div>
-                                <button onclick="toggleListSearchVisibility()" class="inline-flex h-11 items-center gap-2 rounded-xl border px-4 text-xs font-bold uppercase tracking-[0.18em] shadow-sm transition-all ${isSearchVisible ? 'border-forest bg-forest text-white' : 'border-parchmentDark bg-white text-sage hover:border-gold hover:text-forest'}" title="${isNotebookMode ? 'Switch to card view and open search' : 'Toggle search'}">
-                                    <i data-lucide="search" class="h-4 w-4"></i>Search
+                                <button onclick="toggleListSearchVisibility()" aria-label="Search" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border text-xs font-bold uppercase tracking-[0.18em] shadow-sm transition-all ${isSearchVisible ? 'border-forest bg-forest text-white' : 'border-parchmentDark bg-white text-sage hover:border-gold hover:text-forest'}" title="${isNotebookMode ? 'Switch to card view and open search' : 'Toggle search'}">
+                                    <i data-lucide="search" class="h-4 w-4"></i>
                                 </button>
-                                <button onclick="toggleListFiltersVisibility()" class="inline-flex h-11 items-center gap-2 rounded-xl border px-4 text-xs font-bold uppercase tracking-[0.18em] shadow-sm transition-all ${isFilterVisible ? 'border-forest bg-forest text-white' : 'border-parchmentDark bg-white text-sage hover:border-gold hover:text-forest'}" title="${isNotebookMode ? 'Switch to card view and open filters' : 'Toggle filters'}">
-                                    <i data-lucide="sliders-horizontal" class="h-4 w-4"></i>Filters
+                                <button onclick="toggleListFiltersVisibility()" aria-label="Filters" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border text-xs font-bold uppercase tracking-[0.18em] shadow-sm transition-all ${isFilterVisible ? 'border-forest bg-forest text-white' : 'border-parchmentDark bg-white text-sage hover:border-gold hover:text-forest'}" title="${isNotebookMode ? 'Switch to card view and open filters' : 'Toggle filters'}">
+                                    <i data-lucide="sliders-horizontal" class="h-4 w-4"></i>
                                 </button>
                             </div>
                         </div>
                     </div>
 
-                    <div class="border-b border-parchmentDark bg-parchment px-5 py-4">
-                        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                            <div>
-                                <p class="text-[11px] font-bold uppercase tracking-[0.28em] text-sage opacity-80">Collection scope</p>
-                                <p class="mt-1 text-sm font-semibold text-sage">Choose what kind of recipe list you want to manage before adding search and filter rules.</p>
-                            </div>
-                            <div class="flex flex-wrap gap-2">
-                                ${collectionScopeButtons.map(scope => `
-                                    <button onclick="collectionScopeFilter='${scope.value}'; renderList()" class="inline-flex h-11 items-center gap-2 rounded-xl border px-4 text-xs font-bold uppercase tracking-[0.18em] shadow-sm transition-all ${collectionScopeFilter === scope.value ? 'border-forest bg-forest text-white' : 'border-parchmentDark bg-white text-sage hover:border-gold hover:text-forest'}">
-                                        <i data-lucide="${scope.icon}" class="h-4 w-4"></i>${scope.label} <span class="rounded-full ${collectionScopeFilter === scope.value ? 'bg-white bg-opacity-20 text-white' : 'bg-accent text-sage'} px-2 py-0.5 text-[10px]">${scope.count}</span>
-                                    </button>
-                                `).join('')}
-                            </div>
-                        </div>
-                    </div>
+                    ${activeFiltersMarkup}
 
-                    ${hasVisibleControls ? `
+                    ${(isSearchVisible || isFilterVisible) ? `
                         <div class="space-y-5 p-5">
                             ${isSearchVisible ? `
                                 <div class="relative">
@@ -2923,6 +2995,17 @@
 
                             ${isFilterVisible ? `
                                 <div class="space-y-5">
+                                    <div class="rounded-xl border border-accent bg-accent bg-opacity-30 p-4">
+                                        <div>
+                                            <p class="text-[11px] font-bold uppercase tracking-[0.28em] text-sage opacity-80">Source</p>
+                                            <p class="mt-1 text-sm font-semibold text-sage">Toggle between recipes you wrote and recipes you saved from Browse.</p>
+                                        </div>
+
+                                        <div class="mt-4 flex flex-wrap gap-2">
+                                            ${sourceFilterButtonsMarkup}
+                                        </div>
+                                    </div>
+
                                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                                         <div class="space-y-2">
                                             <label class="block text-[11px] font-bold uppercase tracking-[0.28em] text-sage opacity-80">Category</label>
@@ -2982,21 +3065,33 @@
                                     <div class="rounded-xl border border-accent bg-accent bg-opacity-40 p-4">
                                         <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                                             <div>
-                                                <p class="text-[11px] font-bold uppercase tracking-[0.28em] text-sage opacity-80">Diet preferences</p>
-                                                <p class="mt-1 text-sm font-semibold text-sage">Tap one or more filters to narrow the list.</p>
+                                                <p class="text-[11px] font-bold uppercase tracking-[0.28em] text-sage opacity-80">Diets</p>
+                                                <p class="mt-1 text-sm font-semibold text-sage">Use diet tags only when you want to narrow results by dietary fit.</p>
                                             </div>
-                                            <button onclick="resetRecipeFilters()" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sage border-opacity-20 bg-white px-4 text-xs font-bold uppercase tracking-[0.2em] text-sage shadow-sm transition-all hover:border-gold hover:text-forest">
-                                                <i data-lucide="rotate-ccw" class="h-4 w-4"></i>Reset all
-                                            </button>
+                                            <div class="flex flex-wrap gap-2">
+                                                <button onclick="toggleDietFiltersVisibility()" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-4 text-xs font-bold uppercase tracking-[0.2em] shadow-sm transition-all ${showDietFilters ? 'border-forest bg-forest text-white' : 'border-sage border-opacity-20 bg-white text-sage hover:border-gold hover:text-forest'}">
+                                                    <i data-lucide="leaf" class="h-4 w-4"></i>Diets
+                                                    <span class="rounded-full px-2 py-0.5 text-[10px] ${showDietFilters ? 'bg-white bg-opacity-20 text-white' : 'bg-accent text-sage'}">${selectedDietSummary}</span>
+                                                    <i data-lucide="${showDietFilters ? 'chevron-up' : 'chevron-down'}" class="h-4 w-4"></i>
+                                                </button>
+                                                ${showDietFilters ? `<button onclick="toggleDietGuide()" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sage border-opacity-20 bg-white px-4 text-xs font-bold uppercase tracking-[0.2em] text-sage shadow-sm transition-all hover:border-gold hover:text-forest"><i data-lucide="info" class="h-4 w-4"></i>${showDietGuide ? 'Hide guide' : 'Diet guide'}</button>` : ''}
+                                                <button onclick="resetRecipeFilters()" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sage border-opacity-20 bg-white px-4 text-xs font-bold uppercase tracking-[0.2em] text-sage shadow-sm transition-all hover:border-gold hover:text-forest">
+                                                    <i data-lucide="rotate-ccw" class="h-4 w-4"></i>Reset all
+                                                </button>
+                                            </div>
                                         </div>
 
-                                        <div class="mt-4 flex flex-wrap gap-2">
-                                            ${dietFilterButtonsMarkup}
-                                        </div>
-
-                                        ${activeFilters.length > 0 ? `
-                                            <div class="mt-4 flex flex-wrap gap-2 border-t border-sage border-opacity-10 pt-4">
-                                                ${activeFilters.map(filter => `<span class="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-sage shadow-sm border border-parchmentDark">${filter}</span>`).join('')}
+                                        ${showDietFilters ? `
+                                            <div class="mt-4 border-t border-sage border-opacity-10 pt-4">
+                                                <p class="text-xs font-semibold leading-relaxed text-sage">Recipes must satisfy every selected diet. Stricter tags still count, so Vegan also matches Vegetarian, and Keto also matches Low-carb.</p>
+                                                <div class="mt-4 flex flex-wrap gap-2">
+                                                    ${dietFilterButtonsMarkup}
+                                                </div>
+                                                ${showDietGuide ? `
+                                                    <div class="mt-4 grid gap-3 border-t border-sage border-opacity-10 pt-4 md:grid-cols-2 xl:grid-cols-3">
+                                                        ${dietGuideMarkup}
+                                                    </div>
+                                                ` : ''}
                                             </div>
                                         ` : ''}
                                     </div>
@@ -3024,9 +3119,6 @@
                     const recipeSourceLabel = recipe.source === 'published'
                         ? 'Saved from Browse'
                         : (isRecipePublishedLive(recipe) ? 'Published live' : (recipe.publishedId ? 'Private draft with publish history' : 'Private recipe'));
-                    const secondaryAction = recipe.source === 'published'
-                        ? `<button onclick="event.stopPropagation(); renderPublishedRecipeDetail('${recipe.publishedId}')" class="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-parchmentDark bg-white px-3 text-[11px] font-bold uppercase tracking-[0.16em] text-sage transition-all hover:border-gold hover:text-forest"><i data-lucide="external-link" class="h-4 w-4"></i>Latest</button>`
-                        : `<button onclick="event.stopPropagation(); renderAddForm(${recipe.id})" class="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-parchmentDark bg-white px-3 text-[11px] font-bold uppercase tracking-[0.16em] text-sage transition-all hover:border-gold hover:text-forest"><i data-lucide="pencil-line" class="h-4 w-4"></i>Edit</button>`;
                     html += `
                         <div onclick="renderDetail(${recipe.id})" class="relative h-full bg-white rounded-md shadow-sm hover:shadow-xl transition-all cursor-pointer border border-parchmentDark group overflow-hidden flex flex-col">
                             ${savedRecipeOutdated ? `<button onclick="event.stopPropagation(); renderDetail(${recipe.id})" title="Author update available" class="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-gold bg-white text-gold shadow-md transition-all hover:scale-105 hover:text-forest"><i data-lucide="alert-circle" class="h-5 w-5"></i></button>` : ''}
@@ -3057,12 +3149,8 @@
                                     </div>
                                 </div>
 
-                                <div class="mt-5 border-t border-accent pt-4">
+                                <div class="mt-auto border-t border-accent pt-4">
                                     <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-sage opacity-80">${recipeSourceLabel}</p>
-                                    <div class="mt-3 flex flex-wrap items-center gap-2">
-                                        ${secondaryAction}
-                                        <button onclick="event.stopPropagation(); renderDetail(${recipe.id})" class="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-gold bg-gold px-3 text-[11px] font-bold uppercase tracking-[0.16em] text-white transition-all hover:border-yellow-600 hover:bg-yellow-600"><i data-lucide="arrow-right" class="h-4 w-4"></i>Open</button>
-                                    </div>
                                 </div>
                             </div>
                         </div>
