@@ -62,6 +62,10 @@
             padding-bottom: 1rem;
         }
 
+        .theme-simple .simple-hidden {
+            display: none !important;
+        }
+
         @media (max-width: 767px) {
             #app-content {
                 padding-bottom: calc(6.5rem + env(safe-area-inset-bottom, 0px));
@@ -1064,28 +1068,83 @@
     <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 
     <script>
-        // --- 0. GEMINI API SETUP ---
-        const apiKey = ""; // API key is injected by the environment
-
-        async function fetchGeminiAPI(payload) {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-            const delays = [1000, 2000, 4000, 8000, 16000];
-            
-            for (let i = 0; i < 5; i++) {
-                try {
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                    return await response.json();
-                } catch (error) {
-                    if (i === 4) throw error;
-                    await new Promise(r => setTimeout(r, delays[i]));
-                }
-            }
-        }
+        // --- 0. LOCAL AI SETUP ---
+        const localAiTranslationPatterns = [
+            { pattern: /\b(?:en|y|et|und|e|i|ve)\b/g, replacement: ' and ' },
+            { pattern: /\b(?:kip|kipfilet|pollo|poulet|huhn|hahnchen|frango|kurczak|tavuk)\b/g, replacement: 'chicken' },
+            { pattern: /\b(?:rundvlees|rundergehakt|carne de res|ternera|boeuf|rindfleisch|manzo|carne bovina|wolowina|dana eti)\b/g, replacement: 'beef' },
+            { pattern: /\b(?:varkensvlees|cerdo|porc|schweinefleisch|maiale|porco|wieprzowina|domuz)\b/g, replacement: 'pork' },
+            { pattern: /\b(?:kalkoen|pavo|dinde|pute|tacchino|peru|indyk|hindi)\b/g, replacement: 'turkey' },
+            { pattern: /\b(?:lam|cordero|agneau|lamm|agnello|cordeiro|jagniecina|kuzu)\b/g, replacement: 'lamb' },
+            { pattern: /\b(?:vis|pescado|poisson|fisch|pesce|peixe|ryba|balik)\b/g, replacement: 'fish' },
+            { pattern: /\b(?:zalm|salmon|saumon|lachs|salmone|salmao|losos)\b/g, replacement: 'salmon' },
+            { pattern: /\b(?:tonijn|atun|thon|thunfisch|tonno|atum|tunczyk)\b/g, replacement: 'tuna' },
+            { pattern: /\b(?:garnaal|gamba|gambas|camaron(?:es)?|crevette(?:s)?|garnelen|gamberi|camarao|krewetki|karides)\b/g, replacement: 'shrimp' },
+            { pattern: /\b(?:tofu|doufu)\b/g, replacement: 'tofu' },
+            { pattern: /\b(?:linzen|lentejas|lentilles|linsen|lenticchie|lentilha|soczewica|mercimek)\b/g, replacement: 'lentil' },
+            { pattern: /\b(?:kaas|queso|fromage|kase|formaggio|queijo|ser|peynir)\b/g, replacement: 'cheese' },
+            { pattern: /\b(?:boter|mantequilla|beurre|butter|burro|manteiga|maslo|tereyagi)\b/g, replacement: 'butter' },
+            { pattern: /\b(?:melk|leche|lait|milch|latte|leite|mleko|sut)\b/g, replacement: 'milk' },
+            { pattern: /\b(?:room|crema|creme|sahne|panna|nata|smietana|krema)\b/g, replacement: 'cream' },
+            { pattern: /\b(?:yoghurt|yogurt|yaourt|joghurt|iogurt|iogurte|jogurt)\b/g, replacement: 'yogurt' },
+            { pattern: /\b(?:ei|eieren|huevo(?:s)?|oeuf(?:s)?|uovo|uova|ovo(?:s)?|jajko|jajka|yumurta)\b/g, replacement: 'egg' },
+            { pattern: /\b(?:ui|uien|cebolla|cebollas|cebola(?:s)?|oignon(?:s)?|zwiebel(?:n)?|cipolla|cipolle|cebula|cebule|sogan)\b/g, replacement: 'onion' },
+            { pattern: /\b(?:sjalot|chalote|shallot|eschalotte|scalogno)\b/g, replacement: 'shallot' },
+            { pattern: /\b(?:knoflook|ajo|ail|knoblauch|aglio|alho|czosnek|sarimsak)\b/g, replacement: 'garlic' },
+            { pattern: /\b(?:gember|jengibre|gingembre|ingwer|zenzero|gengibre|imbir|zencefil)\b/g, replacement: 'ginger' },
+            { pattern: /\b(?:aardappel(?:en)?|patata(?:s)?|papa(?:s)?|pomme de terre|kartoffel(?:n)?|patate|batata(?:s)?|ziemniak(?:i)?|patates)\b/g, replacement: 'potato' },
+            { pattern: /\b(?:rijst|arroz|riz|reis|riso|pirinc)\b/g, replacement: 'rice' },
+            { pattern: /\b(?:pasta|macarrao|macarron(?:es)?|makaron|spaghetti|penne|fusilli)\b/g, replacement: 'pasta' },
+            { pattern: /\b(?:bloem|harina|farine|mehl|farina|farinha|maka|un)\b/g, replacement: 'flour' },
+            { pattern: /\b(?:suiker|azucar|sucre|zucker|zucchero|acucar|cukier|seker)\b/g, replacement: 'sugar' },
+            { pattern: /\b(?:honing|miel|honig|miele|mel|miod|bal)\b/g, replacement: 'honey' },
+            { pattern: /\b(?:tomaat|tomaten|tomate(?:s)?|pomodoro|pomodori|pomidor(?:y)?|domates)\b/g, replacement: 'tomato' },
+            { pattern: /\b(?:brood|pan|pain|brot|pane|pao|chleb|ekmek)\b/g, replacement: 'bread' },
+            { pattern: /\b(?:noedels|fideos|nouilles|nudeln|noodles|makarna)\b/g, replacement: 'noodles' },
+            { pattern: /\b(?:bonen|frijoles|haricots|bohnen|fagioli|feijao|fasola|fasulye)\b/g, replacement: 'beans' },
+            { pattern: /\b(?:kikkererwten|garbanzos|pois chiches|kichererbsen|ceci|grao de bico|ciecierzyca|nohut)\b/g, replacement: 'chickpea' },
+            { pattern: /\b(?:champignons|setas|champi(?:nones)?|pilze|funghi|cogumelo(?:s)?|grzyb(?:y)?|mantar)\b/g, replacement: 'mushroom' },
+            { pattern: /\b(?:paprika|pimiento|poivron|peperone|pimentao|papryka|biber)\b/g, replacement: 'pepper' },
+            { pattern: /\b(?:wortel|zanahoria|carotte|karotte|carota|cenoura|marchew|havuc)\b/g, replacement: 'carrot' },
+            { pattern: /\b(?:broccoli|brocoli|brokkoli|brocolis|brokul)\b/g, replacement: 'broccoli' },
+            { pattern: /\b(?:spinazie|espinaca|epinard|spinat|spinaci|espinafre|szpinak|ispanak)\b/g, replacement: 'spinach' },
+            { pattern: /\b(?:courgette|zucchini|calabacin|zucchine|abobrinha|cukinia|kabak)\b/g, replacement: 'zucchini' },
+            { pattern: /\b(?:komkommer|pepino|concombre|gurke|cetriolo|ogorek|salatalik)\b/g, replacement: 'cucumber' },
+            { pattern: /\b(?:mais|maiz|mais doce|kukurydza|misir)\b/g, replacement: 'corn' },
+            { pattern: /\b(?:citroen|limon|citron|zitrone|limone|limao|cytryna)\b/g, replacement: 'lemon' },
+            { pattern: /\b(?:limoen|lime|lima)\b/g, replacement: 'lime' },
+            { pattern: /\b(?:peterselie|perejil|persil|petersilie|prezzemolo|salsa|natka pietruszki|maydanoz)\b/g, replacement: 'parsley' },
+            { pattern: /\b(?:basilicum|albahaca|basilic|basilikum|basilico|manjericao|bazylia|feslegen)\b/g, replacement: 'basil' },
+            { pattern: /\b(?:koriander|cilantro|coriandre|coriandolo|coentro|kolendra|kisnis)\b/g, replacement: 'cilantro' },
+            { pattern: /\b(?:bouillon|caldo|brodo|bruhe|bulion|et suyu|sebze suyu)\b/g, replacement: 'stock' },
+            { pattern: /\b(?:kokosmelk|leche de coco|lait de coco|kokosmilch|latte di cocco|leite de coco|mleko kokosowe|hindistan cevizi sutu)\b/g, replacement: 'coconut milk' },
+            { pattern: /\b(?:sojasaus|salsa de soja|sauce soja|sojasauce|salsa di soia|molho de soja|sos sojowy|soya sosu)\b/g, replacement: 'soy sauce' },
+            { pattern: /\b(?:sesam|sesamo|sezam|susam)\b/g, replacement: 'sesame' },
+            { pattern: /\b(?:komijn|comino|kreuzkummel|cumino|cominho|kmin rzymski|kimyon)\b/g, replacement: 'cumin' },
+            { pattern: /\b(?:kurkuma|curcuma|haldi|zerdecal)\b/g, replacement: 'turmeric' },
+            { pattern: /\b(?:garam masala|masala)\b/g, replacement: 'garam masala' },
+            { pattern: /\b(?:zaatar|zatar)\b/g, replacement: 'zaatar' },
+            { pattern: /\b(?:harissa)\b/g, replacement: 'harissa' },
+            { pattern: /\b(?:tahin|tahini)\b/g, replacement: 'tahini' },
+            { pattern: /\b(?:tortilla(?:s)?|wrap(?:s)?)\b/g, replacement: 'tortilla' },
+            { pattern: /\b(?:olijfolie|aceite de oliva|huile d olive|olivenol|olio d oliva|azeite|oliwa z oliwek|zeytinyagi)\b/g, replacement: 'olive oil' },
+            { pattern: /\b(?:zout|sal|sel|salz|sol|tuz)\b/g, replacement: 'salt' },
+            { pattern: /\b(?:peper|pimienta|poivre|pfeffer|pepe|pimenta|pieprz|biber)\b/g, replacement: 'pepper' },
+            { pattern: /\b(?:snijden|gesneden|cortar|couper|schneiden|tagliare|picar|fatiar|kroic|dogramak)\b/g, replacement: 'chop' },
+            { pattern: /\b(?:roeren|roer|mezclar|remuer|ruhren|mescolare|misturar|mieszac|karistirmak)\b/g, replacement: 'stir' },
+            { pattern: /\b(?:koken|hervir|bouillir|kochen|bollire|ferver|gotowac)\b/g, replacement: 'boil' },
+            { pattern: /\b(?:bakken|hornear|cuire|backen|forno|fornare|assar|piec|firinda)\b/g, replacement: 'bake' },
+            { pattern: /\b(?:frituren|freir|frire|braten|friggere|fritar|smazyc|kizartmak)\b/g, replacement: 'fry' },
+            { pattern: /\b(?:roosteren|asar|rotir|rosten|arrostire|assar|piec|firinlamak)\b/g, replacement: 'roast' },
+            { pattern: /\b(?:sudderen|mijoter|simmern|cuocere a fuoco lento|cozinhar lentamente|dusic|kisik ateste)\b/g, replacement: 'simmer' },
+            { pattern: /\b(?:sauteren|saltear|faire sauter|anbraten|saltare|refogar|podsmazyc)\b/g, replacement: 'saute' },
+            { pattern: /\b(?:stomen|cocer al vapor|cuire a la vapeur|dampfen|cuocere al vapore|cozinhar no vapor|gotowac na parze|buharda pisirmek)\b/g, replacement: 'steam' },
+            { pattern: /\b(?:grillen|asar a la parrilla|griller|grillen|grigliare|grelhar|grillowac|izgara)\b/g, replacement: 'grill' },
+            { pattern: /\b(?:mixen|licuar|mixer|frullare|bater|blendowac|karistiriciyla cekmek)\b/g, replacement: 'blend' },
+            { pattern: /\b(?:marineren|marinar|mariner|marinieren|marinare|marynowac|marine etmek)\b/g, replacement: 'marinate' },
+            { pattern: /\b(?:kloppen|batir|fouetter|schlagen|sbattere|ubijac|cirpmak)\b/g, replacement: 'whisk' },
+            { pattern: /\b(?:schillen|pelar|peler|schalen|pelare|obierac|soymak)\b/g, replacement: 'peel' }
+        ];
 
         // --- 1. DATA & LOCAL STORAGE ---
         const defaultPlaceholderBanner = "https://images.unsplash.com/photo-1495195134817-a1a280040141?auto=format&fit=crop&q=80&w=1000";
@@ -1106,7 +1165,6 @@
             indexViewMode: "cards",
             notebookCover: getDefaultNotebookCover(),
             showNotebookStickyNotes: true,
-            simpleMode: false,
             premium: false,
             simpleMode: false,
             favorites: [],
@@ -1138,6 +1196,7 @@
         let draftIngredients = [];
         let draftSteps = [];
         let draftProfile = null; 
+        let simpleModeManualDetailsVisible = false;
         let editingRecipeId = null;
         let recipeSubmitAction = 'save';
         let hasLoadedPublishedRecipesCache = false;
@@ -1953,6 +2012,7 @@
             delete userSettings.themeMode;
             userSettings.notebookCover = normalizeNotebookCover(userSettings.notebookCover);
             document.getElementById('body')?.classList.remove('theme-dark');
+            applyUserModeClasses();
             document.documentElement.style.colorScheme = 'light';
             indexViewMode = userSettings.indexViewMode === 'book' ? 'book' : 'cards';
 
@@ -2000,8 +2060,15 @@
         }
 
         function saveData() {
+            applyUserModeClasses();
             localStorage.setItem('recipeArchiveSettings', JSON.stringify(userSettings));
             localStorage.setItem('recipeArchiveData', JSON.stringify(recipes));
+        }
+
+        function applyUserModeClasses() {
+            const bodyElement = document.getElementById('body');
+            if (!bodyElement) return;
+            bodyElement.classList.toggle('theme-simple', Boolean(userSettings.simpleMode));
         }
 
         // --- PHASE 2: FIREBASE BACKEND ---
@@ -3063,6 +3130,21 @@
                                         </div>
                                     </div>
                                 </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Accessibility</label>
+                                    <button type="button" onclick="toggleSimpleModeSetting()" class="w-full rounded-xl border border-sage border-opacity-20 bg-accent bg-opacity-60 p-4 text-left transition-colors hover:border-gold hover:bg-white">
+                                        <div class="flex items-center justify-between gap-4">
+                                            <div>
+                                                <p class="text-sm font-bold text-forest">Simple Mode</p>
+                                                <p class="mt-1 text-xs font-semibold text-sage">A calmer recipe screen for elderly cooks. This setting saves automatically the moment you switch it.</p>
+                                            </div>
+                                            <span class="relative inline-flex h-7 w-14 flex-shrink-0 items-center rounded-full transition-colors ${userSettings.simpleMode ? 'bg-forest' : 'bg-sage/35'}">
+                                                <span class="inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${userSettings.simpleMode ? 'translate-x-8' : 'translate-x-1'}"></span>
+                                            </span>
+                                        </div>
+                                        <p class="mt-3 text-[11px] font-bold uppercase tracking-[0.24em] ${userSettings.simpleMode ? 'text-forest' : 'text-sage'}">${userSettings.simpleMode ? 'Currently on' : 'Currently off'}</p>
+                                    </button>
+                                </div>
                             </div>
 
                             <div class="pt-4 border-t border-accent flex justify-end">
@@ -3157,6 +3239,13 @@
 
             saveData();
             showToast('Settings saved successfully!', 'settings-2');
+            renderSettings();
+        }
+
+        function toggleSimpleModeSetting() {
+            userSettings.simpleMode = !userSettings.simpleMode;
+            saveData();
+            showToast(`Simple Mode ${userSettings.simpleMode ? 'enabled' : 'disabled'} and saved automatically.`, 'settings-2');
             renderSettings();
         }
 
@@ -5161,35 +5250,8 @@
             btn.classList.add('opacity-50');
             loader.classList.remove('hidden');
 
-            const payload = {
-                contents: [{ parts: [{ text: `Generate a recipe using these ingredients: ${input}. Keep the language strictly in English. Return valid JSON.` }] }],
-                systemInstruction: { parts: [{ text: "You are an expert Chef. Create a realistic, tasty recipe from the provided ingredients." }] },
-                generationConfig: {
-                    responseMimeType: "application/json",
-                    responseSchema: {
-                        type: "OBJECT",
-                        properties: {
-                            title: { type: "STRING", description: "Creative recipe title" },
-                            category: { type: "STRING", description: "Either: Cooking, Baking, Dessert, Drink" },
-                            country: { type: "STRING", description: "Country of origin, e.g. Italy, France, USA" },
-                            prepTime: { type: "INTEGER", description: "Preparation time in minutes" },
-                            cookTime: { type: "INTEGER", description: "Cooking time in minutes" },
-                            servings: { type: "INTEGER", description: "Number of servings, usually 4" },
-                            difficulty: { type: "STRING", description: "Either: Easy, Medium, Hard" },
-                            cuisine: { type: "STRING", description: "Cuisine type, e.g. Italian, Asian, Mediterranean" },
-                            diet: { type: "ARRAY", items: { type: "STRING" }, description: "Applicable diet tags from: ${supportedDietOptionsText}" },
-                            ingredients: { type: "ARRAY", items: { type: "STRING" } },
-                            instructions: { type: "ARRAY", items: { type: "STRING" } },
-                            tips: { type: "STRING" }
-                        }
-                    }
-                }
-            };
-
             try {
-                const response = await fetchGeminiAPI(payload);
-                const jsonText = response.candidates?.[0]?.content?.parts?.[0]?.text;
-                const recipeData = JSON.parse(jsonText);
+                const recipeData = generateLocalRecipeFromIngredients(input);
 
                 document.getElementById('r-title').value = recipeData.title || "";
                 
@@ -5214,10 +5276,10 @@
                 renderDraftIngredients();
                 renderDraftSteps();
                 
-                showToast("✨ Magic Recipe Generated!", "sparkles");
+                showToast("✨ Local AI recipe generated!", "sparkles");
             } catch (err) {
                 console.error(err);
-                showToast("AI Chef failed to generate recipe. Try again.", "alert-triangle");
+                showToast("Local AI could not build the recipe right now. Try a clearer ingredient list.", "alert-triangle");
             } finally {
                 btn.disabled = false;
                 btn.classList.remove('opacity-50');
@@ -5226,6 +5288,14 @@
         }
 
         function renderAddForm(recipeId = null) {
+            const localRecipesCount = recipes.filter(recipe => recipe.source === 'local').length;
+            if (!recipeId && !userSettings.premium && localRecipesCount >= 8) {
+                showPremiumModal('add more than 8 recipes');
+                renderList();
+                return;
+            }
+
+            simpleModeManualDetailsVisible = false;
             isCookingMode = false;
             document.getElementById('body').classList.remove('cooking-mode-active');
             setActiveNav('add');
@@ -5240,6 +5310,20 @@
             const publishSubmitLabel = recipeToEdit
                 ? (recipeToEdit.publishedId ? (isRecipePublishedLive(recipeToEdit) ? 'Save & Update Publish' : 'Save & Republish') : 'Save & Publish')
                 : 'Save & Publish';
+            const manualDetailsHiddenClass = userSettings.simpleMode ? 'hidden' : '';
+            const simpleModeNotice = userSettings.simpleMode
+                ? `<div class="mb-6 rounded-md border border-sage border-opacity-20 bg-accent bg-opacity-50 px-4 py-4 text-sm text-forest">
+                    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                        <div>
+                            <p class="font-bold">Simple Mode is handling the extra details for you.</p>
+                            <p class="mt-1 font-semibold text-sage">When you save, Uculi will auto-tag the hidden recipe details automatically.</p>
+                        </div>
+                        <button type="button" id="btn-show-manual-details" onclick="showManualRecipeDetails()" class="inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-sage bg-white px-5 text-xs font-bold uppercase tracking-wider text-forest transition-colors hover:border-gold hover:text-sage">
+                            <i data-lucide="sliders-horizontal" class="h-4 w-4 text-gold"></i> Manually add details
+                        </button>
+                    </div>
+                </div>`
+                : '';
             const dietOptionsMarkup = dietOptions.map(option => {
                 const desc = dietDescriptions[option] || '';
                 return `<label class="relative flex items-center gap-2 cursor-pointer rounded-sm border border-parchmentDark bg-white px-3 py-2 font-semibold text-forest shadow-sm transition-all hover:border-gold hover:text-sage group">
@@ -5254,25 +5338,26 @@
             contentDiv.innerHTML = `
                 <div class="bg-white p-6 md:p-10 rounded-sm shadow-sm mb-6 border border-parchmentDark max-w-4xl mx-auto">
                     
-                    <!-- AI MAGIC GENERATOR FEATURE ✨ -->
-                    <div class="bg-gradient-to-r from-accent to-gold/20 p-6 rounded-md border border-gold mb-10 shadow-sm relative overflow-hidden" translate="no">
+                    <!-- LOCAL AI GENERATOR FEATURE ✨ -->
+                    <div class="simple-hidden bg-gradient-to-r from-accent to-gold/20 p-6 rounded-md border border-gold mb-10 shadow-sm relative overflow-hidden" translate="no">
                         <div class="absolute -right-4 -top-4 text-6xl opacity-10 pointer-events-none">✨</div>
                         <h3 class="font-fantasy font-bold text-2xl text-forest mb-2 flex items-center gap-2">
-                            <i data-lucide="sparkles" class="w-6 h-6 text-gold"></i> AI Magic Generator
+                            <i data-lucide="sparkles" class="w-6 h-6 text-gold"></i> Uculi Local AI Generator
                         </h3>
-                        <p class="text-sm text-forest mb-4 font-semibold">Empty fridge? Tell us what ingredients you have, and our AI Chef will create a complete recipe for you!</p>
+                        <p class="text-sm text-forest mb-4 font-semibold">Empty fridge? Tell Uculi what ingredients you have and it will build a recipe locally in your browser. Dutch, Spanish, French, German, Italian, Portuguese, Polish, and Turkish cooking words are normalized before analysis.</p>
                         <div class="flex flex-col md:flex-row gap-2">
-                            <input type="text" id="ai-ingredients-input" placeholder="e.g., chicken, broccoli, rice..." class="${inputClass} flex-1 !border-gold/50">
+                            <input type="text" id="ai-ingredients-input" placeholder="e.g., chicken, broccoli, rice... or kip, broccoli, rijst..." class="${inputClass} flex-1 !border-gold/50">
                             <button type="button" onclick="triggerMagicGenerator()" id="btn-magic-generate" class="bg-forest text-white h-12 px-6 rounded-sm font-bold shadow-md hover:bg-sage transition-colors flex items-center justify-center gap-2 whitespace-nowrap uppercase tracking-wider text-xs">
                                 <span>Generate Recipe</span> <i data-lucide="sparkles" class="w-4 h-4 text-gold"></i>
                             </button>
                         </div>
                         <div id="ai-loading" class="hidden mt-4 text-sm font-bold text-sage flex items-center gap-2">
-                            <i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> The AI Chef is thinking...
+                            <i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Uculi Local AI is building your draft...
                         </div>
                     </div>
 
                     <h2 class="font-fantasy font-bold text-3xl mb-8 text-forest border-b border-accent pb-4 flex items-center gap-2"><i data-lucide="file-plus-2" class="w-8 h-8 text-gold"></i> ${formTitle}</h2>
+                    ${simpleModeNotice}
                     
                     <form id="add-recipe-form" class="space-y-8" onsubmit="saveRecipe(event)">
                         <div class="flex flex-col items-center mb-8 bg-accent bg-opacity-30 p-6 rounded-md border border-sage border-opacity-10">
@@ -5288,14 +5373,14 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-accent bg-opacity-30 rounded-md border border-sage border-opacity-10">
                             <div class="md:col-span-2"><label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Recipe Title</label><input type="text" id="r-title" required class="${inputClass}"></div>
                             <div><label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Author</label><input type="text" id="r-author" value="${userSettings.name}" class="${inputClass}"></div>
-                            <div>
+                            <div data-simple-mode-section class="${manualDetailsHiddenClass}">
                                 <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Category</label>
                                 <select id="r-category" required class="${inputClass}">
                                     <option value="Cooking">Cooking</option><option value="Baking">Baking</option>
                                     <option value="Dessert">Dessert</option><option value="Drink">Drink</option>
                                 </select>
                             </div>
-                            <div class="md:col-span-2">
+                            <div data-simple-mode-section class="md:col-span-2 ${manualDetailsHiddenClass}">
                                 <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Country / Origin</label>
                                 <input type="text" id="r-country" list="countries-list" placeholder="Typ of selecteer een land..." value="${userSettings.country}" class="${inputClass}">
                             </div>
@@ -5320,16 +5405,16 @@
                             </div>
                         </div>
 
-                        <div><label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2 flex items-center gap-2"><i data-lucide="lightbulb" class="w-4 h-4"></i> Chef's Notes</label><textarea id="r-tips" placeholder="Secret ingredient..." class="${textareaClass}"></textarea></div>
+                        <div data-simple-mode-section class="${manualDetailsHiddenClass}"><label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2 flex items-center gap-2"><i data-lucide="lightbulb" class="w-4 h-4"></i> Chef's Notes</label><textarea id="r-tips" placeholder="Secret ingredient..." class="${textareaClass}"></textarea></div>
 
-                        <div class="rounded-md border border-sage border-opacity-10 bg-accent bg-opacity-20 overflow-hidden">
+                        <div data-simple-mode-section class="${manualDetailsHiddenClass} rounded-md border border-sage border-opacity-10 bg-accent bg-opacity-20 overflow-hidden">
                             <button type="button" onclick="toggleRecipeDetails()" class="w-full flex items-center justify-between gap-4 p-5 text-left hover:bg-white hover:bg-opacity-50 transition-colors">
                                 <div>
                                     <p id="recipe-details-toggle-label" class="text-sm font-bold uppercase tracking-[0.24em] text-sage">Details</p>
-                                    <p id="recipe-details-toggle-hint" class="mt-1 text-sm font-semibold text-forest opacity-80">Optional metadata for timing, cuisine, servings and diet.</p>
+                                    <p id="recipe-details-toggle-hint" class="mt-1 text-sm font-semibold text-forest opacity-80">Fill these in yourself when you can. If you want help, Local AI can suggest a starting point.</p>
                                 </div>
                                 <div class="flex items-center gap-3 text-sage">
-                                    <span class="hidden md:inline text-xs font-bold uppercase tracking-[0.24em] opacity-70">Auto-fill ready</span>
+                                    <span class="hidden md:inline text-xs font-bold uppercase tracking-[0.24em] opacity-70">Manual first, AI if needed</span>
                                     <i id="recipe-details-toggle-icon" data-lucide="chevron-down" class="w-5 h-5 transition-transform duration-200"></i>
                                 </div>
                             </button>
@@ -5338,10 +5423,10 @@
                                 <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                                     <div>
                                         <p class="text-xs font-bold uppercase tracking-[0.24em] text-sage">Recipe Details</p>
-                                        <p class="mt-1 text-sm font-semibold text-forest opacity-80">Let AI estimate the details from your ingredients, instructions and chef's notes, then fine-tune anything yourself.</p>
+                                        <p class="mt-1 text-sm font-semibold text-forest opacity-80">Fill these out yourself for the best result. If you want a shortcut, Local AI can draft them for you.</p>
                                     </div>
-                                    <button type="button" id="btn-autofill-details" onclick="autoFillRecipeDetails()" class="bg-forest text-white h-11 px-5 rounded-sm font-bold shadow-md hover:bg-sage transition-colors flex items-center justify-center gap-2 uppercase tracking-wider text-xs whitespace-nowrap">
-                                        <i id="autofill-details-icon" data-lucide="sparkles" class="w-4 h-4 text-gold"></i> Auto-fill
+                                    <button type="button" id="btn-autofill-details" onclick="autoFillRecipeDetails()" class="border border-forest bg-white text-forest h-11 px-5 rounded-sm font-bold shadow-sm hover:border-gold hover:text-sage transition-colors flex items-center justify-center gap-2 uppercase tracking-wider text-xs whitespace-nowrap">
+                                        <i id="autofill-details-icon" data-lucide="sparkles" class="w-4 h-4 text-gold"></i> Local AI Autofill
                                     </button>
                                 </div>
 
@@ -5382,7 +5467,7 @@
                                     </div>
                                 </div>
 
-                                <p class="text-xs text-sage font-semibold italic">AI suggestions are only a starting point. Every field stays fully editable before you save.</p>
+                                <p class="text-xs text-sage font-semibold italic">Local AI suggestions are only a starting point. Every field stays fully editable before you save.</p>
                             </div>
                         </div>
 
@@ -5416,6 +5501,15 @@
 
             renderDraftIngredients();
             renderDraftSteps();
+            setRecipeDetailsVisibility(Boolean(recipeToEdit) || !userSettings.simpleMode);
+        }
+
+        function showManualRecipeDetails() {
+            simpleModeManualDetailsVisible = true;
+            document.querySelectorAll('[data-simple-mode-section]').forEach(section => section.classList.remove('hidden'));
+            document.getElementById('btn-show-manual-details')?.classList.add('hidden');
+            setRecipeDetailsVisibility(true);
+            showToast('Extra details are now visible. Simple Mode will still save normally.', 'sliders-horizontal');
         }
 
         function addDraftIngredient() {
@@ -5484,15 +5578,381 @@
             setRecipeDetailsVisibility(true);
         }
 
-        function localAutoTagRecipe(title, ingredientsStr, notesStr) {
-            const str = (title + ' ' + ingredientsStr + ' ' + notesStr).toLowerCase();
-            const tags = { difficulty: 'Easy', categories: [], diet: [] };
-            if (/beef|chicken|pork|sausage|meat|steak/i.test(str)) { tags.difficulty = 'Medium'; tags.categories.push('Main Course'); }
-            if (!/meat|beef|chicken|pork/i.test(str)) { tags.diet.push('Vegetarian'); }
-            return tags;
+        function normalizeTextForLocalAI(text = '') {
+            let normalized = String(text)
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/['’]/g, ' ')
+                .replace(/[()]/g, ' ')
+                .replace(/[|/]/g, ', ')
+                .replace(/[•·]/g, ', ')
+                .replace(/[–—]/g, ' ')
+                .replace(/\s*&\s*/g, ' and ');
+
+            localAiTranslationPatterns.forEach(({ pattern, replacement }) => {
+                normalized = normalized.replace(pattern, replacement);
+            });
+
+            return normalized.replace(/\s+/g, ' ').trim();
+        }
+
+        function splitLocalAiIngredientInput(input = '') {
+            return normalizeTextForLocalAI(String(input).replace(/\r/g, ' '))
+                .replace(/\b(?:and|with|plus)\b/g, ',')
+                .split(/[\n,;]+/)
+                .map(item => item.replace(/^\d+\.\s*/, '').trim())
+                .filter(Boolean);
+        }
+
+        function titleCaseLocalAi(text = '') {
+            return String(text)
+                .split(/\s+/)
+                .filter(Boolean)
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+        }
+
+        function humanizeLocalAiIngredient(ingredient = '') {
+            const cleaned = normalizeTextForLocalAI(ingredient).replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+            return titleCaseLocalAi(cleaned || 'Pantry Ingredient');
+        }
+
+        function pickLocalAiLeadIngredient(normalizedIngredients = []) {
+            const priorities = [/chicken/, /beef/, /salmon|fish|shrimp|tuna/, /pork/, /turkey|lamb/, /tofu/, /lentil|chickpea|beans/, /mushroom/, /potato/, /rice/, /pasta|noodle/, /tomato/, /pepper/, /broccoli/, /spinach/];
+            for (const pattern of priorities) {
+                const match = normalizedIngredients.find(item => pattern.test(item));
+                if (match) return match;
+            }
+            return normalizedIngredients[0] || 'garden';
+        }
+
+        function pickLocalAiSupportingIngredient(normalizedIngredients = [], leadIngredient = '') {
+            return normalizedIngredients.find(item => item !== leadIngredient && !/salt|pepper|olive oil|water|stock|broth|soy sauce|sesame oil|lemon juice|lime juice/.test(item)) || '';
+        }
+
+        function detectLocalAiCountry(cuisine = 'Homestyle') {
+            const countries = {
+                Italian: '🇮🇹 Italy',
+                Asian: '🇯🇵 Japan',
+                Thai: '🇹🇭 Thailand',
+                Indian: '🇮🇳 India',
+                Mexican: '🇲🇽 Mexico',
+                Mediterranean: '🇬🇷 Greece',
+                'Middle Eastern': '🇱🇧 Lebanon',
+                French: '🇫🇷 France',
+                American: '🇺🇸 United States',
+                Homestyle: userSettings.country || '🌍 Home Kitchen'
+            };
+            return countries[cuisine] || countries.Homestyle;
+        }
+
+        function getLocalAiIngredientMeasure(ingredient = '') {
+            if (/olive oil|soy sauce|sesame oil|lemon juice|lime juice/.test(ingredient)) return '1 tbsp';
+            if (/salt|pepper/.test(ingredient)) return '';
+            if (/garam masala|cumin|oregano|turmeric|paprika|thyme/.test(ingredient)) return '1 tsp';
+            if (/chicken|beef|pork|fish|shrimp|turkey|lamb|tofu/.test(ingredient)) return '400g';
+            if (/rice|pasta|noodle|beans|chickpea|lentil/.test(ingredient)) return '250g';
+            if (/potato|tomato|pepper|carrot|onion|mushroom|zucchini|cucumber|corn|lemon|lime/.test(ingredient)) return '2';
+            if (/broccoli|cauliflower/.test(ingredient)) return '1 head';
+            if (/garlic|shallot/.test(ingredient)) return '2 cloves';
+            if (/cheese/.test(ingredient)) return '100g';
+            if (/milk|cream|stock|broth|coconut milk|yogurt/.test(ingredient)) return '250ml';
+            if (/flour/.test(ingredient)) return '200g';
+            if (/spinach|parsley|cilantro|basil/.test(ingredient)) return '1 handful';
+            if (/ginger/.test(ingredient)) return '1 thumb';
+            if (/sugar|butter|honey/.test(ingredient)) return '2 tbsp';
+            if (/tortilla/.test(ingredient)) return '4';
+            return '1 cup';
+        }
+
+        function buildLocalAiTitle(leadIngredient, supportingIngredient, tags, normalizedIngredients = []) {
+            const normalizedText = normalizedIngredients.join(' ');
+            const styleWord = {
+                Italian: 'Rustic',
+                Asian: 'Savory',
+                Thai: 'Bright',
+                Indian: 'Spiced',
+                Mexican: 'Zesty',
+                Mediterranean: 'Sunlit',
+                'Middle Eastern': 'Golden',
+                French: 'Silky',
+                American: 'Hearty',
+                Homestyle: 'Cozy'
+            }[tags.cuisine] || 'Cozy';
+
+            const leadLabel = humanizeLocalAiIngredient(leadIngredient);
+            const supportLabel = supportingIngredient ? humanizeLocalAiIngredient(supportingIngredient) : '';
+            let dishWord = 'Skillet';
+
+            if (tags.category === 'Drink') dishWord = 'Refresher';
+            else if (tags.category === 'Dessert') dishWord = 'Treat';
+            else if (tags.category === 'Baking') dishWord = 'Bake';
+            else if (/tortilla/.test(normalizedText)) dishWord = 'Tacos';
+            else if (/pasta|noodle/.test(normalizedText)) dishWord = 'Pasta';
+            else if (/rice|grain/.test(normalizedText)) dishWord = 'Bowl';
+            else if (/broth|stock|soup/.test(normalizedText) || (tags.method === 'simmer' && /beans|lentil|chickpea|potato/.test(normalizedText))) dishWord = 'Stew';
+            else if (/bread/.test(normalizedText) && /cheese|tomato|mushroom/.test(normalizedText)) dishWord = 'Toast';
+            else if (tags.method === 'grill') dishWord = 'Grill';
+            else if (tags.method === 'bake') dishWord = 'Bake';
+            else if (/lettuce|spinach|cucumber|tomato/.test(normalizedText) && !/rice|pasta|potato/.test(normalizedText)) dishWord = 'Salad';
+
+            return `${styleWord} ${leadLabel}${supportLabel ? ` and ${supportLabel}` : ''} ${dishWord}`.trim();
+        }
+
+        function getLocalAiPantryAdditions(tags, normalizedIngredients = []) {
+            const additions = [];
+            const normalizedText = normalizedIngredients.join(' ');
+
+            if (!/olive oil/.test(normalizedText) && tags.category !== 'Drink') additions.push('1 tbsp olive oil');
+
+            if (tags.cuisine === 'Italian') additions.push('1 tsp dried oregano', '1 handful basil');
+            if (tags.cuisine === 'Asian') additions.push('1 tbsp soy sauce', '1 tsp sesame oil', '1 thumb ginger');
+            if (tags.cuisine === 'Thai') additions.push('200ml coconut milk', '1 tbsp lime juice');
+            if (tags.cuisine === 'Indian') additions.push('1 tsp garam masala', '1 tsp turmeric');
+            if (tags.cuisine === 'Mexican') additions.push('1 tsp cumin', '1 tbsp lime juice');
+            if (tags.cuisine === 'Mediterranean') additions.push('1 tbsp lemon juice', '1 handful parsley');
+            if (tags.cuisine === 'Middle Eastern') additions.push('1 tsp cumin', '1 handful parsley', '1 tbsp lemon juice');
+            if (tags.cuisine === 'French') additions.push('1 tbsp butter', '1 tsp thyme');
+            if (tags.cuisine === 'American') additions.push('1 tsp smoked paprika');
+
+            if (tags.category === 'Drink') additions.push('200ml cold water or milk');
+            if ((tags.category === 'Dessert' || tags.category === 'Baking') && /flour/.test(normalizedText) && !/baking powder/.test(normalizedText)) additions.push('1 tsp baking powder');
+
+            return additions;
+        }
+
+        function buildLocalAiIngredientList(rawIngredients, normalizedIngredients, tags) {
+            const generatedIngredients = rawIngredients.map((rawIngredient, index) => {
+                const normalizedIngredient = normalizedIngredients[index] || normalizeTextForLocalAI(rawIngredient);
+                if (/\d/.test(rawIngredient)) return rawIngredient.trim();
+                if (/salt|pepper/.test(normalizedIngredient)) return 'Salt and pepper to taste';
+                return `${getLocalAiIngredientMeasure(normalizedIngredient)} ${humanizeLocalAiIngredient(normalizedIngredient)}`.trim();
+            }).filter(Boolean);
+
+            const pantryAdditions = getLocalAiPantryAdditions(tags, normalizedIngredients);
+            const combinedIngredients = [...generatedIngredients, ...pantryAdditions];
+            if (!combinedIngredients.some(item => /salt and pepper/i.test(item))) combinedIngredients.push('Salt and pepper to taste');
+
+            return Array.from(new Set(combinedIngredients.filter(Boolean))).slice(0, 12);
+        }
+
+        function buildLocalAiInstructions(normalizedIngredients, tags, leadIngredient, supportingIngredient) {
+            const leadLabel = humanizeLocalAiIngredient(leadIngredient).toLowerCase();
+            const supportLabel = supportingIngredient ? humanizeLocalAiIngredient(supportingIngredient).toLowerCase() : 'the remaining ingredients';
+            const vegetables = normalizedIngredients
+                .filter(item => /onion|garlic|ginger|shallot|tomato|mushroom|broccoli|pepper|carrot|spinach|zucchini|cucumber/.test(item) && item !== leadIngredient && item !== supportingIngredient)
+                .slice(0, 2)
+                .map(item => humanizeLocalAiIngredient(item).toLowerCase());
+            const aromaticHint = vegetables.length ? vegetables.join(' and ') : 'any aromatics you have';
+
+            if (tags.category === 'Drink') {
+                return [
+                    `Add ${leadLabel}${supportingIngredient ? ` and ${supportLabel}` : ''} to a blender with a splash of cold liquid.`,
+                    'Blend until smooth and creamy.',
+                    'Taste and adjust with citrus, sweetener, or ice if needed.',
+                    'Serve immediately while cold and fresh.'
+                ];
+            }
+
+            if (tags.category === 'Dessert' || tags.category === 'Baking') {
+                return [
+                    'Heat the oven to 180°C and lightly grease a baking dish or tray.',
+                    `Mix ${leadLabel}${supportingIngredient ? ` with ${supportLabel}` : ''} until evenly combined.`,
+                    'Transfer the mixture to the prepared dish and bake until golden and set.',
+                    'Let it cool slightly before serving.'
+                ];
+            }
+
+            if (tags.method === 'grill') {
+                return [
+                    `Season ${leadLabel}${supportingIngredient ? ` and ${supportLabel}` : ''} well and let everything sit for a few minutes.`,
+                    'Heat a grill pan or barbecue until hot.',
+                    `Cook the ${leadLabel} until nicely marked, then add ${supportLabel} until tender.`,
+                    'Rest briefly, slice if needed, and serve warm.'
+                ];
+            }
+
+            if (tags.method === 'steam') {
+                return [
+                    `Prepare ${leadLabel}${supportingIngredient ? ` and ${supportLabel}` : ''} into even pieces.`,
+                    'Bring a steamer or a pan with a steaming basket up to a gentle simmer.',
+                    'Steam the ingredients until just tender.',
+                    'Finish with seasoning, oil, or citrus before serving.'
+                ];
+            }
+
+            if (tags.method === 'simmer') {
+                return [
+                    `Prepare ${leadLabel}${supportingIngredient ? ` and ${supportLabel}` : ''}${vegetables.length ? `, then slice ${vegetables.join(' and ')}` : ''} into bite-size pieces.`,
+                    `Warm olive oil in a pot and soften ${aromaticHint}.`,
+                    `${/chicken|beef|pork|fish|shrimp|turkey|lamb/.test(leadIngredient) ? `Add the ${leadLabel} and cook until lightly coloured.` : 'Add the main ingredients and stir for 2 to 3 minutes.'}`,
+                    'Pour in stock or water, bring everything to a gentle simmer, and cook until tender and flavorful.',
+                    'Taste, adjust the seasoning, and serve warm.'
+                ];
+            }
+
+            if (tags.method === 'boil') {
+                return [
+                    `Prepare ${leadLabel}${supportingIngredient ? ` and ${supportLabel}` : ''}.`,
+                    'Bring a pot of salted water or stock to the boil.',
+                    `Cook the main base until just tender, then stir in ${supportLabel}.`,
+                    'Drain or reduce the liquid as needed, season well, and serve hot.'
+                ];
+            }
+
+            const liquidHint = tags.cuisine === 'Asian'
+                ? 'a splash of soy sauce and water'
+                : tags.cuisine === 'Thai'
+                    ? 'coconut milk and a little water'
+                    : tags.cuisine === 'Indian'
+                        ? 'stock and warm spices'
+                : tags.cuisine === 'Mexican'
+                    ? 'stock and a pinch of cumin'
+                    : tags.cuisine === 'Mediterranean'
+                        ? 'a little stock and lemon juice'
+                        : tags.cuisine === 'Middle Eastern'
+                            ? 'stock and a squeeze of lemon'
+                        : 'a little stock or water';
+
+            return [
+                `Prepare ${leadLabel}${supportingIngredient ? ` and ${supportLabel}` : ''}${vegetables.length ? `, then slice ${vegetables.join(' and ')}` : ''} into bite-size pieces.`,
+                `Warm olive oil in a pan over medium heat and cook ${aromaticHint} until fragrant.`,
+                `${/chicken|beef|pork|fish|shrimp/.test(leadIngredient) ? `Add the ${leadLabel} and cook until it starts to brown.` : 'Add the main ingredients and stir for 2 to 3 minutes.'}`,
+                `Stir in the remaining ingredients with ${liquidHint} and cook until everything is tender and well coated.`,
+                'Taste, adjust the seasoning, and serve warm.'
+            ];
+        }
+
+        function generateLocalRecipeFromIngredients(input) {
+            const rawIngredients = splitLocalAiIngredientInput(input);
+            if (rawIngredients.length === 0) throw new Error('No recognizable ingredients were found.');
+            const normalizedIngredients = rawIngredients.map(item => normalizeTextForLocalAI(item)).filter(Boolean);
+            const tags = localAutoTagRecipe('', normalizedIngredients.join(', '));
+            const leadIngredient = pickLocalAiLeadIngredient(normalizedIngredients);
+            const supportingIngredient = pickLocalAiSupportingIngredient(normalizedIngredients, leadIngredient);
+
+            return {
+                title: buildLocalAiTitle(leadIngredient, supportingIngredient, tags, normalizedIngredients),
+                category: tags.category,
+                country: detectLocalAiCountry(tags.cuisine),
+                prepTime: tags.prepTime,
+                cookTime: tags.cookTime,
+                servings: tags.servings,
+                difficulty: tags.difficulty,
+                cuisine: tags.cuisine,
+                diet: tags.diet,
+                ingredients: buildLocalAiIngredientList(rawIngredients, normalizedIngredients, tags),
+                instructions: buildLocalAiInstructions(normalizedIngredients, tags, leadIngredient, supportingIngredient),
+                tips: tags.category === 'Drink'
+                    ? 'Blend again with extra ice if you want a colder finish.'
+                    : tags.cuisine === 'Indian'
+                        ? 'A spoonful of yogurt or a squeeze of lemon at the end will round everything out.'
+                        : tags.cuisine === 'Thai'
+                            ? 'Finish with extra lime or fresh herbs to keep the flavors bright.'
+                            : tags.cuisine === 'Middle Eastern'
+                                ? 'A drizzle of olive oil and some chopped herbs will lift the final dish.'
+                    : tags.cuisine === 'Italian'
+                        ? 'Finish with a little extra olive oil or fresh herbs just before serving.'
+                        : tags.cuisine === 'Asian'
+                            ? 'A squeeze of lime or a few sesame seeds will brighten the final dish.'
+                            : 'Taste once more at the end and add a fresh herb or citrus squeeze to wake everything up.'
+            };
+        }
+
+        function localAutoTagRecipe(title, ingredientsStr, notesStr = '', stepsStr = '') {
+            const sourceText = normalizeTextForLocalAI(`${title} ${ingredientsStr} ${notesStr} ${stepsStr}`);
+            const ingredientCount = splitLocalAiIngredientInput(ingredientsStr).length;
+            const stepCount = String(stepsStr).split(/\n+/).map(step => step.trim()).filter(Boolean).length;
+            const hasDrinkKeywords = /smoothie|juice|latte|tea|coffee|drink|cocktail|lemonade/.test(sourceText);
+            const hasDessertKeywords = /cake|cookie|brownie|sweet|sugar|chocolate|icing|dessert|pie/.test(sourceText);
+            const hasBakingKeywords = /flour|yeast|bread|muffin|cupcake|pastry|bake/.test(sourceText);
+            const hasSoupKeywords = /soup|stew|broth|stock/.test(sourceText);
+            const hasRiceKeywords = /rice|risotto|grain/.test(sourceText);
+            const hasPastaKeywords = /pasta|noodle/.test(sourceText);
+            const hasMeatKeywords = /beef|chicken|pork|sausage|meat|steak|bacon|turkey|lamb/.test(sourceText);
+            const hasFishKeywords = /fish|salmon|tuna|shrimp|prawn|cod|seafood/.test(sourceText);
+            const hasDairyKeywords = /milk|cheese|butter|cream|yogurt/.test(sourceText);
+            const hasEggKeywords = /egg/.test(sourceText);
+            const hasGlutenKeywords = /flour|bread|pasta|noodle|wheat/.test(sourceText);
+            const hasNutKeywords = /almond|cashew|walnut|hazelnut|peanut|pistachio/.test(sourceText);
+            const hasSoyKeywords = /soy|tofu|tempeh|miso|edamame/.test(sourceText);
+
+            let category = 'Cooking';
+            if (hasDrinkKeywords) category = 'Drink';
+            else if (hasDessertKeywords) category = 'Dessert';
+            else if (hasBakingKeywords) category = 'Baking';
+
+            let cuisine = 'Homestyle';
+            if (/garam masala|turmeric|paneer|dal|masala|cardamom|coriander/.test(sourceText)) cuisine = 'Indian';
+            else if (/lemongrass|fish sauce|coconut milk|thai basil|red curry|green curry|lime leaves/.test(sourceText)) cuisine = 'Thai';
+            else if (/tahini|zaatar|sumac|halloumi|falafel|shawarma|harissa|pita/.test(sourceText)) cuisine = 'Middle Eastern';
+            else if (/shallot|thyme|creme fraiche|dijon|wine sauce/.test(sourceText)) cuisine = 'French';
+            else if (/bbq|barbecue|cheddar|burger|ranch|cornbread/.test(sourceText)) cuisine = 'American';
+            else if (/soy|ginger|sesame|noodle|miso|teriyaki|curry|szechuan|gochujang/.test(sourceText)) cuisine = 'Asian';
+            else if (/basil|mozzarella|parmesan|pasta|risotto|oregano/.test(sourceText)) cuisine = 'Italian';
+            else if (/tortilla|jalapeno|cumin|salsa|taco|quesadilla/.test(sourceText)) cuisine = 'Mexican';
+            else if (/olive oil|feta|chickpea|hummus|zaatar|harissa/.test(sourceText)) cuisine = 'Mediterranean';
+
+            let method = 'saute';
+            if (hasDrinkKeywords) method = 'blend';
+            else if (/grill|barbecue/.test(sourceText)) method = 'grill';
+            else if (/steam/.test(sourceText)) method = 'steam';
+            else if (/roast/.test(sourceText)) method = 'roast';
+            else if (/bake|oven/.test(sourceText) || hasBakingKeywords || hasDessertKeywords) method = 'bake';
+            else if (/boil|blanch/.test(sourceText) || hasRiceKeywords || hasPastaKeywords) method = 'boil';
+            else if (/simmer|stew|curry|soup/.test(sourceText)) method = 'simmer';
+            else if (/fry|saute|sear|stir fry/.test(sourceText)) method = 'fry';
+
+            const diet = [];
+            if (!hasMeatKeywords && !hasFishKeywords) diet.push('Vegetarian');
+            if (!hasMeatKeywords && hasFishKeywords) diet.push('Pescatarian');
+            if (!hasMeatKeywords && !hasFishKeywords && !hasDairyKeywords && !hasEggKeywords && !/honey/.test(sourceText)) diet.push('Vegan');
+            if (!hasDairyKeywords) diet.push('Dairy-free');
+            if (!hasGlutenKeywords) diet.push('Gluten-free');
+            if (!hasNutKeywords) diet.push('Nut-free');
+            if (!hasEggKeywords) diet.push('Egg-free');
+            if (!hasSoyKeywords) diet.push('Soy-free');
+
+            let difficulty = 'Easy';
+            const complexityScore = ingredientCount + stepCount + ((method === 'simmer' || method === 'bake') ? 2 : 0) + ((/marinate|ferment|proof|temper|reduce/.test(sourceText)) ? 2 : 0) + ((/Indian|Thai|French/.test(cuisine)) ? 1 : 0);
+            if (complexityScore >= 12 || /ferment|proof|temper/.test(sourceText)) difficulty = 'Hard';
+            else if (complexityScore >= 7) difficulty = 'Medium';
+
+            const baseTimes = {
+                blend: { prepTime: 10, cookTime: 0 },
+                bake: { prepTime: 20, cookTime: 30 },
+                roast: { prepTime: 18, cookTime: 35 },
+                grill: { prepTime: 15, cookTime: 18 },
+                steam: { prepTime: 12, cookTime: 14 },
+                boil: { prepTime: 12, cookTime: 18 },
+                simmer: { prepTime: 15, cookTime: 30 },
+                fry: { prepTime: 12, cookTime: 16 },
+                saute: { prepTime: 10, cookTime: 14 }
+            };
+            const timing = baseTimes[method] || baseTimes.saute;
+            let prepTime = timing.prepTime + (ingredientCount >= 8 ? 5 : 0);
+            let cookTime = timing.cookTime + (stepCount >= 5 ? 5 : 0) + ((hasMeatKeywords || hasFishKeywords) ? 5 : 0) + (hasSoupKeywords ? 8 : 0);
+            const servings = hasDrinkKeywords ? 2 : (hasDessertKeywords || hasBakingKeywords ? 6 : (/tortilla|wrap/.test(sourceText) ? 4 : (ingredientCount >= 8 ? 6 : 4)));
+
+            return {
+                category,
+                cuisine,
+                diet,
+                difficulty,
+                method,
+                prepTime,
+                cookTime,
+                servings
+            };
         }
 
         async function autoFillRecipeDetails() {
+            if (draftIngredients.length === 0) {
+                showToast('Add ingredients first so local auto-tagging has something to work with.', 'alert-circle');
+                return;
+            }
+
             const btn = document.getElementById('btn-autofill-details');
             const icon = document.getElementById('autofill-details-icon');
             if (btn) { btn.disabled = true; btn.classList.add('opacity-60'); }
@@ -5500,22 +5960,18 @@
             
             try {
                 const title = document.getElementById('r-title').value || '';
-                const ingredients = draftIngredients.join(' ');
+                const ingredients = draftIngredients.join(', ');
                 const notes = document.getElementById('r-tips')?.value || '';
+                const stepsText = draftSteps.map(step => getRecipeInstructionText(step)).join('\n');
                 
-                const tags = localAutoTagRecipe(title, ingredients, notes);
-                
-                document.getElementById('r-prep').value = 15;
-                document.getElementById('r-cook').value = 30;
-                document.getElementById('r-servings').value = 4;
-                if (tags.categories.length > 0) document.getElementById('r-category').value = tags.categories.join(', ');
-                if (tags.diet.length > 0) document.getElementById('r-diet').value = tags.diet.join(', ');
-                document.getElementById('r-difficulty').value = tags.difficulty;
-                document.getElementById('r-cost').value = ']';
+                const tags = localAutoTagRecipe(title, ingredients, notes, stepsText);
+                document.getElementById('r-category').value = tags.category;
+                applyRecipeDetailFields(tags);
                 
                 showToast('Smart Tags Applied locally!', 'check-circle');
             } catch (err) {
                 console.error(err);
+                showToast('Local auto-tagging failed. You can still fill the details manually.', 'alert-triangle');
             } finally {
                 if (btn) { btn.disabled = false; btn.classList.remove('opacity-60'); }
                 if (icon) icon.classList.remove('animate-spin');
@@ -5599,24 +6055,42 @@
             const selectedDiet = Array.from(dietCheckboxes).map(cb => cb.value);
 
             const existingRecipe = editingRecipeId ? recipes.find(recipe => recipe.id === editingRecipeId) : null;
+            const localRecipesCount = recipes.filter(recipe => recipe.source === 'local').length;
+            if (!existingRecipe && !userSettings.premium && localRecipesCount >= 8) {
+                showPremiumModal('add more than 8 recipes');
+                return;
+            }
+
+            const titleValue = document.getElementById('r-title').value;
+            const notesValue = document.getElementById('r-tips').value;
+            const manualCategory = document.getElementById('r-category').value;
+            const manualPrepTime = parseInt(document.getElementById('r-prepTime').value) || 0;
+            const manualCookTime = parseInt(document.getElementById('r-cookTime').value) || 0;
+            const manualServings = parseInt(document.getElementById('r-servings').value) || 4;
+            const manualDifficulty = document.getElementById('r-difficulty').value || '';
+            const manualCuisine = document.getElementById('r-cuisine').value || '';
+            const stepsText = draftSteps.map(step => getRecipeInstructionText(step)).join('\n');
+            const autoTaggedDetails = userSettings.simpleMode
+                ? localAutoTagRecipe(titleValue, draftIngredients.join(', '), notesValue, stepsText)
+                : null;
             const recipePayload = {
                 ...existingRecipe,
                 id: existingRecipe?.id || generateId(),
-                title: document.getElementById('r-title').value,
+                title: titleValue,
                 author: document.getElementById('r-author').value || 'Unknown',
                 source: existingRecipe?.source || 'local',
-                category: document.getElementById('r-category').value,
+                category: userSettings.simpleMode ? (autoTaggedDetails?.category || manualCategory) : manualCategory,
                 country: document.getElementById('r-country').value,
                 profile: draftProfile || existingRecipe?.profile || defaultPlaceholderProfile,
-                prepTime: parseInt(document.getElementById('r-prepTime').value) || 0,
-                cookTime: parseInt(document.getElementById('r-cookTime').value) || 0,
-                servings: parseInt(document.getElementById('r-servings').value) || 4,
-                difficulty: document.getElementById('r-difficulty').value || '',
-                diet: selectedDiet,
-                cuisine: document.getElementById('r-cuisine').value || '',
+                prepTime: userSettings.simpleMode ? (manualPrepTime || autoTaggedDetails?.prepTime || 0) : manualPrepTime,
+                cookTime: userSettings.simpleMode ? (manualCookTime || autoTaggedDetails?.cookTime || 0) : manualCookTime,
+                servings: userSettings.simpleMode ? (manualServings || autoTaggedDetails?.servings || 4) : manualServings,
+                difficulty: userSettings.simpleMode ? (manualDifficulty || autoTaggedDetails?.difficulty || '') : manualDifficulty,
+                diet: userSettings.simpleMode && selectedDiet.length === 0 ? (autoTaggedDetails?.diet || []) : selectedDiet,
+                cuisine: userSettings.simpleMode ? (manualCuisine || autoTaggedDetails?.cuisine || '') : manualCuisine,
                 ingredients: [...draftIngredients],
                 instructions: normalizeRecipeInstructions(draftSteps),
-                tips: document.getElementById('r-tips').value,
+                tips: notesValue,
                 lastOpened: existingRecipe?.lastOpened || Date.now(),
                 checkedIngredients: existingRecipe?.checkedIngredients || [],
                 checkedSteps: existingRecipe?.checkedSteps || [],
