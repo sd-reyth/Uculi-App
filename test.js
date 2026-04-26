@@ -1,1069 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Uculi</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-        <!-- Firebase -->
-        <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
-        <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
-        <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
-        <!-- Google Sign-In -->
-        <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        parchment: '#FAFAFA',
-                        parchmentDark: '#EFEFEF',
-                        sage: '#7A8B76',
-                        forest: '#2C3D2E',
-                        gold: '#C5A059',
-                        accent: '#F4EFE6'
-                    },
-                    fontFamily: {
-                        fantasy: ['"Cormorant Garamond"', 'serif'],
-                        body: ['"Nunito"', 'sans-serif'],
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        :root {
-            --shell-bg: #FAFAFA;
-            --shell-border: #EFEFEF;
-            --body-bg: #EFEFEF;
-            --text-primary: #2C3D2E;
-            --text-muted: #7A8B76;
-            --surface-main: #FFFFFF;
-            --surface-soft: #F4EFE6;
-            --surface-muted: #EFEFEF;
-        }
-
-        body {
-            background-color: var(--body-bg);
-            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
-            color: var(--text-primary);
-        }
-
-        #app-shell {
-            background-color: var(--shell-bg);
-            border-color: var(--shell-border);
-            transition: background-color 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
-        }
-
-        #app-content {
-            padding-bottom: 1rem;
-        }
-
-        @media (max-width: 767px) {
-            #app-content {
-                padding-bottom: calc(6.5rem + env(safe-area-inset-bottom, 0px));
-            }
-
-            #main-nav {
-                position: fixed;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                z-index: 40;
-                padding-bottom: env(safe-area-inset-bottom, 0px);
-                background: rgba(255, 255, 255, 0.96);
-                backdrop-filter: blur(14px);
-            }
-        }
-
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #7A8B76; border-radius: 2px; }
-
-        button:not(:disabled),
-        .custom-file-upload {
-            transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease, background-color 180ms ease, color 180ms ease, border-color 180ms ease;
-            transform-origin: center;
-        }
-
-        button:not(:disabled):hover,
-        .custom-file-upload:hover {
-            transform: translateY(-1px);
-            filter: saturate(1.03);
-        }
-
-        button:not(:disabled):active,
-        .custom-file-upload:active {
-            transform: translateY(1px) scale(0.985);
-        }
-
-        button:focus-visible,
-        input:focus-visible,
-        select:focus-visible,
-        textarea:focus-visible,
-        .custom-file-upload:focus-within {
-            outline: none;
-            box-shadow: 0 0 0 3px rgba(197, 160, 89, 0.24);
-        }
-
-        .cooking-step-highlight {
-            background: rgba(197, 160, 89, 0.12) !important;
-            box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.38);
-            border-color: rgba(197, 160, 89, 0.28) !important;
-        }
-
-        .notebook-spread {
-            background:
-                radial-gradient(circle at top left, rgba(255, 255, 255, 0.9), transparent 32%),
-                linear-gradient(135deg, #fffdf6 0%, #f7f1e6 50%, #fffdfa 100%);
-            perspective: 1800px;
-        }
-
-        .notebook-book-frame {
-            width: min(100%, 68rem);
-            max-width: 100%;
-            padding-inline: clamp(0.35rem, 1.8vw, 1rem);
-            box-sizing: border-box;
-            margin-inline: auto;
-        }
-
-        .notebook-book-cover-frame {
-            width: min(100%, 40rem);
-            max-width: 100%;
-            padding-inline: clamp(0.2rem, 1vw, 0.6rem);
-            box-sizing: border-box;
-            margin-inline: auto;
-        }
-
-        .notebook-book-cover-surface {
-            min-height: clamp(26rem, 86vw, 44rem);
-            aspect-ratio: 0.74 / 1;
-        }
-
-        .notebook-landing-hero {
-            position: relative;
-            display: grid;
-            gap: clamp(1.4rem, 3vw, 2.6rem);
-            align-items: center;
-            padding: clamp(1.25rem, 3vw, 2.5rem);
-            border-radius: 2rem;
-            border: 1px solid rgba(122, 139, 118, 0.18);
-            background:
-                radial-gradient(circle at top left, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 34%),
-                linear-gradient(135deg, rgba(255, 253, 246, 0.96) 0%, rgba(249, 243, 232, 0.92) 48%, rgba(238, 229, 211, 0.9) 100%);
-            box-shadow: 0 24px 44px rgba(44, 61, 46, 0.12);
-            overflow: hidden;
-            isolation: isolate;
-        }
-
-        .notebook-landing-hero::after {
-            content: '';
-            position: absolute;
-            right: -4rem;
-            bottom: -5rem;
-            width: 16rem;
-            height: 16rem;
-            border-radius: 999px;
-            background: radial-gradient(circle, rgba(197, 160, 89, 0.22) 0%, rgba(197, 160, 89, 0) 70%);
-            z-index: -1;
-        }
-
-        .notebook-landing-cover-column {
-            display: grid;
-            gap: 0.85rem;
-            justify-items: center;
-        }
-
-        .notebook-landing-cover-frame {
-            width: min(100%, 25rem);
-            margin-inline: 0;
-            padding-inline: 0;
-        }
-
-        .notebook-landing-cover-surface {
-            min-height: clamp(19rem, 42vw, 31rem);
-            aspect-ratio: 0.78 / 1;
-        }
-
-        .notebook-landing-copy {
-            display: grid;
-            gap: 1rem;
-            align-content: center;
-        }
-
-        .notebook-landing-stat-grid {
-            display: grid;
-            gap: 0.85rem;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .notebook-landing-stat,
-        .notebook-landing-section {
-            border-radius: 1.35rem;
-            border: 1px solid rgba(122, 139, 118, 0.18);
-            background: rgba(255, 255, 255, 0.72);
-            padding: 1rem 1.05rem;
-            box-shadow: 0 14px 28px rgba(44, 61, 46, 0.08);
-            backdrop-filter: blur(8px);
-        }
-
-        .notebook-landing-pill-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.55rem;
-        }
-
-        .notebook-landing-pill {
-            display: inline-flex;
-            align-items: center;
-            min-height: 2rem;
-            padding: 0.35rem 0.8rem;
-            border-radius: 999px;
-            border: 1px solid rgba(122, 139, 118, 0.18);
-            background: rgba(255, 255, 255, 0.86);
-            font-size: 0.7rem;
-            font-weight: 800;
-            letter-spacing: 0.16em;
-            text-transform: uppercase;
-            color: #4a5f4d;
-        }
-
-        .notebook-landing-meta-note {
-            display: flex;
-            align-items: center;
-            gap: 0.55rem;
-            font-size: 0.78rem;
-            font-weight: 700;
-            color: #5f7261;
-        }
-
-        .notebook-cover-panel[data-cover-openable="true"] {
-            cursor: pointer;
-            touch-action: pan-y;
-        }
-
-        .notebook-cover-panel[data-cover-openable="true"]:focus-visible {
-            outline: none;
-            box-shadow:
-                0 0 0 4px rgba(255, 253, 246, 0.9),
-                0 0 0 7px rgba(45, 77, 52, 0.28),
-                0 32px 60px rgba(44, 61, 46, 0.24),
-                inset 0 0 0 1px rgba(255, 255, 255, 0.2);
-        }
-
-        .notebook-sticky-note-anchor {
-            position: absolute;
-            transform: translate(-50%, -50%);
-            pointer-events: auto;
-            touch-action: none;
-            cursor: grab;
-        }
-
-        .notebook-sticky-note-anchor:active {
-            cursor: grabbing;
-        }
-
-        .notebook-sticky-note-anchor.is-active {
-            z-index: 35;
-        }
-
-        .notebook-sticky-note {
-            position: relative;
-            isolation: isolate;
-            border: 1px solid var(--sticky-note-border, rgba(176, 136, 46, 0.35));
-            border-radius: 0.42rem 0.5rem 0.36rem 0.48rem;
-            background:
-                linear-gradient(180deg, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.12) 14%, rgba(255, 255, 255, 0) 14%),
-                repeating-linear-gradient(
-                    180deg,
-                    rgba(0, 0, 0, 0) 0,
-                    rgba(0, 0, 0, 0) 1.52rem,
-                    var(--sticky-note-rule, rgba(109, 126, 162, 0.18)) 1.52rem,
-                    var(--sticky-note-rule, rgba(109, 126, 162, 0.18)) 1.62rem
-                ),
-                var(--sticky-note-bg, #f5de87);
-            color: var(--sticky-note-ink, #5d4516);
-            box-shadow:
-                0 14px 24px rgba(44, 61, 46, 0.12),
-                0 2px 0 rgba(121, 91, 34, 0.08),
-                inset 0 0 0 1px rgba(255, 255, 255, 0.14);
-            overflow: hidden;
-            transform-origin: center;
-        }
-
-        .notebook-sticky-note::before {
-            content: '';
-            position: absolute;
-            top: 0.95rem;
-            bottom: 0.8rem;
-            left: 1rem;
-            width: 1px;
-            background: var(--sticky-note-margin, rgba(176, 94, 94, 0.24));
-            opacity: 0.8;
-            pointer-events: none;
-        }
-
-        .notebook-sticky-note::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 1.15rem;
-            height: 1.15rem;
-            background: linear-gradient(225deg, rgba(255, 255, 255, 0.96) 0 48%, rgba(214, 188, 112, 0.28) 49% 100%);
-            clip-path: polygon(100% 0, 0 0, 100% 100%);
-            box-shadow: -1px 1px 0 rgba(111, 82, 28, 0.12);
-            opacity: 0.92;
-            pointer-events: none;
-        }
-
-        .notebook-sticky-note-tape {
-            position: absolute;
-            top: 0.55rem;
-            left: 50%;
-            width: 2.6rem;
-            height: 0.32rem;
-            transform: translateX(-50%);
-            border-radius: 999px;
-            background: var(--sticky-note-tape, rgba(255, 248, 221, 0.52));
-            opacity: 0.55;
-        }
-
-        .notebook-sticky-note-handle {
-            position: absolute;
-            z-index: 2;
-            width: 0.88rem;
-            height: 0.88rem;
-            border-radius: 0.28rem;
-            border: 1px solid rgba(161, 130, 67, 0.78);
-            background: rgba(255, 251, 236, 0.94);
-            box-shadow: 0 5px 8px rgba(57, 44, 20, 0.12);
-            opacity: 0;
-            transform: scale(0.72);
-            transition: opacity 160ms ease, transform 160ms ease;
-        }
-
-        .notebook-sticky-note-anchor:hover .notebook-sticky-note-handle,
-        .notebook-sticky-note-anchor.is-active .notebook-sticky-note-handle {
-            opacity: 0.92;
-            transform: scale(1);
-        }
-
-        .notebook-sticky-note-handle.top-left {
-            top: 0.4rem;
-            left: 0.45rem;
-            cursor: nwse-resize;
-        }
-
-        .notebook-sticky-note-handle.top-right {
-            top: 0.4rem;
-            right: 0.45rem;
-            cursor: nesw-resize;
-        }
-
-        .notebook-sticky-note-handle.bottom-left {
-            bottom: 0.45rem;
-            left: 0.45rem;
-            cursor: nesw-resize;
-        }
-
-        .notebook-sticky-note-handle.bottom-right {
-            right: 0.45rem;
-            bottom: 0.45rem;
-            cursor: nwse-resize;
-        }
-
-        .notebook-sticky-note__body {
-            position: relative;
-            z-index: 1;
-            display: flex;
-            min-height: inherit;
-            flex-direction: column;
-            justify-content: flex-start;
-            padding: 1.15rem 0.95rem 0.95rem 1.45rem;
-        }
-
-        .notebook-sticky-note__text {
-            display: -webkit-box;
-            line-clamp: 6;
-            -webkit-line-clamp: 6;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-            line-height: 1.58;
-            white-space: normal;
-            word-break: break-word;
-            text-wrap: pretty;
-        }
-
-        .notebook-sticky-note-menu {
-            position: absolute;
-            left: 50%;
-            width: min(18rem, calc(100vw - 2.5rem));
-            max-width: calc(100vw - 2.5rem);
-            transform: translateX(-50%);
-            --notebook-note-menu-pointer-x: 50%;
-            border-radius: 1rem;
-            border: 1px solid rgba(122, 139, 118, 0.18);
-            background: rgba(255, 255, 255, 0.97);
-            box-shadow: 0 20px 34px rgba(44, 61, 46, 0.14);
-            padding: 0.9rem;
-            backdrop-filter: blur(10px);
-            z-index: 12;
-        }
-
-        .notebook-sticky-note-menu::before {
-            content: '';
-            position: absolute;
-            left: var(--notebook-note-menu-pointer-x);
-            width: 0.95rem;
-            height: 0.95rem;
-            background: rgba(255, 255, 255, 0.96);
-            border-left: 1px solid rgba(122, 139, 118, 0.18);
-            border-top: 1px solid rgba(122, 139, 118, 0.18);
-            transform: translateX(-50%) rotate(45deg);
-        }
-
-        .notebook-sticky-note-menu.is-left-aligned {
-            left: 0.75rem;
-            transform: none;
-            --notebook-note-menu-pointer-x: 2.25rem;
-        }
-
-        .notebook-sticky-note-menu.is-right-aligned {
-            left: auto;
-            right: 0.75rem;
-            transform: none;
-            --notebook-note-menu-pointer-x: calc(100% - 2.25rem);
-        }
-
-        .notebook-sticky-note-menu.is-below {
-            top: calc(100% + 0.9rem);
-        }
-
-        .notebook-sticky-note-menu.is-below::before {
-            top: -0.48rem;
-        }
-
-        .notebook-sticky-note-menu.is-above {
-            bottom: calc(100% + 0.9rem);
-        }
-
-        .notebook-sticky-note-menu.is-above::before {
-            bottom: -0.48rem;
-            transform: translateX(-50%) rotate(225deg);
-        }
-
-        .notebook-sticky-note-menu-swatch {
-            width: 1.35rem;
-            height: 1.35rem;
-            border-radius: 999px;
-            border: 1px solid rgba(122, 139, 118, 0.18);
-            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
-            transition: transform 160ms ease, border-color 160ms ease;
-            flex: 0 0 auto;
-        }
-
-        .notebook-sticky-note-menu-swatch.is-active {
-            border-color: rgba(45, 77, 52, 0.72);
-            transform: scale(1.08);
-        }
-
-        .notebook-sticky-note--sm {
-            width: 9rem;
-            min-height: 8rem;
-            font-size: 0.72rem;
-        }
-
-        .notebook-sticky-note--md {
-            width: 10.75rem;
-            min-height: 9.5rem;
-            font-size: 0.78rem;
-        }
-
-        .notebook-sticky-note--lg {
-            width: 12.25rem;
-            min-height: 11rem;
-            font-size: 0.84rem;
-        }
-
-        .notebook-note-control {
-            display: inline-flex;
-            min-height: 2.75rem;
-            align-items: center;
-            justify-content: center;
-            gap: 0.55rem;
-            border-radius: 0.9rem;
-            padding-inline: 1rem;
-            font-size: 0.68rem;
-            font-weight: 800;
-            letter-spacing: 0.16em;
-            text-transform: uppercase;
-            transition: all 180ms ease;
-        }
-
-        .notebook-note-control--icon {
-            width: 2.75rem;
-            min-width: 2.75rem;
-            padding-inline: 0;
-            gap: 0;
-            flex-shrink: 0;
-        }
-
-        .notebook-note-control--manage {
-            min-width: 10.5rem;
-            border: 1px solid rgba(197, 160, 89, 0.68);
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(250, 244, 231, 0.94) 100%);
-            color: #2f4a35;
-            box-shadow: 0 12px 24px rgba(44, 61, 46, 0.1);
-        }
-
-        .notebook-note-control--manage:hover {
-            border-color: rgba(197, 160, 89, 0.98);
-            background: linear-gradient(135deg, rgba(236, 210, 118, 0.96) 0%, rgba(219, 177, 77, 0.96) 100%);
-            color: #fffdf6;
-        }
-
-        .notebook-note-control--toggle {
-            border: 1px solid rgba(122, 139, 118, 0.22);
-            background: rgba(255, 255, 255, 0.9);
-            color: #4a5f4d;
-            box-shadow: 0 10px 20px rgba(44, 61, 46, 0.08);
-        }
-
-        .notebook-note-control--toggle:hover {
-            border-color: rgba(197, 160, 89, 0.72);
-            color: #26422b;
-        }
-
-        @media (min-width: 960px) {
-            .notebook-landing-hero {
-                grid-template-columns: minmax(0, 25rem) minmax(0, 1fr);
-            }
-
-            .notebook-landing-cover-column {
-                justify-items: start;
-            }
-        }
-
-        .notebook-book-spread-surface {
-            min-height: clamp(30rem, 78vw, 46rem);
-            aspect-ratio: 1.55 / 1;
-            width: 100%;
-            max-width: 100%;
-            box-sizing: border-box;
-        }
-
-        .notebook-paper {
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            min-height: 0;
-            overflow: hidden;
-            background:
-                repeating-linear-gradient(
-                    -48deg,
-                    transparent,
-                    transparent 3px,
-                    rgba(0, 0, 0, 0.011) 3px,
-                    rgba(0, 0, 0, 0.011) 4px
-                ),
-                linear-gradient(to bottom, transparent 0, transparent 31px, rgba(122, 139, 118, 0.14) 31px, rgba(122, 139, 118, 0.14) 32px, transparent 32px) 0 0 / 100% 34px,
-                linear-gradient(90deg, rgba(197, 160, 89, 0.22) 0, rgba(197, 160, 89, 0.22) 1px, transparent 1px) 38px 0 / 100% 100%,
-                linear-gradient(160deg, #fffdf7 0%, #faf5eb 60%, #f7f1e4 100%);
-            box-shadow:
-                inset 0 0 0 1px rgba(122, 139, 118, 0.08),
-                inset 0 -4px 14px rgba(44, 61, 46, 0.05);
-        }
-
-        .notebook-paper__body {
-            flex: 1 1 auto;
-            min-height: 0;
-        }
-
-        .notebook-paper__footer {
-            position: relative;
-            z-index: 1;
-            margin-top: auto;
-            padding-top: 1rem;
-        }
-
-        .notebook-page-nav {
-            display: inline-flex;
-            min-height: 3rem;
-            align-items: center;
-            justify-content: center;
-            gap: 0.55rem;
-            border-radius: 0.9rem;
-            border: 1px solid rgba(122, 139, 118, 0.22);
-            background: rgba(255, 255, 255, 0.92);
-            padding: 0.7rem 1rem;
-            font-size: 0.72rem;
-            font-weight: 800;
-            letter-spacing: 0.18em;
-            text-transform: uppercase;
-            color: #5f7261;
-            box-shadow: 0 10px 24px rgba(44, 61, 46, 0.12);
-            transition: all 180ms ease;
-        }
-
-        .notebook-page-nav:hover:not(:disabled) {
-            border-color: rgba(197, 160, 89, 0.7);
-            color: #26422b;
-            box-shadow: 0 12px 26px rgba(44, 61, 46, 0.16);
-        }
-
-        .notebook-page-nav:disabled {
-            cursor: not-allowed;
-            opacity: 0.42;
-            box-shadow: none;
-        }
-
-        .notebook-page-nav--primary {
-            border-color: rgba(45, 77, 52, 0.88);
-            background: #2f4a35;
-            color: #fffdf6;
-            box-shadow: 0 14px 28px rgba(45, 77, 52, 0.24);
-        }
-
-        .notebook-page-nav--primary:hover:not(:disabled) {
-            border-color: rgba(197, 160, 89, 0.9);
-            background: #45624a;
-            color: #fffdf6;
-        }
-
-        @media (min-width: 768px) {
-            .notebook-paper__body {
-                overflow-y: auto;
-                overscroll-behavior: contain;
-                padding-right: 0.35rem;
-                scrollbar-width: thin;
-                scrollbar-color: rgba(122, 139, 118, 0.35) transparent;
-            }
-        }
-
-        .notebook-paper::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            left: 40px;
-            width: 2px;
-            background: linear-gradient(to bottom, rgba(200, 84, 84, 0.22), rgba(200, 84, 84, 0.38), rgba(200, 84, 84, 0.22));
-            pointer-events: none;
-        }
-
-        .notebook-paper::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            width: 22px;
-            pointer-events: none;
-        }
-
-        .notebook-paper-left::before {
-            left: auto;
-            right: 40px;
-        }
-
-        .notebook-paper-left::after {
-            right: 0;
-            background: linear-gradient(270deg, rgba(104, 84, 49, 0.14), rgba(104, 84, 49, 0));
-        }
-
-        .notebook-paper-right::after {
-            left: 0;
-            background: linear-gradient(90deg, rgba(104, 84, 49, 0.14), rgba(104, 84, 49, 0));
-        }
-
-        @media (max-width: 767px) {
-            .notebook-book-frame {
-                padding-inline: 0.25rem;
-            }
-
-            .notebook-landing-hero {
-                padding: 1rem;
-                border-radius: 1.5rem;
-            }
-
-            .notebook-landing-cover-frame {
-                width: min(100%, 22rem);
-                margin-inline: auto;
-            }
-
-            .notebook-landing-cover-surface {
-                min-height: clamp(18rem, 92vw, 24rem);
-            }
-
-            .notebook-sticky-note--sm {
-                width: 7.8rem;
-                min-height: 7rem;
-            }
-
-            .notebook-sticky-note--md {
-                width: 9rem;
-                min-height: 8rem;
-            }
-
-            .notebook-sticky-note--lg {
-                width: 10rem;
-                min-height: 9rem;
-            }
-
-            .notebook-landing-stat-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .notebook-book-spread-surface {
-                min-height: clamp(34rem, 168vw, 56rem);
-                aspect-ratio: auto;
-                box-shadow: 0 16px 30px rgba(44, 61, 46, 0.12);
-            }
-
-            .notebook-paper {
-                min-height: auto;
-            }
-
-            .notebook-paper__body {
-                overflow: visible;
-                padding-right: 0;
-            }
-
-            .notebook-paper__footer {
-                padding-top: 0.85rem;
-            }
-
-            .notebook-page-nav {
-                width: 100%;
-            }
-
-            .notebook-paper-left::before {
-                left: 40px;
-                right: auto;
-            }
-
-            .notebook-paper-left::after,
-            .notebook-paper-right::after {
-                left: 0;
-                right: auto;
-                background: linear-gradient(90deg, rgba(104, 84, 49, 0.11), rgba(104, 84, 49, 0));
-            }
-        }
-
-        .notebook-swipe-surface {
-            touch-action: pan-y;
-            user-select: none;
-        }
-
-        .notebook-cover-shell {
-            perspective: 2200px;
-        }
-
-        .notebook-cover-panel {
-            position: relative;
-            transform-origin: left center;
-            transform-style: preserve-3d;
-            background: var(--cover-surface, linear-gradient(135deg, #ddd0b9 0%, #c5b18d 48%, #aa9065 100%));
-            color: var(--cover-ink, #2b241a);
-            box-shadow:
-                0 32px 60px rgba(44, 61, 46, 0.24),
-                inset 0 0 0 1px rgba(255, 255, 255, 0.2);
-            transition: transform 320ms cubic-bezier(0.2, 0.72, 0.18, 1), box-shadow 220ms ease;
-        }
-
-        .notebook-cover-panel::before {
-            content: '';
-            position: absolute;
-            top: 0.75rem;
-            bottom: 0.75rem;
-            left: 1rem;
-            width: 1rem;
-            border-radius: 999px;
-            background: var(--cover-spine, linear-gradient(180deg, rgba(102, 74, 33, 0.72), rgba(72, 54, 29, 0.92)));
-            box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.15);
-        }
-
-        .notebook-cover-panel:hover {
-            box-shadow:
-                0 40px 74px rgba(44, 61, 46, 0.26),
-                inset 0 0 0 1px rgba(255, 255, 255, 0.22);
-        }
-
-        .notebook-cover-plate {
-            background: var(--cover-plate, rgba(255, 255, 255, 0.5));
-            border: 1px solid var(--cover-plate-border, rgba(88, 62, 31, 0.16));
-            color: var(--cover-ink, #2b241a);
-            box-shadow: 0 14px 24px rgba(44, 61, 46, 0.12);
-            backdrop-filter: blur(8px);
-        }
-
-        .notebook-cover-sticker {
-            border: 1px solid rgba(255, 255, 255, 0.45);
-            box-shadow: 0 14px 24px rgba(44, 61, 46, 0.16);
-            backdrop-filter: blur(4px);
-        }
-
-        .notebook-cover-sticker.is-transparent {
-            border-color: transparent;
-            box-shadow: none;
-            backdrop-filter: none;
-        }
-
-        .notebook-cover-sticker.is-floating-emoji {
-            filter: drop-shadow(0 10px 14px rgba(73, 55, 27, 0.18));
-        }
-
-        .notebook-cover-sticker-tape {
-            position: absolute;
-            top: 0.45rem;
-            width: 1.25rem;
-            height: 0.6rem;
-            border-radius: 0.3rem;
-            background: linear-gradient(180deg, rgba(255, 250, 240, 0.92), rgba(239, 224, 192, 0.72));
-            border: 1px solid rgba(145, 118, 70, 0.16);
-            box-shadow: 0 2px 6px rgba(67, 50, 25, 0.12);
-            opacity: 0.94;
-        }
-
-        .notebook-cover-sticker-tape.left {
-            left: 0.45rem;
-            transform: rotate(-18deg);
-        }
-
-        .notebook-cover-sticker-tape.right {
-            right: 0.45rem;
-            transform: rotate(16deg);
-        }
-
-        .cover-editor-preview-sticker {
-            cursor: grab;
-            touch-action: none;
-            user-select: none;
-        }
-
-        .cover-editor-preview-sticker:active {
-            cursor: grabbing;
-        }
-
-        .notebook-ruled-block {
-            min-height: 34px;
-        }
-
-        .notebook-line-row {
-            min-height: 34px;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            border-bottom: 1px solid rgba(122, 139, 118, 0.1);
-        }
-
-        .notebook-line-row--top {
-            align-items: flex-start;
-        }
-
-        .notebook-line-text {
-            display: block;
-            padding-top: 2px;
-            line-height: 34px;
-        }
-
-        .cooking-mode-active #main-header,
-        .cooking-mode-active #main-nav {
-            display: none;
-        }
-        .cooking-mode-active #app-content {
-            font-size: 1.1rem;
-            padding-top: 2rem;
-            max-width: 100%;
-        }
-
-        .cooking-mode-active .detail-shell {
-            border: none;
-            box-shadow: none;
-            background: transparent;
-            overflow: visible;
-        }
-
-        .cooking-mode-active .detail-hero-shell,
-        .cooking-mode-active .detail-meta-grid,
-        .cooking-mode-active .detail-status-chips,
-        .cooking-mode-active .detail-secondary-section,
-        .cooking-mode-active .detail-library-tools,
-        .cooking-mode-active .detail-rating-panel,
-        .cooking-mode-active .detail-notes-panel {
-            display: none;
-        }
-
-        .cooking-mode-active .detail-content-shell {
-            padding: 0;
-        }
-
-        .cooking-mode-active .detail-cooking-focus {
-            position: sticky;
-            top: 0.75rem;
-            z-index: 30;
-            margin-bottom: 1rem;
-            border-color: rgba(212, 160, 23, 0.24);
-            box-shadow: 0 18px 40px rgba(44, 61, 46, 0.12);
-        }
-
-        .cooking-mode-active .detail-layout-grid {
-            grid-template-columns: minmax(0, 1fr);
-            gap: 1rem;
-        }
-
-        .cooking-mode-active .detail-ingredients-panel {
-            position: sticky;
-            top: 7.25rem;
-            z-index: 20;
-            border-color: rgba(122, 139, 118, 0.18);
-            box-shadow: 0 14px 26px rgba(44, 61, 46, 0.08);
-        }
-
-        .cooking-mode-active .detail-instructions-panel h3 {
-            font-size: clamp(2rem, 4vw, 2.8rem);
-        }
-
-        .cooking-mode-active .detail-instructions-panel ol {
-            gap: 0.85rem;
-        }
-
-        .cooking-mode-active .detail-instructions-panel li {
-            background: rgba(255, 255, 255, 0.92);
-            border-color: rgba(122, 139, 118, 0.14);
-            padding: 1.1rem 1.15rem;
-            box-shadow: 0 10px 20px rgba(44, 61, 46, 0.05);
-        }
-
-        .cooking-mode-active .detail-instructions-panel p {
-            font-size: 1.08rem;
-            line-height: 1.9;
-        }
-
-        .cooking-mode-active .detail-instructions-panel button[title="Start timer"] {
-            opacity: 1;
-        }
-
-        @media (max-width: 767px) {
-            .cooking-mode-active .detail-cooking-focus {
-                top: 0.5rem;
-            }
-
-            .cooking-mode-active .detail-ingredients-panel {
-                position: static;
-            }
-        }
-
-        input[type="file"] { display: none; }
-        .custom-file-upload { display: inline-block; cursor: pointer; }
-        input::-webkit-calendar-picker-indicator { opacity: 0.5; cursor: pointer; }
-
-        body { top: 0px !important; }
-        .skiptranslate iframe, .goog-te-banner-frame { display: none !important; visibility: hidden !important; }
-        #goog-gt-tt { display: none !important; visibility: hidden !important; }
-        .goog-text-highlight { background-color: transparent !important; box-shadow: none !important; }
-    </style>
-</head>
-<body class="font-body text-forest min-h-screen selection:bg-gold selection:text-white transition-all duration-300" id="body">
-
-    <div id="google_translate_element" style="display:none;"></div>
-
-    <div id="app-shell" class="w-full max-w-6xl mx-auto flex flex-col min-h-screen relative shadow-2xl bg-parchment overflow-hidden border-x border-parchmentDark">
-        
-        <header id="main-header" class="bg-sage text-parchment p-4 shadow-sm z-10 flex justify-between items-center transition-all sticky top-0" translate="no">
-            <div>
-                <h1 class="text-2xl font-fantasy font-bold tracking-wide flex items-center gap-2">
-                    <i data-lucide="book-open" class="w-6 h-6"></i> Uculi
-                </h1>
-                <p class="text-xs font-body font-semibold opacity-90 text-accent">Your culinary collection of recipes</p>
-            </div>
-            <button onclick="renderAddForm()" class="bg-gold text-white px-4 py-2 rounded-sm font-bold shadow-sm hover:bg-yellow-600 transition-colors flex items-center gap-2 md:hidden">
-                <i data-lucide="plus" class="w-4 h-4"></i> Add
-            </button>
-        </header>
-
-                    <!-- PERSONAL NOTES MODAL -->
-                    <div id="notes-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden opacity-0 scale-95 transition-all duration-300 flex items-center justify-center z-50">
-                        <div class="bg-white rounded-md shadow-2xl p-8 max-w-2xl mx-4 w-full">
-                            <h2 class="font-fantasy font-bold text-3xl text-forest mb-4">Edit Your Notes</h2>
-                            <textarea id="notes-textarea" placeholder="Add your personal modifications, tips, or reminders..." class="w-full h-40 p-4 border border-sage rounded-md focus:border-gold outline-none text-forest font-semibold"></textarea>
-                            <div class="flex gap-4 mt-6">
-                                <button onclick="closeNotesEditor()" class="flex-1 bg-sage text-white h-12 rounded-sm font-bold hover:bg-forest transition-colors">
-                                    Cancel
-                                </button>
-                                <button id="notes-save-btn" class="flex-1 bg-gold text-white h-12 rounded-sm font-bold hover:bg-yellow-600 transition-colors">
-                                    <i data-lucide="save" class="w-4 h-4 inline mr-2"></i>Save Notes
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div id="cover-editor-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden opacity-0 scale-95 transition-all duration-300 flex items-center justify-center z-50">
-                        <div class="bg-white rounded-md shadow-2xl p-6 md:p-8 max-w-6xl mx-4 w-full max-h-[90vh] overflow-y-auto">
-                            <div class="flex items-center justify-between gap-4 mb-6">
-                                <div>
-                                    <h2 class="font-fantasy font-bold text-3xl text-forest">Edit Notebook Cover</h2>
-                                    <p class="text-sm font-semibold text-sage mt-1">Personalize your cover with color, title, and stickers. This stays private to your own archive.</p>
-                                </div>
-                                <button onclick="closeCoverEditor()" class="w-11 h-11 rounded-full border border-parchmentDark bg-white text-sage flex items-center justify-center shadow-sm">
-                                    <i data-lucide="x" class="w-5 h-5"></i>
-                                </button>
-                            </div>
-
-                            <div id="cover-editor-body"></div>
-
-                            <div class="flex flex-col-reverse md:flex-row gap-4 mt-8">
-                                <button onclick="closeCoverEditor()" class="flex-1 bg-white text-sage h-12 rounded-sm font-bold border border-parchmentDark hover:text-forest transition-colors">Cancel</button>
-                                <button onclick="saveCoverEditor()" class="flex-1 bg-forest text-white h-12 rounded-sm font-bold hover:bg-sage transition-colors flex items-center justify-center gap-2">
-                                    <i data-lucide="save" class="w-4 h-4"></i> Save Cover
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-        <main id="app-content" class="flex-1 overflow-y-auto p-4 md:p-8 space-y-4 transition-all relative"></main>
-
-        <nav id="main-nav" class="sticky bottom-0 w-full bg-white text-sage shadow-[0_-4px_10px_-5px_rgba(0,0,0,0.1)] border-t border-parchmentDark z-20 transition-all">
-            <div class="flex justify-around p-1 md:justify-center md:gap-12">
-                <button data-nav-view="index" onclick="renderList()" class="flex flex-col items-center p-3 rounded-xl text-sage hover:text-gold transition-colors w-1/4 md:w-auto">
-                    <i data-lucide="library" class="w-6 h-6 mb-1"></i>
-                    <span class="text-[10px] font-bold uppercase tracking-wider">Index</span>
-                </button>
-                <button data-nav-view="browse" onclick="renderBrowse()" class="flex flex-col items-center p-3 rounded-xl text-sage hover:text-gold transition-colors w-1/4 md:w-auto">
-                    <i data-lucide="compass" class="w-6 h-6 mb-1"></i>
-                    <span class="text-[10px] font-bold uppercase tracking-wider">Browse</span>
-                </button>
-                <button data-nav-view="add" onclick="renderAddForm()" class="hidden md:flex flex-col items-center p-3 rounded-xl text-sage hover:text-gold transition-colors w-auto">
-                    <i data-lucide="file-plus" class="w-6 h-6 mb-1"></i>
-                    <span class="text-[10px] font-bold uppercase tracking-wider">Add Recipe</span>
-                </button>
-                <button data-nav-view="profile" onclick="renderProfile()" class="flex flex-col items-center p-3 rounded-xl text-sage hover:text-gold transition-colors w-1/4 md:w-auto">
-                    <i data-lucide="user-round" class="w-6 h-6 mb-1"></i>
-                    <span class="text-[10px] font-bold uppercase tracking-wider">Profile</span>
-                </button>
-                <button data-nav-view="settings" onclick="renderSettings()" class="flex flex-col items-center p-3 rounded-xl text-sage hover:text-gold transition-colors w-1/4 md:w-auto">
-                    <i data-lucide="settings-2" class="w-6 h-6 mb-1"></i>
-                    <span class="text-[10px] font-bold uppercase tracking-wider">Settings</span>
-                </button>
-            </div>
-        </nav>
-
-        <div id="toast" class="fixed top-20 left-1/2 transform -translate-x-1/2 bg-forest text-white px-6 py-3 rounded-sm shadow-xl transition-all duration-300 opacity-0 pointer-events-none z-50 text-center text-sm font-bold flex items-center gap-2" translate="no">
-            <i id="toast-icon" data-lucide="info" class="w-5 h-5"></i>
-            <span id="toast-message"></span>
-        </div>
-    </div>
-
-    <script type="text/javascript">
-        function googleTranslateElementInit() {
-            new google.translate.TranslateElement({pageLanguage: 'en', autoDisplay: false}, 'google_translate_element');
-        }
-    </script>
-    <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
-
-    <script>
+﻿
         // --- 0. GEMINI API SETUP ---
         const apiKey = ""; // API key is injected by the environment
 
@@ -1146,35 +81,35 @@
         let publishedRecipeStatusChecks = {};
 
         const countriesList = [
-            "🇦🇷 Argentina", "🇦🇺 Australia", "🇦🇹 Austria", "🇧🇪 Belgium", "🇧🇷 Brazil", "🇨🇦 Canada", 
-            "🇨🇱 Chile", "🇨🇳 China", "🇨🇴 Colombia", "🇭🇷 Croatia", "🇨🇺 Cuba", "🇨🇿 Czechia", 
-            "🇩🇰 Denmark", "🇪🇬 Egypt", "🇪🇹 Ethiopia", "🇫🇮 Finland", "🇫🇷 France", "🇩🇪 Germany", 
-            "🇬🇷 Greece", "🇭🇺 Hungary", "🇮🇳 India", "🇮🇩 Indonesia", "🇮🇷 Iran", "🇮🇪 Ireland", 
-            "🇮🇱 Israel", "🇮🇹 Italy", "🇯🇲 Jamaica", "🇯🇵 Japan", "🇰🇪 Kenya", "🇱🇧 Lebanon", 
-            "🇲🇾 Malaysia", "🇲🇽 Mexico", "🇲🇦 Morocco", "🇳🇱 Netherlands", "🇳🇿 New Zealand", 
-            "🇳🇬 Nigeria", "🇳🇴 Norway", "🇵🇰 Pakistan", "🇵🇪 Peru", "🇵🇭 Philippines", "🇵🇱 Poland", 
-            "🇵🇹 Portugal", "🇷🇴 Romania", "🇷🇺 Russia", "🇸🇦 Saudi Arabia", "🇸🇬 Singapore", 
-            "🇿🇦 South Africa", "🇰🇷 South Korea", "🇪🇸 Spain", "🇱🇰 Sri Lanka", "🇸🇪 Sweden", 
-            "🇨🇭 Switzerland", "🇸🇾 Syria", "🇹🇼 Taiwan", "🇹🇭 Thailand", "🇹🇷 Turkey", 
-            "🇺🇦 Ukraine", "🇬🇧 United Kingdom", "🇺🇸 United States", "🇻🇳 Vietnam"
+            "ðŸ‡¦ðŸ‡· Argentina", "ðŸ‡¦ðŸ‡º Australia", "ðŸ‡¦ðŸ‡¹ Austria", "ðŸ‡§ðŸ‡ª Belgium", "ðŸ‡§ðŸ‡· Brazil", "ðŸ‡¨ðŸ‡¦ Canada", 
+            "ðŸ‡¨ðŸ‡± Chile", "ðŸ‡¨ðŸ‡³ China", "ðŸ‡¨ðŸ‡´ Colombia", "ðŸ‡­ðŸ‡· Croatia", "ðŸ‡¨ðŸ‡º Cuba", "ðŸ‡¨ðŸ‡¿ Czechia", 
+            "ðŸ‡©ðŸ‡° Denmark", "ðŸ‡ªðŸ‡¬ Egypt", "ðŸ‡ªðŸ‡¹ Ethiopia", "ðŸ‡«ðŸ‡® Finland", "ðŸ‡«ðŸ‡· France", "ðŸ‡©ðŸ‡ª Germany", 
+            "ðŸ‡¬ðŸ‡· Greece", "ðŸ‡­ðŸ‡º Hungary", "ðŸ‡®ðŸ‡³ India", "ðŸ‡®ðŸ‡© Indonesia", "ðŸ‡®ðŸ‡· Iran", "ðŸ‡®ðŸ‡ª Ireland", 
+            "ðŸ‡®ðŸ‡± Israel", "ðŸ‡®ðŸ‡¹ Italy", "ðŸ‡¯ðŸ‡² Jamaica", "ðŸ‡¯ðŸ‡µ Japan", "ðŸ‡°ðŸ‡ª Kenya", "ðŸ‡±ðŸ‡§ Lebanon", 
+            "ðŸ‡²ðŸ‡¾ Malaysia", "ðŸ‡²ðŸ‡½ Mexico", "ðŸ‡²ðŸ‡¦ Morocco", "ðŸ‡³ðŸ‡± Netherlands", "ðŸ‡³ðŸ‡¿ New Zealand", 
+            "ðŸ‡³ðŸ‡¬ Nigeria", "ðŸ‡³ðŸ‡´ Norway", "ðŸ‡µðŸ‡° Pakistan", "ðŸ‡µðŸ‡ª Peru", "ðŸ‡µðŸ‡­ Philippines", "ðŸ‡µðŸ‡± Poland", 
+            "ðŸ‡µðŸ‡¹ Portugal", "ðŸ‡·ðŸ‡´ Romania", "ðŸ‡·ðŸ‡º Russia", "ðŸ‡¸ðŸ‡¦ Saudi Arabia", "ðŸ‡¸ðŸ‡¬ Singapore", 
+            "ðŸ‡¿ðŸ‡¦ South Africa", "ðŸ‡°ðŸ‡· South Korea", "ðŸ‡ªðŸ‡¸ Spain", "ðŸ‡±ðŸ‡° Sri Lanka", "ðŸ‡¸ðŸ‡ª Sweden", 
+            "ðŸ‡¨ðŸ‡­ Switzerland", "ðŸ‡¸ðŸ‡¾ Syria", "ðŸ‡¹ðŸ‡¼ Taiwan", "ðŸ‡¹ðŸ‡­ Thailand", "ðŸ‡¹ðŸ‡· Turkey", 
+            "ðŸ‡ºðŸ‡¦ Ukraine", "ðŸ‡¬ðŸ‡§ United Kingdom", "ðŸ‡ºðŸ‡¸ United States", "ðŸ‡»ðŸ‡³ Vietnam"
         ];
 
         const initialPublishedVersionCode = 100;
         const dietOptions = ['Vegan', 'Vegetarian', 'Pescatarian', 'Gluten-free', 'Dairy-free', 'Nut-free', 'Egg-free', 'Soy-free', 'Halal', 'Kosher', 'Low-carb', 'Keto', 'Paleo'];
         const dietDescriptions = {
-            'Vegan': 'No animal products whatsoever — excludes meat, fish, dairy, eggs, and honey.',
+            'Vegan': 'No animal products whatsoever â€” excludes meat, fish, dairy, eggs, and honey.',
             'Vegetarian': 'No meat or fish, but may include dairy and eggs.',
             'Pescatarian': 'No meat, but fish and seafood are allowed alongside plant-based foods.',
-            'Gluten-free': 'Contains no gluten — safe for people with coeliac disease or gluten sensitivity.',
+            'Gluten-free': 'Contains no gluten â€” safe for people with coeliac disease or gluten sensitivity.',
             'Dairy-free': 'Contains no milk, cheese, butter, cream, or other dairy products.',
-            'Nut-free': 'Contains no tree nuts or peanuts — suitable for those with nut allergies.',
+            'Nut-free': 'Contains no tree nuts or peanuts â€” suitable for those with nut allergies.',
             'Egg-free': 'Contains no eggs or egg-derived ingredients.',
             'Soy-free': 'Contains no soy or soy-derived ingredients such as tofu or edamame.',
-            'Halal': 'Prepared according to Islamic dietary law — no pork or alcohol.',
-            'Kosher': 'Prepared according to Jewish dietary law — no mixing of meat and dairy.',
+            'Halal': 'Prepared according to Islamic dietary law â€” no pork or alcohol.',
+            'Kosher': 'Prepared according to Jewish dietary law â€” no mixing of meat and dairy.',
             'Low-carb': 'Significantly reduced carbohydrate content, typically under 100g of carbs per day.',
             'Keto': 'Very low carb and high fat diet designed to induce a state of ketosis.',
-            'Paleo': 'Based on foods presumed to be available to pre-agricultural humans — no grains, legumes, or processed foods.',
+            'Paleo': 'Based on foods presumed to be available to pre-agricultural humans â€” no grains, legumes, or processed foods.',
         };
         const dietCompatibilityMap = {
             'Vegan': ['Vegan', 'Vegetarian', 'Pescatarian', 'Dairy-free', 'Egg-free'],
@@ -1216,10 +151,10 @@
                 let num = parseFloat(numStr.replace(',', '.'));
                 return `${match} (${(num * 2.20462).toFixed(1).replace('.0', '')} lbs)`;
             });
-            resultText = resultText.replace(/(\d+[\.,]?\d*)\s*(c|°c|celsius)\b/gi, (match, numStr) => {
+            resultText = resultText.replace(/(\d+[\.,]?\d*)\s*(c|Â°c|celsius)\b/gi, (match, numStr) => {
                 let num = parseFloat(numStr.replace(',', '.'));
                 let f = Math.round((num * 9/5) + 32);
-                return `${match} (${f}°F)`;
+                return `${match} (${f}Â°F)`;
             });
             return resultText;
         }
@@ -1249,9 +184,9 @@
 
         function getDefaultNotebookCoverSticker(seed = 0) {
             const presets = [
-                { text: 'SOUP', emoji: '🥣', color: 'blue', background: 'solid', x: 80, y: 20, size: 'md', rotation: -6 },
-                { text: 'COSY', emoji: '✨', color: 'gold', background: 'solid', x: 24, y: 78, size: 'sm', rotation: 5 },
-                { text: 'HOME', emoji: '🏡', color: 'sage', background: 'solid', x: 76, y: 78, size: 'md', rotation: -3 }
+                { text: 'SOUP', emoji: 'ðŸ¥£', color: 'blue', background: 'solid', x: 80, y: 20, size: 'md', rotation: -6 },
+                { text: 'COSY', emoji: 'âœ¨', color: 'gold', background: 'solid', x: 24, y: 78, size: 'sm', rotation: 5 },
+                { text: 'HOME', emoji: 'ðŸ¡', color: 'sage', background: 'solid', x: 76, y: 78, size: 'md', rotation: -3 }
             ];
             const preset = presets[seed % presets.length];
             return {
@@ -1263,26 +198,26 @@
         function getNotebookCoverStickerEmojiOptions() {
             return [
                 { value: '', label: 'No emoji' },
-                { value: '🥣', label: '🥣 Bowl' },
-                { value: '🍲', label: '🍲 Stew' },
-                { value: '🍜', label: '🍜 Noodles' },
-                { value: '🍰', label: '🍰 Cake' },
-                { value: '🥖', label: '🥖 Bread' },
-                { value: '☕', label: '☕ Coffee' },
-                { value: '🍋', label: '🍋 Lemon' },
-                { value: '🌿', label: '🌿 Herb' },
-                { value: '🍄', label: '🍄 Mushroom' },
-                { value: '🔥', label: '🔥 Flame' },
-                { value: '✨', label: '✨ Sparkles' },
-                { value: '💛', label: '💛 Heart' },
-                { value: '📖', label: '📖 Book' },
-                { value: '🧁', label: '🧁 Cupcake' },
-                { value: '🍓', label: '🍓 Strawberry' },
-                { value: '🥕', label: '🥕 Carrot' },
-                { value: '🧄', label: '🧄 Garlic' },
-                { value: '🧈', label: '🧈 Butter' },
-                { value: '🌞', label: '🌞 Sun' },
-                { value: '🌙', label: '🌙 Moon' }
+                { value: 'ðŸ¥£', label: 'ðŸ¥£ Bowl' },
+                { value: 'ðŸ²', label: 'ðŸ² Stew' },
+                { value: 'ðŸœ', label: 'ðŸœ Noodles' },
+                { value: 'ðŸ°', label: 'ðŸ° Cake' },
+                { value: 'ðŸ¥–', label: 'ðŸ¥– Bread' },
+                { value: 'â˜•', label: 'â˜• Coffee' },
+                { value: 'ðŸ‹', label: 'ðŸ‹ Lemon' },
+                { value: 'ðŸŒ¿', label: 'ðŸŒ¿ Herb' },
+                { value: 'ðŸ„', label: 'ðŸ„ Mushroom' },
+                { value: 'ðŸ”¥', label: 'ðŸ”¥ Flame' },
+                { value: 'âœ¨', label: 'âœ¨ Sparkles' },
+                { value: 'ðŸ’›', label: 'ðŸ’› Heart' },
+                { value: 'ðŸ“–', label: 'ðŸ“– Book' },
+                { value: 'ðŸ§', label: 'ðŸ§ Cupcake' },
+                { value: 'ðŸ“', label: 'ðŸ“ Strawberry' },
+                { value: 'ðŸ¥•', label: 'ðŸ¥• Carrot' },
+                { value: 'ðŸ§„', label: 'ðŸ§„ Garlic' },
+                { value: 'ðŸ§ˆ', label: 'ðŸ§ˆ Butter' },
+                { value: 'ðŸŒž', label: 'ðŸŒž Sun' },
+                { value: 'ðŸŒ™', label: 'ðŸŒ™ Moon' }
             ];
         }
 
@@ -1884,7 +819,7 @@
                                             <div>
                                                 <label class="block text-[11px] font-bold uppercase tracking-[0.2em] text-sage mb-2">Rotation</label>
                                                 <input type="range" min="-18" max="18" step="3" value="${Number(sticker.rotation) || 0}" oninput="updateDraftCoverSticker(${index}, 'rotation', this.value)" class="w-full accent-[#C5A059] mt-3">
-                                                <p class="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-sage">${Number(sticker.rotation) || 0}°</p>
+                                                <p class="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-sage">${Number(sticker.rotation) || 0}Â°</p>
                                             </div>
                                         </div>
                                     </div>
@@ -1973,7 +908,7 @@
                     author: "House Recipe",
                     source: "local",
                     category: "Cooking",
-                    country: "🇳🇱 Netherlands",
+                    country: "ðŸ‡³ðŸ‡± Netherlands",
                     profile: defaultPlaceholderProfile,
                     prepTime: 15,
                     cookTime: 40,
@@ -1986,7 +921,7 @@
                         "Chop all vegetables and mushrooms into rough chunks.",
                         "Fry the onions until translucent, then add the mushrooms and garlic.",
                         "Deglaze the pan with red wine.",
-                        "Bake at 180°C or let simmer for 40 minutes."
+                        "Bake at 180Â°C or let simmer for 40 minutes."
                     ],
                     tips: "Serve with a thick slice of rustic bread! The sauce is amazing when soaked up.",
                     lastOpened: Date.now(),
@@ -2586,7 +1521,7 @@
             const htmlContent = `
                 <div style="font-family: 'Cormorant Garamond', serif; padding: 40px; max-width: 800px; color: #2C3D2E;">
                     <h1 style="font-size: 36px; margin-bottom: 10px; font-weight: bold;">${recipe.title}</h1>
-                    <p style="color: #7A8B76; font-size: 14px; margin-bottom: 20px;">By ${recipe.author} • ${recipe.country || 'Unknown'}</p>
+                    <p style="color: #7A8B76; font-size: 14px; margin-bottom: 20px;">By ${recipe.author} â€¢ ${recipe.country || 'Unknown'}</p>
 
                     <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; padding: 15px; background-color: #F4EFE6; border-radius: 8px;">
                         ${recipe.prepTime ? `<div style="text-align: center;"><strong>${recipe.prepTime}m</strong><br><span style="font-size: 12px; color: #7A8B76;">Prep</span></div>` : ''}
@@ -2597,7 +1532,7 @@
 
                     <h2 style="font-size: 24px; margin-top: 25px; margin-bottom: 15px; font-weight: bold; border-bottom: 2px solid #C5A059; padding-bottom: 10px;">Ingredients</h2>
                     <ul style="list-style: none; padding: 0;">
-                        ${(recipe.ingredients || []).map(ing => `<li style="padding: 8px 0; border-bottom: 1px solid #EFEFEF;">• ${applyMeasurementSystem(ing)}</li>`).join('')}
+                        ${(recipe.ingredients || []).map(ing => `<li style="padding: 8px 0; border-bottom: 1px solid #EFEFEF;">â€¢ ${applyMeasurementSystem(ing)}</li>`).join('')}
                     </ul>
 
                     <h2 style="font-size: 24px; margin-top: 25px; margin-bottom: 15px; font-weight: bold; border-bottom: 2px solid #C5A059; padding-bottom: 10px;">Instructions</h2>
@@ -2970,7 +1905,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Default Country</label>
-                                    <input type="text" id="profile-country" value="${userSettings.country}" list="countries-list" placeholder="e.g. 🇮🇹 Italy" class="${inputClass}">
+                                    <input type="text" id="profile-country" value="${userSettings.country}" list="countries-list" placeholder="e.g. ðŸ‡®ðŸ‡¹ Italy" class="${inputClass}">
                                 </div>
                             </div>
 
@@ -3035,8 +1970,8 @@
                                 <div>
                                     <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Measurement System</label>
                                     <select id="settings-measurement" class="${inputClass}">
-                                        <option value="Metric" ${userSettings.measurementSystem === 'Metric' ? 'selected' : ''}>Metric (Grams, ML, °C)</option>
-                                        <option value="Imperial" ${userSettings.measurementSystem === 'Imperial' ? 'selected' : ''}>Imperial (Ounces, Cups, °F)</option>
+                                        <option value="Metric" ${userSettings.measurementSystem === 'Metric' ? 'selected' : ''}>Metric (Grams, ML, Â°C)</option>
+                                        <option value="Imperial" ${userSettings.measurementSystem === 'Imperial' ? 'selected' : ''}>Imperial (Ounces, Cups, Â°F)</option>
                                     </select>
                                 </div>
                                 <div>
@@ -3044,8 +1979,8 @@
                                     <select id="settings-language" class="${inputClass}">
                                         <option value="en" ${userSettings.language === 'en' ? 'selected' : ''}>English (Original)</option>
                                         <option value="nl" ${userSettings.language === 'nl' ? 'selected' : ''}>Nederlands (Dutch)</option>
-                                        <option value="es" ${userSettings.language === 'es' ? 'selected' : ''}>Español (Spanish)</option>
-                                        <option value="fr" ${userSettings.language === 'fr' ? 'selected' : ''}>Français (French)</option>
+                                        <option value="es" ${userSettings.language === 'es' ? 'selected' : ''}>EspaÃ±ol (Spanish)</option>
+                                        <option value="fr" ${userSettings.language === 'fr' ? 'selected' : ''}>FranÃ§ais (French)</option>
                                         <option value="de" ${userSettings.language === 'de' ? 'selected' : ''}>Deutsch (German)</option>
                                         <option value="it" ${userSettings.language === 'it' ? 'selected' : ''}>Italiano (Italian)</option>
                                     </select>
@@ -3698,7 +2633,7 @@
                                     <div class="notebook-landing-stat">
                                         <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-sage opacity-70">Preview recipe</p>
                                         <p class="mt-3 font-fantasy text-2xl font-bold leading-tight text-forest">${previewTitle}</p>
-                                        <p class="mt-2 text-xs font-semibold uppercase tracking-[0.2em] text-sage">${previewCategory} · page ${notebookPageIndex + 1} of ${totalPages}</p>
+                                        <p class="mt-2 text-xs font-semibold uppercase tracking-[0.2em] text-sage">${previewCategory} Â· page ${notebookPageIndex + 1} of ${totalPages}</p>
                                     </div>
                                 </div>
 
@@ -3718,7 +2653,7 @@
                                             </span>
                                             <div>
                                                 <p class="font-bold text-forest">${escapeHTML(latestOpenedRecipe.title || 'Untitled recipe')}</p>
-                                                <p class="mt-1 text-sm font-semibold leading-relaxed text-sage">Opened ${latestOpenedDate}${latestOpenedRecipe.source === 'published' ? ' · saved collection' : ' · personal archive'}</p>
+                                                <p class="mt-1 text-sm font-semibold leading-relaxed text-sage">Opened ${latestOpenedDate}${latestOpenedRecipe.source === 'published' ? ' Â· saved collection' : ' Â· personal archive'}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -3777,8 +2712,8 @@
                                             <div class="notebook-line-row">${recipeMood}</div>
                                             <div class="notebook-line-row text-[11px] font-bold uppercase tracking-[0.22em]">
                                                 <span>${recipe.category || 'Recipe'}</span>
-                                                ${recipe.difficulty ? `<span>· ${recipe.difficulty}</span>` : ''}
-                                                ${recipe.country ? `<span>· ${recipe.country}</span>` : ''}
+                                                ${recipe.difficulty ? `<span>Â· ${recipe.difficulty}</span>` : ''}
+                                                ${recipe.country ? `<span>Â· ${recipe.country}</span>` : ''}
                                             </div>
                                         </div>
 
@@ -3803,7 +2738,7 @@
                                                 <span class="text-[10px] font-bold uppercase tracking-[0.22em] text-sage opacity-75">${recipe.ingredients?.length || 0} total</span>
                                             </div>
                                             <ul class="notebook-ruled-block mt-1 text-sm font-semibold text-forest">
-                                                ${previewIngredients.map(ingredient => `<li class="notebook-line-row"><span class="text-gold text-lg">•</span><span class="notebook-line-text">${applyMeasurementSystem(ingredient)}</span></li>`).join('')}
+                                                ${previewIngredients.map(ingredient => `<li class="notebook-line-row"><span class="text-gold text-lg">â€¢</span><span class="notebook-line-text">${applyMeasurementSystem(ingredient)}</span></li>`).join('')}
                                             </ul>
                                             ${extraIngredients > 0 ? `<p class="pt-3 text-xs font-bold uppercase tracking-[0.22em] text-sage opacity-80">+ ${extraIngredients} more ingredients in the full recipe</p>` : ''}
                                         </div>
@@ -3822,7 +2757,7 @@
                                             <div>
                                                 <p class="text-[11px] font-bold uppercase tracking-[0.3em] text-sage opacity-80">Recipe story</p>
                                                 <div class="notebook-ruled-block mt-2 text-sm font-semibold text-sage">
-                                                    <div class="notebook-line-row">By ${recipe.author || 'Chef'}${recipe.lastOpened ? ` · last opened ${new Date(recipe.lastOpened).toLocaleDateString()}` : ''}</div>
+                                                    <div class="notebook-line-row">By ${recipe.author || 'Chef'}${recipe.lastOpened ? ` Â· last opened ${new Date(recipe.lastOpened).toLocaleDateString()}` : ''}</div>
                                                 </div>
                                             </div>
                                             <div class="relative w-24 h-24 rounded-2xl border-4 border-white shadow-lg bg-cover bg-center rotate-[3deg]" style="background-image:url('${recipe.profile || defaultPlaceholderProfile}')">
@@ -3848,7 +2783,7 @@
 
                                         <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                             <div class="text-[11px] font-bold uppercase tracking-[0.2em] text-sage">
-                                                ${(recipe.diet || []).length > 0 ? recipe.diet.join(' · ') : 'No diet tags'}
+                                                ${(recipe.diet || []).length > 0 ? recipe.diet.join(' Â· ') : 'No diet tags'}
                                             </div>
                                             <button type="button" onclick="openNotebookRecipeForCooking(${recipe.id})" class="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-gold bg-gold px-4 text-[11px] font-bold uppercase tracking-[0.16em] text-white shadow-sm transition-all hover:border-yellow-600 hover:bg-yellow-600 sm:w-auto">
                                                 <i data-lucide="chef-hat" class="h-4 w-4"></i> Start Cooking
@@ -4235,7 +3170,7 @@
                         <div onclick="renderPublishedRecipeDetail('${recipe.id}')" class="h-full bg-white rounded-md shadow-sm hover:shadow-xl transition-all cursor-pointer border border-parchmentDark group overflow-hidden relative flex flex-col">
                             <div class="absolute right-4 top-4 z-10">
                                 ${owned ? `
-                                    <span class="inline-flex items-center gap-1 rounded-full bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-sage shadow-md">Yours${versionLabel ? ` · ${versionLabel}` : ''}</span>
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-sage shadow-md">Yours${versionLabel ? ` Â· ${versionLabel}` : ''}</span>
                                 ` : `
                                     <button onclick="event.stopPropagation(); toggleSavedPublishedRecipe('${recipe.id}')" class="w-11 h-11 rounded-full border border-white bg-white ${saved ? 'text-red-500' : 'text-sage'} shadow-md flex items-center justify-center hover:scale-105 transition-all">
                                         <i data-lucide="heart" class="w-5 h-5 ${saved ? 'fill-current' : ''}"></i>
@@ -4298,7 +3233,7 @@
                         ${owned ? `
                             <div class="pointer-events-auto flex flex-wrap items-center justify-end gap-2">
                                 ${ownedLocalRecipe ? `<button onclick="renderDetail(${ownedLocalRecipe.id})" class="bg-white text-forest px-4 h-14 rounded-sm font-bold flex items-center gap-2 shadow-xl hover:bg-accent transition-all border-2 border-white uppercase tracking-wider text-xs"><i data-lucide="book-open" class="w-4 h-4"></i>Open local</button>` : ''}
-                                <span class="inline-flex items-center rounded-full bg-white px-4 py-3 text-xs font-bold uppercase tracking-[0.24em] text-sage shadow-xl border border-white">Published by you${versionLabel ? ` · ${versionLabel}` : ''}</span>
+                                <span class="inline-flex items-center rounded-full bg-white px-4 py-3 text-xs font-bold uppercase tracking-[0.24em] text-sage shadow-xl border border-white">Published by you${versionLabel ? ` Â· ${versionLabel}` : ''}</span>
                             </div>
                         ` : `<button onclick="toggleSavedPublishedRecipe('${recipe.id}', 'detail')" class="pointer-events-auto bg-white ${saved ? 'text-red-500' : 'text-sage'} px-5 h-14 rounded-sm font-bold flex items-center gap-2 shadow-xl hover:bg-accent transition-all border-2 border-white uppercase tracking-wider text-xs"><i data-lucide="heart" class="w-5 h-5 ${saved ? 'fill-current' : ''}"></i>${saved ? 'Saved to Index' : 'Save to Index'}</button>`}
                     </div>
@@ -5214,7 +4149,7 @@
                 renderDraftIngredients();
                 renderDraftSteps();
                 
-                showToast("✨ Magic Recipe Generated!", "sparkles");
+                showToast("âœ¨ Magic Recipe Generated!", "sparkles");
             } catch (err) {
                 console.error(err);
                 showToast("AI Chef failed to generate recipe. Try again.", "alert-triangle");
@@ -5254,9 +4189,9 @@
             contentDiv.innerHTML = `
                 <div class="bg-white p-6 md:p-10 rounded-sm shadow-sm mb-6 border border-parchmentDark max-w-4xl mx-auto">
                     
-                    <!-- AI MAGIC GENERATOR FEATURE ✨ -->
+                    <!-- AI MAGIC GENERATOR FEATURE âœ¨ -->
                     <div class="bg-gradient-to-r from-accent to-gold/20 p-6 rounded-md border border-gold mb-10 shadow-sm relative overflow-hidden" translate="no">
-                        <div class="absolute -right-4 -top-4 text-6xl opacity-10 pointer-events-none">✨</div>
+                        <div class="absolute -right-4 -top-4 text-6xl opacity-10 pointer-events-none">âœ¨</div>
                         <h3 class="font-fantasy font-bold text-2xl text-forest mb-2 flex items-center gap-2">
                             <i data-lucide="sparkles" class="w-6 h-6 text-gold"></i> AI Magic Generator
                         </h3>
@@ -5683,36 +4618,4 @@
                     }
                 }
         renderList();
-    </script>
-</body>
-</html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    
