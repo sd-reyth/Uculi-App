@@ -1106,6 +1106,9 @@
             indexViewMode: "cards",
             notebookCover: getDefaultNotebookCover(),
             showNotebookStickyNotes: true,
+            simpleMode: false,
+            premium: false,
+            simpleMode: false
             favorites: [],
             myRecipeRatings: {}
         };
@@ -1656,7 +1659,7 @@
             `;
         }
 
-        function openCoverEditor() {
+        function openCoverEditor() { if(!userSettings.premium) { showPremiumModal("customize notebook covers"); return; }
             draftNotebookCover = JSON.parse(JSON.stringify(normalizeNotebookCover(userSettings.notebookCover)));
             const modal = document.getElementById('cover-editor-modal');
             if (!modal) return;
@@ -1907,7 +1910,7 @@
             });
         }
 
-        function openNotebookStickyNotesEditor(recipeId) {
+        function openNotebookStickyNotesEditor(recipeId) { if(!userSettings.premium) { showPremiumModal("use sticky notes"); return; }
             const recipe = recipes.find(item => item.id === recipeId);
             if (!recipe) return;
 
@@ -2244,7 +2247,7 @@
             };
         }
 
-        async function publishRecipe(recipeId) {
+        async function publishRecipe(recipeId) { if(!userSettings.premium) { showPremiumModal("publish recipes"); return; }
             if (!isAuthenticated || !firebaseInitialized || !currentUser) {
                 showToast('Sign in to publish recipes', 'alert-circle');
                 return false;
@@ -3360,7 +3363,7 @@
             }
         }
 
-        function openNotebookStickyNoteMenu(recipeId, noteIndex) {
+        function openNotebookStickyNoteMenu(recipeId, noteIndex) { if(!userSettings.premium) { showPremiumModal("use sticky notes"); return; }
             if (activeNotebookStickyNoteMenu?.recipeId === recipeId && activeNotebookStickyNoteMenu?.noteIndex === noteIndex) {
                 focusNotebookStickyNoteEditor(recipeId, noteIndex);
                 return;
@@ -4424,6 +4427,42 @@
             if (modal) modal.classList.add('hidden', 'opacity-0', 'scale-95');
         }
 
+        function showPremiumModal(featureName) {
+            createModal("Unlock Uculi Premium", `
+                <div class="p-6 text-center bg-white">
+                    <div class="w-16 h-16 bg-gold bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-4 border border-gold">
+                        <i data-lucide="crown" class="w-8 h-8 text-gold"></i>
+                    </div>
+                    <h3 class="text-2xl font-fantasy font-bold text-forest mb-2">Premium Feature</h3>
+                    <p class="text-sage mb-6 text-sm font-semibold">You need Premium to \${featureName}. Subscribe to supercharge your notebook and support Uculi!</p>
+                    
+                    <div class="space-y-3 text-left bg-parchment p-4 rounded-md border border-parchmentDark mb-6">
+                        <p class="flex items-center gap-2 text-sm text-forest font-bold"><i data-lucide="check" class="w-4 h-4 text-gold"></i> Unlimited Local Recipes</p>
+                        <p class="flex items-center gap-2 text-sm text-forest font-bold"><i data-lucide="check" class="w-4 h-4 text-gold"></i> Connect with Families</p>
+                        <p class="flex items-center gap-2 text-sm text-forest font-bold"><i data-lucide="check" class="w-4 h-4 text-gold"></i> Cloud Sync & Publishing</p>
+                        <p class="flex items-center gap-2 text-sm text-forest font-bold"><i data-lucide="check" class="w-4 h-4 text-gold"></i> Custom Notebook Covers</p>
+                        <p class="flex items-center gap-2 text-sm text-forest font-bold opacity-60 italic"><i data-lucide="sparkles" class="w-4 h-4 text-gold"></i> Future: Live Shopping List</p>
+                    </div>
+
+                    <button onclick="simulatePremiumUpgrade()" class="w-full bg-forest text-white h-12 rounded-md font-bold uppercase tracking-wider hover:bg-opacity-90 flex items-center justify-center gap-2 transition-colors mb-3">
+                        Subscribe Now (Pricing TBD)
+                    </button>
+                    <button onclick="closeModal()" class="w-full text-xs text-sage uppercase tracking-wider font-bold hover:text-forest transition-colors">
+                        Maybe Later
+                    </button>
+                </div>
+            `);
+        }
+
+        window.simulatePremiumUpgrade = function() {
+            userSettings.premium = true;
+            saveData();
+            closeModal();
+            showToast("Welcome to Uculi Premium!", "crown");
+            if (currentNav === "settings") renderSettings();
+            if (currentNav === "profile") renderProfile();
+        };
+
         function createModal(title, contentHTML, buttons = []) {
             const modalId = 'dynamic-modal-' + Date.now();
             const modalHtml = `
@@ -4492,7 +4531,7 @@
         }
 
         // --- FAMILY RECIPE BOOKS ---
-        function showCreateFamilyModal() {
+        function showCreateFamilyModal() { if(!userSettings.premium) { showPremiumModal("create families"); return; }
             if (!isAuthenticated) return showToast('Please sign in to create a family.', 'alert-circle', true);
             const activeFamilies = userFamilies.filter(f => !f.removedMembers || !f.removedMembers.some(m => m.userId === currentUser.uid));
             if (activeFamilies.length >= 3) {
@@ -4525,7 +4564,7 @@
             ]);
         }
 
-        function showJoinFamilyModal() {
+        function showJoinFamilyModal() { if(!userSettings.premium) { showPremiumModal("join families"); return; }
             if (!isAuthenticated) return showToast('Please sign in to join a family.', 'alert-circle', true);
             
             const activeFamilies = userFamilies.filter(f => !f.removedMembers || !f.removedMembers.some(m => m.userId === currentUser.uid));
@@ -5445,57 +5484,40 @@
             setRecipeDetailsVisibility(true);
         }
 
+        function localAutoTagRecipe(title, ingredientsStr, notesStr) {
+            const str = (title + ' ' + ingredientsStr + ' ' + notesStr).toLowerCase();
+            const tags = { difficulty: 'Easy', categories: [], diet: [] };
+            if (/beef|chicken|pork|sausage|meat|steak/i.test(str)) { tags.difficulty = 'Medium'; tags.categories.push('Main Course'); }
+            if (!/meat|beef|chicken|pork/i.test(str)) { tags.diet.push('Vegetarian'); }
+            return tags;
+        }
+
         async function autoFillRecipeDetails() {
-            if (draftIngredients.length === 0) {
-                showToast('Add ingredients first so AI has something to work with.', 'alert-circle');
-                return;
-            }
-
-            if (draftSteps.length === 0) {
-                showToast('Add at least one instruction so AI can estimate the details.', 'alert-circle');
-                return;
-            }
-
             const btn = document.getElementById('btn-autofill-details');
             const icon = document.getElementById('autofill-details-icon');
-            const notes = document.getElementById('r-tips').value.trim();
-            const title = document.getElementById('r-title').value.trim();
-
-            btn.disabled = true;
-            btn.classList.add('opacity-60');
+            if (btn) { btn.disabled = true; btn.classList.add('opacity-60'); }
             if (icon) icon.classList.add('animate-spin');
-
-            const payload = {
-                contents: [{ parts: [{ text: `Infer recipe details from this draft recipe.\nTitle: ${title || 'Untitled recipe'}\nIngredients: ${draftIngredients.join(', ')}\nInstructions: ${draftSteps.map(step => getRecipeInstructionText(step)).join(' | ')}\nChef notes: ${notes || 'None provided'}\nReturn practical, user-editable estimates.` }] }],
-                systemInstruction: { parts: [{ text: `You are an expert chef. Infer reasonable recipe metadata from the provided draft. Use only these difficulty values: Easy, Medium, Hard. Use only these diet values when applicable: ${supportedDietOptionsText}. If a diet value does not apply, omit it.` }] },
-                generationConfig: {
-                    responseMimeType: 'application/json',
-                    responseSchema: {
-                        type: 'OBJECT',
-                        properties: {
-                            prepTime: { type: 'INTEGER', description: 'Preparation time in minutes' },
-                            cookTime: { type: 'INTEGER', description: 'Cooking time in minutes' },
-                            servings: { type: 'INTEGER', description: 'Estimated number of servings' },
-                            difficulty: { type: 'STRING', description: 'Either Easy, Medium, or Hard' },
-                            cuisine: { type: 'STRING', description: 'Cuisine type such as Italian, Asian, Mediterranean, American, Mexican, European' },
-                            diet: { type: 'ARRAY', items: { type: 'STRING' }, description: `Applicable diet tags from: ${supportedDietOptionsText}` }
-                        }
-                    }
-                }
-            };
-
+            
             try {
-                const response = await fetchGeminiAPI(payload);
-                const jsonText = response.candidates?.[0]?.content?.parts?.[0]?.text;
-                const details = JSON.parse(jsonText);
-                applyRecipeDetailFields(details);
-                showToast('AI filled the details. You can tweak everything before saving.', 'sparkles');
-            } catch (error) {
-                console.error(error);
-                showToast('AI could not infer the details right now. Try again.', 'alert-triangle');
+                const title = document.getElementById('r-title').value || '';
+                const ingredients = draftIngredients.join(' ');
+                const notes = document.getElementById('r-tips')?.value || '';
+                
+                const tags = localAutoTagRecipe(title, ingredients, notes);
+                
+                document.getElementById('r-prep').value = 15;
+                document.getElementById('r-cook').value = 30;
+                document.getElementById('r-servings').value = 4;
+                if (tags.categories.length > 0) document.getElementById('r-category').value = tags.categories.join(', ');
+                if (tags.diet.length > 0) document.getElementById('r-diet').value = tags.diet.join(', ');
+                document.getElementById('r-difficulty').value = tags.difficulty;
+                document.getElementById('r-cost').value = ']';
+                
+                showToast('Smart Tags Applied locally!', 'check-circle');
+            } catch (err) {
+                console.error(err);
             } finally {
-                btn.disabled = false;
-                btn.classList.remove('opacity-60');
+                if (btn) { btn.disabled = false; btn.classList.remove('opacity-60'); }
                 if (icon) icon.classList.remove('animate-spin');
             }
         }
@@ -5664,6 +5686,32 @@
     </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
