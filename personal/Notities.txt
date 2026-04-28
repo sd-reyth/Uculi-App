@@ -1,0 +1,16 @@
+Vijf stappenplan
+
+Interactie- en button-consistentie
+We lopen alle schermen langs waar nog losse of afwijkende knoppen zitten. Doel: dezelfde soort actie moet overal hetzelfde aanvoelen qua stijl, hover, disabled state, loading state en plaatsing.
+
+Audit van zichtbare acties
+We controleren per scherm of elke zichtbare knop of CTA echt doet wat hij belooft. Als iets nog niet af is, moet dat of verborgen worden, of duidelijk als preview/coming later worden getoond. Geen half-werkbare acties meer.
+
+Responsive en usability sweep
+We testen daarna de belangrijkste schermen op mobiel en desktop. Focus: bottom nav, modalhoogtes, scrollgedrag, keyboard overlap, tap targets, leesbaarheid en visuele rust.
+
+Copy en visuele hiërarchie
+Pas nadat gedrag klopt, scherpen we teksten, empty states en visuele nadruk aan. Dus niet eerst mooier praten, maar eerst zorgen dat alles logisch werkt.
+
+Daarna pas billing
+Billing blijft belangrijk, maar komt pas nadat de productervaring stabiel voelt.

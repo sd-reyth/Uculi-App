@@ -1,0 +1,12 @@
+.firebase/
+.firebaserc
+firebase-debug.log
+
+.env
+.env.*
+!.env.example
+
+.noop/
+
+public/*
+!public/.gitkeep
