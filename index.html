@@ -174,6 +174,29 @@
             line-height: 1;
         }
 
+        .settings-disclosure {
+            overflow: hidden;
+        }
+
+        .settings-disclosure > summary {
+            list-style: none;
+        }
+
+        .settings-disclosure > summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .settings-disclosure-chevron {
+            transition: transform 180ms ease, color 180ms ease, border-color 180ms ease, background-color 180ms ease;
+        }
+
+        .settings-disclosure[open] .settings-disclosure-chevron {
+            transform: rotate(180deg);
+            color: #8c6a22;
+            border-color: rgba(197, 160, 89, 0.45);
+            background-color: rgba(197, 160, 89, 0.12);
+        }
+
         @media (min-width: 768px) {
             #main-header {
                 padding: 1.1rem 1.6rem;
@@ -494,7 +517,8 @@
         }
 
         .notebook-landing-stack {
-            width: min(100%, 42rem);
+            width: 100%;
+            max-width: 78rem;
             display: grid;
             gap: 1rem;
             justify-items: center;
@@ -576,6 +600,55 @@
             padding: 0.35rem 0.8rem;
             border-radius: 999px;
             border: 1px solid rgba(122, 139, 118, 0.18);
+
+        @media (min-width: 1024px) {
+            .notebook-landing-hero {
+                justify-items: stretch;
+            }
+
+            .notebook-landing-stack {
+                grid-template-columns: minmax(19rem, 27rem) minmax(0, 1fr);
+                column-gap: clamp(1.5rem, 3vw, 3rem);
+                row-gap: 1.5rem;
+                align-items: start;
+            }
+
+            .notebook-landing-heading {
+                grid-column: 1 / -1;
+                width: min(100%, 46rem);
+                text-align: left;
+            }
+
+            .notebook-landing-heading p,
+            .notebook-landing-heading h2 {
+                margin-inline: 0;
+            }
+
+            .notebook-landing-cover-column {
+                grid-column: 1;
+                justify-items: start;
+                align-self: stretch;
+            }
+
+            .notebook-landing-copy {
+                grid-column: 2;
+                width: 100%;
+                max-width: 44rem;
+                align-self: center;
+                justify-items: start;
+                text-align: left;
+            }
+
+            .notebook-landing-invite {
+                width: 100%;
+            }
+
+            .notebook-landing-action-row,
+            .notebook-landing-pill-row,
+            .notebook-landing-meta-note {
+                justify-content: flex-start;
+            }
+        }
             background: rgba(255, 255, 255, 0.86);
             font-size: 0.7rem;
             font-weight: 800;
@@ -1899,9 +1972,12 @@
         function getBillingStatusMeta() {
             const billing = normalizeBillingProfile(userSettings.billing);
             const status = String(billing.status || 'free').toLowerCase();
+            const planId = String(billing.planId || 'premium').toLowerCase();
+            const hasLifetimePlan = planId.includes('lifetime');
 
             if (status === 'preview') {
                 return {
+                    state: 'preview',
                     badge: 'Premium Preview',
                     summary: 'Premium preview is active on this device for local testing. Replace it with real checkout and entitlement sync before launch.',
                     sourceLabel: 'Local preview',
@@ -1911,32 +1987,42 @@
 
             if (status === 'active') {
                 return {
-                    badge: 'Premium Active',
-                    summary: 'Premium entitlement is active. Advanced features stay unlocked while the linked subscription remains valid.',
+                    state: 'active',
+                    badge: hasLifetimePlan ? 'Lifetime Access' : 'Premium Active',
+                    summary: hasLifetimePlan
+                        ? 'Lifetime access is active. The full Uculi toolkit stays unlocked without a recurring renewal.'
+                        : 'Premium entitlement is active. Advanced features stay unlocked while the linked subscription remains valid.',
                     sourceLabel: billing.provider || 'Billing provider',
-                    actionLabel: 'Manage Premium'
+                    actionLabel: hasLifetimePlan ? 'Lifetime Active' : 'Manage Premium'
                 };
             }
 
             if (status === 'grace') {
                 return {
-                    badge: 'Premium Grace Period',
-                    summary: 'Premium is temporarily still available while the billing state needs attention.',
+                    state: 'grace',
+                    badge: hasLifetimePlan ? 'Lifetime Sync Pending' : 'Premium Grace Period',
+                    summary: hasLifetimePlan
+                        ? 'Lifetime access is still available while the linked entitlement state is being refreshed.'
+                        : 'Premium is temporarily still available while the billing state needs attention.',
                     sourceLabel: billing.entitlementSource || 'Grace period',
-                    actionLabel: 'Resolve Billing'
+                    actionLabel: hasLifetimePlan ? 'Refresh Lifetime Access' : 'Resolve Billing'
                 };
             }
 
             if (status === 'restored') {
                 return {
-                    badge: 'Premium Restored',
-                    summary: 'Premium access was restored from a linked account state.',
+                    state: 'restored',
+                    badge: hasLifetimePlan ? 'Lifetime Restored' : 'Premium Restored',
+                    summary: hasLifetimePlan
+                        ? 'Lifetime access was restored from a linked account state.'
+                        : 'Premium access was restored from a linked account state.',
                     sourceLabel: billing.entitlementSource || 'Restore flow',
-                    actionLabel: 'Premium Restored'
+                    actionLabel: hasLifetimePlan ? 'Lifetime Restored' : 'Premium Restored'
                 };
             }
 
             return {
+                state: 'free',
                 badge: 'Free Plan',
                 summary: 'Free stays local-only with up to 8 recipes on this device. Premium unlocks notebook mode, sharing, downloads, cloud sync, publishing, and families.',
                 sourceLabel: 'Local free tier',
@@ -3987,7 +4073,7 @@
             reader.readAsText(file);
         }
 
-        function exportRecipeAsPDF(recipeId) {
+        async function exportRecipeAsPDF(recipeId) {
             if (requirePremiumFeature('recipePdfExport')) {
                 return;
             }
@@ -3995,53 +4081,231 @@
             const recipe = recipes.find(r => r.id === recipeId);
             if (!recipe) return;
 
-            const htmlContent = `
-                <div style="font-family: 'Cormorant Garamond', serif; padding: 40px; max-width: 800px; color: #2C3D2E;">
-                    <h1 style="font-size: 36px; margin-bottom: 10px; font-weight: bold;">${recipe.title}</h1>
-                    <p style="color: #7A8B76; font-size: 14px; margin-bottom: 20px;">By ${recipe.author} • ${recipe.country || 'Unknown'}</p>
-
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; padding: 15px; background-color: #F4EFE6; border-radius: 8px;">
-                        ${recipe.prepTime ? `<div style="text-align: center;"><strong>${recipe.prepTime}m</strong><br><span style="font-size: 12px; color: #7A8B76;">Prep</span></div>` : ''}
-                        ${recipe.cookTime ? `<div style="text-align: center;"><strong>${recipe.cookTime}m</strong><br><span style="font-size: 12px; color: #7A8B76;">Cook</span></div>` : ''}
-                        ${recipe.servings ? `<div style="text-align: center;"><strong>${recipe.servings}</strong><br><span style="font-size: 12px; color: #7A8B76;">Servings</span></div>` : ''}
-                        ${recipe.difficulty ? `<div style="text-align: center;"><strong>${recipe.difficulty}</strong><br><span style="font-size: 12px; color: #7A8B76;">Difficulty</span></div>` : ''}
-                    </div>
-
-                    <h2 style="font-size: 24px; margin-top: 25px; margin-bottom: 15px; font-weight: bold; border-bottom: 2px solid #C5A059; padding-bottom: 10px;">Ingredients</h2>
-                    <ul style="list-style: none; padding: 0;">
-                        ${(recipe.ingredients || []).map(ing => `<li style="padding: 8px 0; border-bottom: 1px solid #EFEFEF;">• ${applyMeasurementSystem(ing)}</li>`).join('')}
-                    </ul>
-
-                    <h2 style="font-size: 24px; margin-top: 25px; margin-bottom: 15px; font-weight: bold; border-bottom: 2px solid #C5A059; padding-bottom: 10px;">Instructions</h2>
-                    <ol style="padding-left: 20px;">
-                        ${(recipe.instructions || []).map(step => `<li style="padding: 10px 0; line-height: 1.6;">${applyMeasurementSystem(getRecipeInstructionText(step))}</li>`).join('')}
-                    </ol>
-
-                    ${recipe.tips ? `
-                    <h2 style="font-size: 24px; margin-top: 25px; margin-bottom: 15px; font-weight: bold; border-bottom: 2px solid #C5A059; padding-bottom: 10px;">Chef's Notes</h2>
-                    <p style="line-height: 1.6;">${applyMeasurementSystem(recipe.tips)}</p>
-                    ` : ''}
-
-                    ${recipe.personalNotes ? `
-                    <h2 style="font-size: 24px; margin-top: 25px; margin-bottom: 15px; font-weight: bold; border-bottom: 2px solid #C5A059; padding-bottom: 10px;">Your Notes</h2>
-                    <p style="line-height: 1.6;">${applyMeasurementSystem(recipe.personalNotes)}</p>
-                    ` : ''}
-                </div>
-            `;
-
-            const element = document.createElement('div');
-            element.innerHTML = htmlContent;
-
-            const opt = {
-                margin: 10,
-                filename: `${recipe.title}.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2 },
-                jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+            const normalizePdfText = (value, fallback = '') => {
+                const normalized = String(value ?? fallback)
+                    .replace(/[\u{1F1E6}-\u{1F1FF}]/gu, '')
+                    .replace(/[\u{1F300}-\u{1FAFF}]/gu, '')
+                    .replace(/\u00A0/g, ' ')
+                    .normalize('NFKD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .replace(/[“”]/g, '"')
+                    .replace(/[‘’]/g, "'")
+                    .replace(/[–—]/g, '-')
+                    .replace(/•/g, '-')
+                    .replace(/°/g, ' deg')
+                    .replace(/\s+/g, ' ')
+                    .trim()
+                    .replace(/[^\x20-\x7E]/g, '')
+                    .trim();
+                return normalized || fallback;
             };
 
-            html2pdf().set(opt).from(element).save();
-            showToast('PDF downloaded!', 'download');
+            const filename = `${normalizePdfText(recipe.title, 'recipe').replace(/[\\/:*?"<>|]+/g, '-').trim() || 'recipe'}.pdf`;
+            const metadata = [
+                `By ${normalizePdfText(recipe.author, 'Unknown author')}`,
+                normalizePdfText(recipe.country, 'Unknown country')
+            ].filter(Boolean).join(' | ');
+            const statLine = [
+                recipe.prepTime ? `Prep ${recipe.prepTime}m` : '',
+                recipe.cookTime ? `Cook ${recipe.cookTime}m` : '',
+                recipe.servings ? `Serves ${recipe.servings}` : '',
+                recipe.difficulty ? normalizePdfText(recipe.difficulty) : ''
+            ].filter(Boolean).join('   ');
+            const ingredientLines = (recipe.ingredients || []).map(ingredient => normalizePdfText(applyMeasurementSystem(ingredient))).filter(Boolean);
+            const instructionLines = (recipe.instructions || []).map(step => normalizePdfText(applyMeasurementSystem(getRecipeInstructionText(step)))).filter(Boolean);
+
+            const seedElement = document.createElement('div');
+            seedElement.textContent = 'seed';
+            seedElement.setAttribute('aria-hidden', 'true');
+            seedElement.style.position = 'absolute';
+            seedElement.style.left = '-10000px';
+            seedElement.style.top = '0';
+            seedElement.style.pointerEvents = 'none';
+            document.body.appendChild(seedElement);
+
+            try {
+                const worker = html2pdf().set({ jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' } }).from(seedElement).toPdf();
+                await worker;
+                const pdf = await worker.get('pdf');
+
+                if (!pdf || typeof pdf.text !== 'function') {
+                    throw new Error('jsPDF instance unavailable');
+                }
+
+                if (typeof pdf.internal?.getNumberOfPages === 'function' && pdf.internal.getNumberOfPages() > 0 && typeof pdf.deletePage === 'function') {
+                    pdf.deletePage(1);
+                }
+                if (typeof pdf.internal?.getNumberOfPages === 'function' && pdf.internal.getNumberOfPages() === 0) {
+                    pdf.addPage();
+                }
+
+                const pageWidth = pdf.internal.pageSize.getWidth();
+                const pageHeight = pdf.internal.pageSize.getHeight();
+                const margin = 18;
+                const maxWidth = pageWidth - (margin * 2);
+                const bottomMargin = 18;
+                const lineHeight = 6;
+                let cursorY = 20;
+
+                const drawLogoPlaceholder = (x, y) => {
+                    pdf.setFillColor(44, 61, 46);
+                    pdf.setDrawColor(197, 160, 89);
+                    pdf.setLineWidth(0.4);
+                    pdf.roundedRect(x, y, 16, 16, 3, 3, 'FD');
+                    pdf.setDrawColor(255, 255, 255);
+                    pdf.setLineWidth(0.6);
+                    pdf.roundedRect(x + 3.2, y + 4, 4.2, 7.4, 0.8, 0.8, 'S');
+                    pdf.roundedRect(x + 8.6, y + 4, 4.2, 7.4, 0.8, 0.8, 'S');
+                    pdf.line(x + 8, y + 4, x + 8, y + 11.4);
+                };
+
+                const drawPageHeader = (isFirstPage = false) => {
+                    if (isFirstPage) {
+                        drawLogoPlaceholder(margin, 14);
+                        pdf.setFont('helvetica', 'bold');
+                        pdf.setFontSize(8);
+                        pdf.setTextColor(122, 139, 118);
+                        pdf.text('RECIPE NOTEBOOK', margin + 21, 20);
+                        pdf.setFont('times', 'bold');
+                        pdf.setFontSize(22);
+                        pdf.setTextColor(44, 61, 46);
+                        pdf.text('Uculi', margin + 21, 28.5);
+                        pdf.setFont('helvetica', 'normal');
+                        pdf.setFontSize(9);
+                        pdf.setTextColor(122, 139, 118);
+                        pdf.text('Exported from your personal Uculi archive.', margin + 21, 34.5);
+                        pdf.setDrawColor(239, 239, 239);
+                        pdf.setLineWidth(0.5);
+                        pdf.line(margin, 40, pageWidth - margin, 40);
+                        return 50;
+                    }
+
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.setFontSize(8);
+                    pdf.setTextColor(122, 139, 118);
+                    pdf.text('UCULI RECIPE EXPORT', margin, 16);
+                    pdf.setDrawColor(239, 239, 239);
+                    pdf.setLineWidth(0.5);
+                    pdf.line(margin, 20, pageWidth - margin, 20);
+                    return 28;
+                };
+
+                const drawPageFooter = (pageNumber, totalPages) => {
+                    const footerY = pageHeight - 10;
+                    pdf.setDrawColor(239, 239, 239);
+                    pdf.setLineWidth(0.5);
+                    pdf.line(margin, footerY - 4, pageWidth - margin, footerY - 4);
+                    pdf.setFont('helvetica', 'normal');
+                    pdf.setFontSize(8);
+                    pdf.setTextColor(122, 139, 118);
+                    pdf.text('Exported from Uculi Recipe Notebook', margin, footerY);
+                    pdf.text(`Page ${pageNumber} of ${totalPages}`, pageWidth - margin, footerY, { align: 'right' });
+                };
+
+                const startNewPage = (isFirstPage = false) => {
+                    if (typeof pdf.internal?.getNumberOfPages === 'function' && pdf.internal.getNumberOfPages() === 0) {
+                        pdf.addPage();
+                    }
+                    const targetPage = pdf.internal.getNumberOfPages();
+                    pdf.setPage(targetPage);
+                    cursorY = drawPageHeader(isFirstPage);
+                };
+
+                const ensureSpace = (requiredHeight = lineHeight) => {
+                    if (cursorY + requiredHeight > pageHeight - bottomMargin) {
+                        pdf.addPage();
+                        startNewPage(false);
+                    }
+                };
+
+                const addParagraph = (text, options = {}) => {
+                    const {
+                        font = 'helvetica',
+                        style = 'normal',
+                        size = 12,
+                        color = [44, 61, 46],
+                        after = 2
+                    } = options;
+                    const normalizedText = normalizePdfText(text);
+                    if (!normalizedText) return;
+                    pdf.setFont(font, style);
+                    pdf.setFontSize(size);
+                    pdf.setTextColor(...color);
+                    const lines = pdf.splitTextToSize(normalizedText, maxWidth);
+                    ensureSpace(lines.length * lineHeight);
+                    pdf.text(lines, margin, cursorY);
+                    cursorY += (lines.length * lineHeight) + after;
+                };
+
+                const addSectionTitle = (title) => {
+                    ensureSpace(16);
+                    if (cursorY > 24) {
+                        cursorY += 2;
+                    }
+                    pdf.setFont('times', 'bold');
+                    pdf.setFontSize(18);
+                    pdf.setTextColor(44, 61, 46);
+                    pdf.text(title, margin, cursorY);
+                    cursorY += 3;
+                    pdf.setDrawColor(197, 160, 89);
+                    pdf.setLineWidth(0.6);
+                    pdf.line(margin, cursorY, pageWidth - margin, cursorY);
+                    cursorY += 6;
+                };
+
+                const addList = (items, ordered = false) => {
+                    items.filter(Boolean).forEach((item, index) => {
+                        const prefix = ordered ? `${index + 1}. ` : '- ';
+                        addParagraph(`${prefix}${normalizePdfText(item)}`, { size: 12, after: 1 });
+                    });
+                    cursorY += 1;
+                };
+
+                startNewPage(true);
+
+                pdf.setFont('times', 'bold');
+                pdf.setFontSize(24);
+                pdf.setTextColor(44, 61, 46);
+                const titleLines = pdf.splitTextToSize(normalizePdfText(recipe.title, 'Untitled recipe'), maxWidth);
+                ensureSpace(titleLines.length * 10);
+                pdf.text(titleLines, margin, cursorY);
+                cursorY += (titleLines.length * 10);
+
+                addParagraph(metadata, { size: 11, color: [122, 139, 118], after: 3 });
+                if (statLine) {
+                    addParagraph(statLine, { size: 11, style: 'bold', color: [44, 61, 46], after: 4 });
+                }
+
+                addSectionTitle('Ingredients');
+                addList(ingredientLines);
+
+                addSectionTitle('Instructions');
+                addList(instructionLines, true);
+
+                if (recipe.tips) {
+                    addSectionTitle('Chef\'s Notes');
+                    addParagraph(applyMeasurementSystem(recipe.tips), { size: 12, after: 2 });
+                }
+
+                if (recipe.personalNotes) {
+                    addSectionTitle('Your Notes');
+                    addParagraph(applyMeasurementSystem(recipe.personalNotes), { size: 12, after: 2 });
+                }
+
+                const totalPages = pdf.internal.getNumberOfPages();
+                for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
+                    pdf.setPage(pageNumber);
+                    drawPageFooter(pageNumber, totalPages);
+                }
+
+                pdf.save(filename);
+                showToast('PDF downloaded!', 'download');
+            } catch (error) {
+                console.error(error);
+                showToast('PDF export failed', 'alert-circle');
+            } finally {
+                seedElement.remove();
+            }
         }
 
         const contentDiv = document.getElementById('app-content');
@@ -4781,7 +5045,7 @@
 
         function renderSettingsDisclosure({ icon, title, summary, content, open = false, badge = '' }) {
             return `
-                <details class="rounded-sm border border-parchmentDark bg-white shadow-sm" ${open ? 'open' : ''}>
+                <details class="settings-disclosure rounded-sm border border-parchmentDark bg-white shadow-sm" ${open ? 'open' : ''}>
                     <summary class="cursor-pointer p-5 md:p-6" style="list-style: none;">
                         <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                             <div class="flex items-start gap-4">
@@ -4796,8 +5060,8 @@
                                     <p class="mt-2 text-sm font-semibold text-sage">${summary}</p>
                                 </div>
                             </div>
-                            <span class="inline-flex items-center gap-2 rounded-full border border-parchmentDark bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-sage">
-                                Open section <i data-lucide="chevrons-up-down" class="w-4 h-4 text-gold"></i>
+                            <span class="settings-disclosure-chevron inline-flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-parchmentDark bg-white text-sage shadow-sm" aria-hidden="true">
+                                <i data-lucide="chevron-down" class="h-6 w-6"></i>
                             </span>
                         </div>
                     </summary>
@@ -4817,6 +5081,9 @@
             const billingMeta = getBillingStatusMeta();
             const billingReady = isBillingCheckoutReady();
             const restoreReady = isBillingRestoreReady();
+            const normalizedPlanId = String(userSettings.billing?.planId || 'premium').toLowerCase();
+            const lifetimePlanActive = premiumActive && normalizedPlanId.includes('lifetime');
+            const premiumTierActive = billingMeta.state === 'preview' || (premiumActive && !lifetimePlanActive);
             const backupDownloadLocked = !premiumActive;
             const cloudSyncLocked = !premiumActive;
             const settingsPreferencesGridClass = 'grid grid-cols-1 gap-5 md:grid-cols-2';
@@ -4824,6 +5091,27 @@
             const billingDetailGridClass = 'mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3';
             const billingActionGridClass = 'mt-6 grid grid-cols-1 gap-4 md:grid-cols-3';
             const infoActionGridClass = 'grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4';
+            const buildSettingsPlanCard = ({ eyebrow, title, description, highlights, badge = '', active = false, accent = false, actionMarkup = '' }) => `
+                <article class="flex h-full flex-col rounded-2xl border p-5 shadow-sm ${active ? 'border-forest bg-forest text-white shadow-[0_18px_36px_rgba(44,61,46,0.16)]' : accent ? 'border-gold bg-[#fffaf1]' : 'border-parchmentDark bg-white'}">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <p class="text-[10px] font-bold uppercase tracking-[0.24em] ${active ? 'text-white/70' : accent ? 'text-gold' : 'text-sage'}">${eyebrow}</p>
+                            <h4 class="mt-2 font-fantasy text-2xl font-bold ${active ? 'text-white' : 'text-forest'}">${title}</h4>
+                        </div>
+                        ${badge ? `<span class="inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${active ? 'border-white/20 bg-white/10 text-white' : accent ? 'border-gold/40 bg-gold/10 text-forest' : 'border-parchmentDark bg-parchment text-sage'}">${badge}</span>` : ''}
+                    </div>
+                    <p class="mt-3 text-sm font-semibold leading-relaxed ${active ? 'text-white/80' : 'text-sage'}">${description}</p>
+                    <div class="mt-4 space-y-2">
+                        ${highlights.map(item => `
+                            <div class="flex items-start gap-2 text-sm font-semibold ${active ? 'text-white' : 'text-forest'}">
+                                <i data-lucide="check" class="mt-0.5 h-4 w-4 flex-shrink-0 ${active ? 'text-gold' : 'text-gold'}"></i>
+                                <span>${item}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                    ${actionMarkup ? `<div class="mt-5">${actionMarkup}</div>` : ''}
+                </article>
+            `;
             const backupContent = `
                 <p class="text-sm font-semibold text-sage mb-5">${backupDownloadLocked ? 'Backups stay available locally, but downloadable exports unlock with Premium.' : 'Create a JSON backup whenever you want an extra copy of your recipes and settings.'}</p>
                 <div class="${settingsActionGridClass}">
@@ -4874,20 +5162,82 @@
                 `;
 
             const currentPlanSection = `
-                <div class="mb-6 flex flex-col gap-4 rounded-2xl border ${premiumActive ? 'border-gold bg-gold/10' : 'border-parchmentDark bg-white'} p-6 shadow-sm md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <p class="text-[11px] font-bold uppercase tracking-[0.28em] ${premiumActive ? 'text-forest' : 'text-sage'}">${billingMeta.badge}</p>
-                        <p class="mt-2 text-sm font-semibold text-sage">${billingMeta.summary}</p>
+                <section class="mb-6 overflow-hidden rounded-[28px] border border-parchmentDark bg-white shadow-lg">
+                    <div class="border-b border-parchmentDark bg-gradient-to-br from-white via-accent/70 to-parchment px-5 py-6 md:px-6">
+                        <div class="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(17rem,0.95fr)] xl:items-start">
+                            <div>
+                                <p class="text-[11px] font-bold uppercase tracking-[0.28em] text-sage opacity-80">Plans & access</p>
+                                <h3 class="mt-3 font-fantasy text-3xl font-bold text-forest md:text-4xl">${billingMeta.badge}</h3>
+                                <p class="mt-3 max-w-2xl text-sm font-semibold leading-relaxed text-sage">${billingMeta.summary}</p>
+                                <div class="mt-4 flex flex-wrap gap-2">
+                                    <span class="inline-flex items-center rounded-full border border-parchmentDark bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-sage">Current plan</span>
+                                    <span class="inline-flex items-center rounded-full border border-gold/35 bg-gold/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-forest">${billingMeta.sourceLabel}</span>
+                                    <span class="inline-flex items-center rounded-full border border-parchmentDark bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-sage">${billingReady ? 'Checkout ready' : 'Preview billing mode'}</span>
+                                </div>
+                            </div>
+                            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                                <div class="rounded-2xl border border-parchmentDark bg-white/90 p-4 shadow-sm">
+                                    <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-sage opacity-80">Why upgrade</p>
+                                    <p class="mt-2 text-sm font-semibold leading-relaxed text-forest">Unlock unlimited recipes, notebook mode, downloads, cloud sync, publishing, and shared families without rebuilding your archive later.</p>
+                                </div>
+                                <div class="rounded-2xl border border-parchmentDark bg-white/90 p-4 shadow-sm">
+                                    <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-sage opacity-80">Best fit</p>
+                                    <p class="mt-2 text-sm font-semibold leading-relaxed text-forest">Choose Premium for ongoing sync and new features, or Lifetime if you want the full toolkit in one long-term purchase.</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="flex flex-wrap gap-3">
-                        ${billingMeta.state === 'free'
-                            ? `<button onclick="showPremiumModal('upgrade')" class="${getAppButtonClasses('accent', { size: 'lg' })}"><i data-lucide="crown" class="w-4 h-4"></i> View Plans</button>`
-                            : ''}
-                        ${billingMeta.state === 'preview'
-                            ? `<button onclick="resetPremiumPreviewAccess()" class="${getAppButtonClasses('secondary', { size: 'lg' })}"><i data-lucide="rotate-ccw" class="w-4 h-4"></i> Reset Preview</button>`
-                            : ''}
+                    <div class="grid gap-4 p-5 md:grid-cols-3 md:p-6">
+                        ${buildSettingsPlanCard({
+                            eyebrow: 'Starter',
+                            title: 'Free',
+                            description: 'Best for testing Uculi on one device before you commit your full archive.',
+                            highlights: [
+                                'Up to 8 local recipes',
+                                'Local-only archive on this device',
+                                'Manual restore from backups',
+                                'Great for early recipe capture'
+                            ],
+                            badge: billingMeta.state === 'free' ? 'Current plan' : '',
+                            active: billingMeta.state === 'free'
+                        })}
+                        ${buildSettingsPlanCard({
+                            eyebrow: billingMeta.state === 'preview' ? 'Preview' : 'Subscription',
+                            title: 'Premium',
+                            description: 'The full Uculi workflow for cooks who want notebook mode, downloads, sync, sharing, and family collaboration.',
+                            highlights: [
+                                'Unlimited local recipes',
+                                'Notebook mode with sticky notes',
+                                'JSON backups and recipe downloads',
+                                'Cloud sync, publishing, and families'
+                            ],
+                            badge: premiumTierActive ? (billingMeta.state === 'preview' ? 'Preview active' : 'Current plan') : 'Most popular',
+                            active: premiumTierActive,
+                            accent: !premiumTierActive,
+                            actionMarkup: premiumTierActive
+                                ? (billingMeta.state === 'preview'
+                                    ? `<button onclick="resetPremiumPreviewAccess()" class="${getAppButtonClasses('secondary', { fullWidth: true, size: 'lg' })}"><i data-lucide="rotate-ccw" class="w-4 h-4"></i> Reset Preview</button>`
+                                    : '')
+                                : `<button onclick="showPremiumModal('unlock premium')" class="${getAppButtonClasses('accent', { fullWidth: true, size: 'lg' })}"><i data-lucide="crown" class="w-4 h-4"></i> Unlock Premium</button>`
+                        })}
+                        ${buildSettingsPlanCard({
+                            eyebrow: 'One-time',
+                            title: 'Lifetime',
+                            description: 'Everything in Premium, positioned for cooks who want Uculi to become their long-term recipe home.',
+                            highlights: [
+                                'Everything included in Premium',
+                                'Built for a lasting personal archive',
+                                'Best fit if you want to buy once',
+                                'Ideal when launch pricing matters'
+                            ],
+                            badge: lifetimePlanActive ? 'Current plan' : 'Pay once',
+                            active: lifetimePlanActive,
+                            actionMarkup: lifetimePlanActive
+                                ? ''
+                                : `<button onclick="showPremiumModal('compare lifetime access')" class="${getAppButtonClasses('secondary', { fullWidth: true, size: 'lg' })}"><i data-lucide="gem" class="w-4 h-4"></i> Explore Lifetime</button>`
+                        })}
                     </div>
-                </div>
+                </section>
             `;
 
             const infoContent = `
@@ -4942,10 +5292,10 @@
                                 ` : ''}
 
                                 <div class="${billingActionGridClass}">
-                                    <button onclick="${billingReady ? "openBillingCheckout('premium')" : "showPremiumModal('upgrade')"}" class="${getAppButtonClasses('primary', { fullWidth: true, size: 'lg' })}">
+                                    <button onclick="${billingReady ? "startPremiumUpgradeFlow('settings-billing')" : "showPremiumModal('upgrade')"}" class="${getAppButtonClasses('primary', { fullWidth: true, size: 'lg' })}">
                                         <i data-lucide="${billingReady ? 'credit-card' : 'crown'}" class="w-4 h-4"></i> ${billingReady ? 'Change Plan' : 'View Plans'}
                                     </button>
-                                    <button onclick="${restoreReady ? 'openBillingRestore()' : "showBillingRestoreSetupStatusModal()"}" class="${getAppButtonClasses('secondary', { fullWidth: true, size: 'lg' })}">
+                                    <button onclick="${restoreReady ? 'restorePremiumEntitlement()' : "showBillingRestoreSetupStatusModal('settings-billing')"}" class="${getAppButtonClasses('secondary', { fullWidth: true, size: 'lg' })}">
                                         <i data-lucide="shield-check" class="w-4 h-4"></i> Restore Purchase
                                     </button>
                                 </div>
@@ -5818,7 +6168,7 @@
                             <div class="pointer-events-none absolute inset-y-8 left-[3.65rem] hidden w-px bg-gradient-to-b from-transparent via-sage/20 to-transparent md:block"></div>
                             ${renderNotebookStickyNotes(recipe.id, notebookStickyNotes, showNotebookStickyNotes)}
 
-                            <div class="grid h-full grid-cols-1 gap-4 md:grid-cols-2 md:gap-0">
+                            <div class="grid h-full grid-cols-1 gap-4 md:grid-cols-2 md:gap-0 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] xl:grid-cols-[minmax(0,1.14fr)_minmax(0,0.86fr)]">
                                 <section class="notebook-paper notebook-paper-left relative rounded-[24px] border border-white border-opacity-70 px-6 py-6 md:h-full md:rounded-r-none md:border-r-0 ${notebookMobileSide !== 'left' ? 'hidden md:flex' : ''}">
                                     <button onclick="openNotebookRecipeForCooking(${recipe.id})" title="Start Cooking" class="absolute top-5 right-5 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white border border-parchmentDark text-forest shadow-md hover:text-gold hover:border-gold transition-colors">
                                         <i data-lucide="chef-hat" class="h-5 w-5"></i>
@@ -7348,7 +7698,7 @@
 
                                 <div class="flex flex-wrap items-start gap-3 lg:justify-end">
                                     ${savedRecipeIsOutdated ? renderDetailIconAction('Update warning', 'alert-circle', `toggleSavedRecipeUpdateNotice(${recipe.id})`, 'warning') : ''}
-                                    ${renderDetailIconAction('Shopping list', 'shopping-basket', `addRecipeIngredientsToShoppingList(${recipe.id}, true)`, 'secondary')}
+                                    ${renderDetailIconAction('Shopping list', 'shopping-basket', `toggleRecipeIngredientsInShoppingList(${recipe.id}, true)`, 'secondary')}
                                     ${hasPremiumAccess()
                                         ? renderDetailIconAction('Share', 'share-2', `shareRecipe(${recipe.id})`, 'secondary')
                                         : renderDetailIconAction('Share', 'lock', "showPremiumModal('share recipes')", 'muted')}
