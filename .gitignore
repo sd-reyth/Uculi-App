@@ -6,7 +6,5 @@ firebase-debug.log
 .env.*
 !.env.example
 
-.noop/
-
 public/*
 !public/.gitkeep
