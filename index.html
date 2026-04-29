@@ -7,11 +7,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
         <!-- Firebase -->
-        <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
-        <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
-        <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js" defer></script>
+        <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js" defer></script>
+        <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js" defer></script>
         <!-- Google Sign-In -->
         <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script>
@@ -36,9 +36,9 @@
     </script>
     <style>
         :root {
-            --shell-bg: #FAFAFA;
+            --shell-bg: #FFFFFF;
             --shell-border: #EFEFEF;
-            --body-bg: #EFEFEF;
+            --body-bg: #FFFFFF;
             --text-primary: #2C3D2E;
             --text-muted: #7A8B76;
             --surface-main: #FFFFFF;
@@ -59,7 +59,7 @@
         }
 
         #app-content {
-            padding-bottom: 1rem;
+            padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
             transition: padding-bottom 220ms ease;
         }
 
@@ -123,9 +123,18 @@
         }
 
         #main-nav {
-            border-top: 1px solid rgba(122, 139, 118, 0.12);
+            position: fixed;
+            left: 50%;
+            bottom: 0.75rem;
+            width: min(calc(100vw - 1.5rem), 54rem);
+            margin: 0;
+            transform: translateX(-50%);
+            border: 1px solid rgba(122, 139, 118, 0.18);
+            border-radius: 1.25rem;
             background: rgba(255, 255, 255, 0.92);
             backdrop-filter: blur(16px);
+            box-shadow: 0 16px 34px rgba(44, 61, 46, 0.16);
+            z-index: 40;
         }
 
         .app-nav-inner {
@@ -267,56 +276,24 @@
 
         @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
             body.desktop-nav-autohide-enabled #app-content {
-                padding-bottom: 1rem;
+                padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
             }
 
             body.desktop-nav-autohide-enabled #main-nav {
-                position: sticky;
-                bottom: 0.75rem;
-                width: min(calc(100% - 1.5rem), 54rem);
-                margin: 0 auto 0.6rem;
-                border: 1px solid rgba(122, 139, 118, 0.18);
-                border-radius: 1.25rem;
-                background: rgba(255, 255, 255, 0.92);
-                backdrop-filter: blur(16px);
-                box-shadow: 0 16px 34px rgba(44, 61, 46, 0.16);
-                transform: translateY(0);
+                transform: translateX(-50%) translateY(0);
                 opacity: 1;
                 transition: transform 220ms ease, opacity 220ms ease, box-shadow 220ms ease, width 220ms ease, background-color 220ms ease;
             }
 
-            body.desktop-nav-autohide-enabled #main-nav .app-nav-inner {
-                justify-content: center;
-                gap: 0.55rem;
-                padding: 0.6rem 0.75rem 0.55rem;
-            }
-
-            body.desktop-nav-autohide-enabled #main-nav .app-nav-button {
-                min-width: 5rem;
-                padding: 0.6rem 0.75rem;
-                border-radius: 1rem;
-            }
-
-            body.desktop-nav-autohide-enabled #main-nav .app-nav-button i {
-                width: 1.15rem;
-                height: 1.15rem;
-                margin-bottom: 0.15rem;
-            }
-
-            body.desktop-nav-autohide-enabled #main-nav .app-nav-label {
-                font-size: 0.56rem;
-                letter-spacing: 0.22em;
-            }
-
             body.desktop-nav-hidden #main-nav {
-                transform: translateY(calc(100% + 0.75rem));
+                transform: translateX(-50%) translateY(calc(100% + 0.75rem));
                 opacity: 0;
                 box-shadow: none;
             }
 
             body.desktop-nav-autohide-enabled #main-nav:hover,
             body.desktop-nav-autohide-enabled #main-nav:focus-within {
-                transform: translateY(0);
+                transform: translateX(-50%) translateY(0);
                 opacity: 1;
             }
         }
@@ -371,12 +348,9 @@
                 left: 0.5rem;
                 right: 0.5rem;
                 bottom: 0.5rem;
-                z-index: 40;
+                width: auto;
+                transform: none;
                 padding-bottom: max(0.25rem, env(safe-area-inset-bottom, 0px));
-                border: 1px solid rgba(122, 139, 118, 0.16);
-                border-radius: 1.2rem;
-                background: rgba(255, 255, 255, 0.94);
-                box-shadow: 0 18px 34px rgba(44, 61, 46, 0.14);
             }
 
             .app-nav-inner {
@@ -448,6 +422,8 @@
             padding-inline: clamp(0.35rem, 1.8vw, 1rem);
             box-sizing: border-box;
             margin-inline: auto;
+            display: flex;
+            justify-content: center;
         }
 
         .notebook-book-cover-frame {
@@ -466,9 +442,9 @@
         .notebook-landing-hero {
             position: relative;
             display: grid;
-            gap: clamp(1.25rem, 2.8vw, 2.1rem);
+            gap: clamp(1rem, 2vw, 1.5rem);
             justify-items: center;
-            padding: clamp(1.25rem, 3vw, 2.5rem);
+            padding: clamp(1rem, 2vw, 1.75rem);
             border-radius: 2rem;
             border: 1px solid rgba(122, 139, 118, 0.18);
             background:
@@ -499,22 +475,30 @@
         }
 
         .notebook-landing-cover-frame {
-            width: min(100%, 25rem);
+            width: min(100%, 17rem);
             margin-inline: 0;
             padding-inline: 0;
         }
 
         .notebook-landing-cover-surface {
-            min-height: clamp(19rem, 42vw, 31rem);
+            min-height: clamp(13rem, 22vw, 18.5rem);
             aspect-ratio: 0.78 / 1;
         }
 
         .notebook-landing-copy {
             display: grid;
             gap: 1rem;
-            width: min(100%, 38rem);
-            justify-items: center;
-            text-align: center;
+            width: 100%;
+            justify-items: stretch;
+            text-align: left;
+        }
+
+        .notebook-landing-copy-main,
+        .notebook-landing-copy-side {
+            display: grid;
+            gap: 1rem;
+            width: 100%;
+            align-content: start;
         }
 
         .notebook-landing-stat-grid {
@@ -529,27 +513,27 @@
             border-radius: 1.35rem;
             border: 1px solid rgba(122, 139, 118, 0.18);
             background: rgba(255, 255, 255, 0.72);
-            padding: 1rem 1.05rem;
-            box-shadow: 0 14px 28px rgba(44, 61, 46, 0.08);
+            padding: 0.95rem 1rem;
+            box-shadow: 0 10px 22px rgba(44, 61, 46, 0.07);
             backdrop-filter: blur(8px);
         }
 
         .notebook-landing-stack {
             width: 100%;
-            max-width: 78rem;
+            max-width: 60rem;
             display: grid;
             gap: 1rem;
-            justify-items: center;
+            justify-items: stretch;
         }
 
         .notebook-landing-heading {
-            width: min(100%, 34rem);
-            text-align: center;
+            width: 100%;
+            text-align: left;
         }
 
         .notebook-landing-heading p,
         .notebook-landing-heading h2 {
-            margin-inline: auto;
+            margin-inline: 0;
         }
 
         .notebook-landing-invite {
@@ -600,7 +584,7 @@
             display: flex;
             flex-wrap: wrap;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
             gap: 0.75rem;
         }
 
@@ -608,7 +592,7 @@
             display: flex;
             flex-wrap: wrap;
             gap: 0.55rem;
-            justify-content: center;
+            justify-content: flex-start;
         }
 
         .notebook-landing-pill {
@@ -618,6 +602,13 @@
             padding: 0.35rem 0.8rem;
             border-radius: 999px;
             border: 1px solid rgba(122, 139, 118, 0.18);
+            background: rgba(255, 255, 255, 0.86);
+            font-size: 0.7rem;
+            font-weight: 800;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: #4a5f4d;
+        }
 
         @media (min-width: 1024px) {
             .notebook-landing-hero {
@@ -625,36 +616,39 @@
             }
 
             .notebook-landing-stack {
-                grid-template-columns: minmax(19rem, 27rem) minmax(0, 1fr);
-                column-gap: clamp(1.5rem, 3vw, 3rem);
-                row-gap: 1.5rem;
+                width: min(100%, 60rem);
+                margin-inline: auto;
+                grid-template-columns: minmax(13rem, 16rem) minmax(0, 1fr);
+                column-gap: clamp(1rem, 1.8vw, 1.6rem);
+                row-gap: 1rem;
                 align-items: start;
-            }
-
-            .notebook-landing-heading {
-                grid-column: 1 / -1;
-                width: min(100%, 46rem);
-                text-align: left;
-            }
-
-            .notebook-landing-heading p,
-            .notebook-landing-heading h2 {
-                margin-inline: 0;
             }
 
             .notebook-landing-cover-column {
                 grid-column: 1;
-                justify-items: start;
-                align-self: stretch;
+                justify-items: center;
+                align-self: center;
             }
 
             .notebook-landing-copy {
                 grid-column: 2;
                 width: 100%;
-                max-width: 44rem;
-                align-self: center;
-                justify-items: start;
-                text-align: left;
+                grid-template-columns: minmax(18rem, 24rem) minmax(14rem, 18rem);
+                column-gap: clamp(1rem, 1.6vw, 1.5rem);
+                row-gap: 1rem;
+                align-items: start;
+            }
+
+            .notebook-landing-copy-main {
+                grid-column: 1;
+            }
+
+            .notebook-landing-copy-side {
+                grid-column: 2;
+            }
+
+            .notebook-landing-stat-grid {
+                grid-template-columns: 1fr;
             }
 
             .notebook-landing-invite {
@@ -666,13 +660,6 @@
             .notebook-landing-meta-note {
                 justify-content: flex-start;
             }
-        }
-            background: rgba(255, 255, 255, 0.86);
-            font-size: 0.7rem;
-            font-weight: 800;
-            letter-spacing: 0.16em;
-            text-transform: uppercase;
-            color: #4a5f4d;
         }
 
         .notebook-landing-meta-note {
@@ -704,6 +691,7 @@
             pointer-events: auto;
             touch-action: none;
             cursor: grab;
+            z-index: 8;
         }
 
         .notebook-sticky-note-anchor:active {
@@ -714,66 +702,79 @@
             z-index: 35;
         }
 
+        .notebook-sticky-note-page-layer {
+            pointer-events: none;
+            position: absolute;
+            inset: 0;
+            overflow: visible;
+            z-index: 9;
+        }
+
         .notebook-sticky-note {
             position: relative;
             isolation: isolate;
             border: 1px solid var(--sticky-note-border, rgba(176, 136, 46, 0.35));
-            border-radius: 0.42rem 0.5rem 0.36rem 0.48rem;
+            border-radius: 0.22rem 0.28rem 0.62rem 0.34rem;
             background:
-                linear-gradient(180deg, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.12) 14%, rgba(255, 255, 255, 0) 14%),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.06) 15%, rgba(255, 255, 255, 0) 15%),
+                linear-gradient(180deg, rgba(255, 243, 169, 0.26), rgba(255, 243, 169, 0) 24%),
                 repeating-linear-gradient(
                     180deg,
                     rgba(0, 0, 0, 0) 0,
-                    rgba(0, 0, 0, 0) 1.52rem,
-                    var(--sticky-note-rule, rgba(109, 126, 162, 0.18)) 1.52rem,
-                    var(--sticky-note-rule, rgba(109, 126, 162, 0.18)) 1.62rem
+                    rgba(0, 0, 0, 0) 1.24rem,
+                    var(--sticky-note-rule, rgba(109, 126, 162, 0.16)) 1.24rem,
+                    var(--sticky-note-rule, rgba(109, 126, 162, 0.16)) 1.31rem
                 ),
                 var(--sticky-note-bg, #f5de87);
             color: var(--sticky-note-ink, #5d4516);
             box-shadow:
-                0 14px 24px rgba(44, 61, 46, 0.12),
-                0 2px 0 rgba(121, 91, 34, 0.08),
-                inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+                0 12px 22px rgba(44, 61, 46, 0.12),
+                0 1px 0 rgba(121, 91, 34, 0.14),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+                inset 0 -10px 18px rgba(121, 91, 34, 0.06);
             overflow: hidden;
             transform-origin: center;
+        }
+
+        .notebook-sticky-note-anchor.is-active .notebook-sticky-note {
+            box-shadow:
+                0 18px 32px rgba(44, 61, 46, 0.16),
+                0 1px 0 rgba(121, 91, 34, 0.14),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+                inset 0 -10px 18px rgba(121, 91, 34, 0.06);
         }
 
         .notebook-sticky-note::before {
             content: '';
             position: absolute;
-            top: 0.95rem;
-            bottom: 0.8rem;
-            left: 1rem;
-            width: 1px;
-            background: var(--sticky-note-margin, rgba(176, 94, 94, 0.24));
-            opacity: 0.8;
+            top: -0.62rem;
+            left: 50%;
+            z-index: 3;
+            width: 0.94rem;
+            height: 0.94rem;
+            border-radius: 999px;
+            background: radial-gradient(circle at 34% 32%, #ffc8c1 0 18%, #ef4b43 38%, #a91212 100%);
+            box-shadow: 0 2px 0 rgba(255, 255, 255, 0.34) inset, 0 8px 12px rgba(93, 30, 22, 0.22);
+            transform: translateX(-50%);
             pointer-events: none;
         }
 
         .notebook-sticky-note::after {
             content: '';
             position: absolute;
-            top: 0;
+            bottom: 0;
             right: 0;
-            width: 1.15rem;
-            height: 1.15rem;
-            background: linear-gradient(225deg, rgba(255, 255, 255, 0.96) 0 48%, rgba(214, 188, 112, 0.28) 49% 100%);
-            clip-path: polygon(100% 0, 0 0, 100% 100%);
-            box-shadow: -1px 1px 0 rgba(111, 82, 28, 0.12);
-            opacity: 0.92;
+            width: 1.38rem;
+            height: 1.38rem;
+            background: linear-gradient(315deg, rgba(255, 255, 255, 0.95) 0 47%, rgba(203, 174, 86, 0.24) 48% 100%);
+            clip-path: polygon(100% 100%, 0 100%, 100% 0);
+            box-shadow: -1px -1px 0 rgba(111, 82, 28, 0.12);
+            opacity: 0.88;
             pointer-events: none;
         }
 
         .notebook-sticky-note-tape {
-            position: absolute;
-            top: 0.55rem;
-            left: 50%;
-            width: 2.6rem;
-            height: 0.32rem;
-            transform: translateX(-50%);
-            border-radius: 999px;
-            background: var(--sticky-note-tape, rgba(255, 248, 221, 0.52));
-            opacity: 0.55;
+            display: none;
         }
 
         .notebook-sticky-note-handle {
@@ -785,7 +786,7 @@
             border: 1px solid rgba(161, 130, 67, 0.78);
             background: rgba(255, 251, 236, 0.94);
             box-shadow: 0 5px 8px rgba(57, 44, 20, 0.12);
-            opacity: 0;
+            opacity: 0.42;
             transform: scale(0.72);
             transition: opacity 160ms ease, transform 160ms ease;
         }
@@ -827,19 +828,85 @@
             min-height: inherit;
             flex-direction: column;
             justify-content: flex-start;
-            padding: 1.15rem 0.95rem 0.95rem 1.45rem;
+            padding: 1.32rem 0.92rem 0.92rem 1.3rem;
         }
 
-        .notebook-sticky-note__text {
-            display: -webkit-box;
-            line-clamp: 6;
-            -webkit-line-clamp: 6;
-            -webkit-box-orient: vertical;
+        .notebook-sticky-note__body::before {
+            content: '';
+            position: absolute;
+            top: 0.98rem;
+            bottom: 0.78rem;
+            left: 0.96rem;
+            width: 1px;
+            background: var(--sticky-note-margin, rgba(176, 94, 94, 0.24));
+            opacity: 0.8;
+            pointer-events: none;
+        }
+
+        .notebook-sticky-note__body::after {
+            content: '';
+            position: absolute;
+            top: -0.06rem;
+            left: 50%;
+            z-index: 2;
+            width: 0.12rem;
+            height: 1rem;
+            border-radius: 999px;
+            background: linear-gradient(180deg, #dce3e5 0%, #8ca0a5 40%, #5f7178 100%);
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22);
+            transform: translateX(-50%) rotate(5deg);
+            pointer-events: none;
+        }
+
+        .notebook-sticky-note__preview {
+            width: 100%;
+            min-height: 5.45rem;
+            display: grid;
+            align-content: start;
+        }
+
+        .notebook-sticky-note__scribble-stack {
+            width: 100%;
+            display: grid;
+            gap: 0.18rem;
+            padding-top: 0.1rem;
+        }
+
+        .notebook-sticky-note__scribble-line {
+            display: block;
+            width: var(--scribble-width, 72%);
+            margin-left: var(--scribble-indent, 0%);
             overflow: hidden;
-            line-height: 1.58;
-            white-space: normal;
-            word-break: break-word;
-            text-wrap: pretty;
+            white-space: nowrap;
+            font-family: "Segoe Script", "Bradley Hand", "Comic Sans MS", cursive;
+            font-size: 0.88rem;
+            font-style: italic;
+            font-weight: 700;
+            line-height: 0.92;
+            letter-spacing: 0.015em;
+            color: rgba(72, 49, 18, 0.8);
+            opacity: var(--scribble-opacity, 0.46);
+            transform: rotate(var(--scribble-tilt, -2deg)) skewX(-8deg);
+            transform-origin: left center;
+            text-shadow: 0.02em 0.02em 0 rgba(255, 255, 255, 0.22);
+            mix-blend-mode: multiply;
+        }
+
+        .notebook-sticky-note__scribble-line.is-header {
+            font-size: 0.98rem;
+            letter-spacing: 0.05em;
+            opacity: 0.7;
+        }
+
+        .notebook-sticky-note__scribble-line.is-signature {
+            font-size: 0.8rem;
+            opacity: 0.5;
+            transform: rotate(var(--scribble-tilt, -9deg)) skewX(-14deg);
+        }
+
+        .notebook-sticky-note__scribble-line::before,
+        .notebook-sticky-note__scribble-line::after {
+            content: none;
         }
 
         .notebook-sticky-note-menu {
@@ -916,21 +983,21 @@
         }
 
         .notebook-sticky-note--sm {
-            width: 9rem;
-            min-height: 8rem;
-            font-size: 0.72rem;
+            width: 7.5rem;
+            min-height: 6.7rem;
+            font-size: 0.69rem;
         }
 
         .notebook-sticky-note--md {
-            width: 10.75rem;
-            min-height: 9.5rem;
-            font-size: 0.78rem;
+            width: 8.85rem;
+            min-height: 7.8rem;
+            font-size: 0.74rem;
         }
 
         .notebook-sticky-note--lg {
-            width: 12.25rem;
-            min-height: 11rem;
-            font-size: 0.84rem;
+            width: 10rem;
+            min-height: 8.95rem;
+            font-size: 0.8rem;
         }
 
         .notebook-note-control {
@@ -1011,12 +1078,14 @@
         }
 
         .notebook-book-spread-surface {
-            min-height: clamp(38rem, 76vw, 56rem);
+            min-height: clamp(34rem, 68vw, 60rem);
             aspect-ratio: 1.414 / 1;
-            width: 100%;
+            width: min(100%, var(--notebook-spread-fit-width, 100%));
             max-width: 100%;
+            max-height: var(--notebook-spread-max-height, none);
             box-sizing: border-box;
             transform-style: preserve-3d;
+            margin-inline: auto;
         }
 
         .notebook-book-spread-surface::after {
@@ -1048,7 +1117,7 @@
             flex-direction: column;
             height: 100%;
             min-height: 0;
-            overflow: hidden;
+            overflow: visible;
             background:
                 repeating-linear-gradient(
                     -48deg,
@@ -1068,15 +1137,19 @@
         .notebook-paper__body {
             flex: 1 1 auto;
             min-height: 0;
-            overflow: hidden;
-            padding-right: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-right: 0.35rem;
+            overscroll-behavior: contain;
+            position: relative;
+            z-index: 1;
         }
 
         .notebook-paper__footer {
             position: relative;
             z-index: 1;
             margin-top: auto;
-            padding-top: 1rem;
+            padding-top: 1.25rem;
         }
 
         .notebook-paper__section {
@@ -1087,43 +1160,99 @@
             margin-top: 0;
         }
 
+        .notebook-page-hero {
+            position: relative;
+        }
+
+        .notebook-page-hero::after {
+            content: '';
+            display: block;
+            clear: both;
+        }
+
+        .notebook-page-photo-cluster {
+            float: right;
+            width: clamp(6.15rem, 28%, 7.35rem);
+            padding: 0;
+            margin: 0.1rem 0 0.85rem 0.95rem;
+            shape-outside: inset(0 round 0.85rem);
+            shape-margin: 0.6rem;
+        }
+
+        .notebook-page-photo-frame {
+            position: relative;
+            width: 100%;
+            padding: 0.34rem 0.34rem 0.65rem;
+            border-radius: 0.72rem;
+            border: 1px solid rgba(197, 160, 89, 0.24);
+            background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,243,234,0.96));
+            box-shadow: 0 10px 20px rgba(44, 61, 46, 0.14);
+            transform: rotate(4.2deg);
+        }
+
+        .notebook-page-photo-frame::after {
+            content: '';
+            position: absolute;
+            inset: 0.45rem 0.45rem 0.9rem;
+            border-radius: 0.6rem;
+            box-shadow: inset 0 0 0 1px rgba(122, 139, 118, 0.1);
+            pointer-events: none;
+        }
+
         .notebook-page-photo-card {
             position: relative;
             overflow: hidden;
-            min-height: 12rem;
-            border-radius: 1.4rem;
-            border: 1px solid rgba(255, 255, 255, 0.72);
+            aspect-ratio: 1.06 / 1;
+            border-radius: 0.55rem;
             background-color: rgba(244, 239, 230, 0.68);
             background-position: center;
             background-repeat: no-repeat;
             background-size: cover;
-            box-shadow: inset 0 0 0 1px rgba(122, 139, 118, 0.08), 0 14px 28px rgba(44, 61, 46, 0.12);
+            box-shadow: inset 0 0 0 1px rgba(122, 139, 118, 0.08), 0 8px 16px rgba(44, 61, 46, 0.08);
         }
 
         .notebook-page-photo-card::after {
             content: '';
             position: absolute;
             inset: 0;
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(43, 36, 26, 0.22));
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(43, 36, 26, 0.12));
         }
 
-        .notebook-page-photo-label {
+        .notebook-page-photo-clothespin {
             position: absolute;
-            left: 1rem;
-            bottom: 1rem;
-            z-index: 1;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.45rem;
+            top: -1.05rem;
+            right: 1.05rem;
+            z-index: 2;
+            width: 1.05rem;
+            height: 2.5rem;
+            border-radius: 0.35rem;
+            background: linear-gradient(180deg, #d7bb92 0%, #b88d52 38%, #8b6336 100%);
+            box-shadow: 0 10px 16px rgba(44, 61, 46, 0.18);
+            transform: rotate(6deg);
+        }
+
+        .notebook-page-photo-clothespin::before {
+            content: '';
+            position: absolute;
+            top: 0.32rem;
+            left: 50%;
+            width: 0.16rem;
+            height: 1.65rem;
             border-radius: 999px;
-            background: rgba(255, 253, 246, 0.9);
-            padding: 0.5rem 0.75rem;
-            font-size: 0.65rem;
-            font-weight: 800;
-            letter-spacing: 0.16em;
-            text-transform: uppercase;
-            color: #2f4a35;
-            box-shadow: 0 8px 18px rgba(44, 61, 46, 0.14);
+            background: linear-gradient(180deg, #5d6d71, #d7d2c4, #516065);
+            transform: translateX(-50%);
+            opacity: 0.8;
+        }
+
+        .notebook-page-photo-clothespin::after {
+            content: '';
+            position: absolute;
+            left: 0.18rem;
+            right: 0.18rem;
+            bottom: 0.34rem;
+            height: 0.22rem;
+            border-radius: 999px;
+            background: rgba(112, 76, 34, 0.35);
         }
 
         .notebook-page-summary-grid {
@@ -1142,9 +1271,9 @@
 
         .notebook-page-nav {
             display: inline-flex;
-            width: 3rem;
-            min-width: 3rem;
-            min-height: 3rem;
+            width: 2.85rem;
+            min-width: 2.85rem;
+            min-height: 2.85rem;
             align-items: center;
             justify-content: center;
             gap: 0;
@@ -1224,7 +1353,7 @@
 
         @media (max-width: 767px) {
             .notebook-book-frame {
-                padding-inline: 0.25rem;
+                padding-inline: 0.1rem;
             }
 
             .notebook-landing-hero {
@@ -1238,22 +1367,22 @@
             }
 
             .notebook-landing-cover-surface {
-                min-height: clamp(18rem, 92vw, 24rem);
+                min-height: clamp(14.5rem, 64vw, 19rem);
             }
 
             .notebook-sticky-note--sm {
-                width: 7.8rem;
-                min-height: 7rem;
+                width: 6.7rem;
+                min-height: 5.9rem;
             }
 
             .notebook-sticky-note--md {
-                width: 9rem;
-                min-height: 8rem;
+                width: 7.7rem;
+                min-height: 6.8rem;
             }
 
             .notebook-sticky-note--lg {
-                width: 10rem;
-                min-height: 9rem;
+                width: 8.8rem;
+                min-height: 7.7rem;
             }
 
             .notebook-landing-stat-grid {
@@ -1265,35 +1394,72 @@
             }
 
             .notebook-book-spread-surface {
-                height: clamp(24rem, 122vw, 38rem);
-                min-height: clamp(24rem, 122vw, 38rem);
+                height: clamp(23.75rem, 98vw, 35rem);
+                min-height: clamp(23.75rem, 98vw, 35rem);
                 aspect-ratio: auto;
                 box-shadow: 0 16px 30px rgba(44, 61, 46, 0.12);
             }
 
             .notebook-paper {
-                height: clamp(22rem, 108vw, 29rem);
-                min-height: clamp(22rem, 108vw, 29rem);
+                height: clamp(21.3rem, 88vw, 27.5rem);
+                min-height: clamp(21.3rem, 88vw, 27.5rem);
             }
 
             .notebook-paper__body {
-                padding-right: 0;
+                padding-right: 0.1rem;
             }
 
-            .notebook-page-photo-card {
-                min-height: 9rem;
+            .notebook-page-photo-frame {
+                width: 100%;
+                padding: 0.3rem 0.3rem 0.55rem;
+                transform: rotate(3deg);
+            }
+
+            .notebook-page-photo-cluster {
+                width: min(6.25rem, 34%);
+                padding-right: 0;
+                margin: 0 0 0.55rem 0.7rem;
+            }
+
+            .notebook-page-photo-clothespin {
+                top: -0.76rem;
+                right: 0.74rem;
+                width: 0.92rem;
+                height: 2rem;
             }
 
             .notebook-paper__footer {
-                padding-top: 0.85rem;
+                padding-top: 0.8rem;
             }
 
             .notebook-page-nav {
-                width: 3rem;
+                width: 2.5rem;
+                min-width: 2.5rem;
+                min-height: 2.5rem;
             }
 
             .notebook-page-summary-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 0.45rem;
+            }
+
+            .notebook-page-summary-card {
+                padding: 0.55rem 0.5rem;
+            }
+
+            .notebook-sticky-note__preview {
+                min-height: 4.35rem;
+            }
+
+            .notebook-sticky-note__scribble-stack {
+                gap: 0.28rem;
+                padding-top: 0.18rem;
+            }
+
+            .notebook-sticky-note-menu {
+                width: min(15.25rem, calc(100vw - 1.3rem));
+                max-width: calc(100vw - 1.3rem);
+                padding: 0.75rem;
             }
 
             .notebook-paper-left::before {
@@ -1490,6 +1656,19 @@
             display: none;
         }
 
+        .cooking-mode-exit-btn {
+            display: none;
+            position: fixed;
+            top: 1.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+        }
+
+        .cooking-mode-active .cooking-mode-exit-btn {
+            display: flex;
+        }
+
         .cooking-mode-active .detail-content-shell {
             padding: 0;
         }
@@ -1570,7 +1749,7 @@
 
     <div id="google_translate_element" style="display:none;"></div>
 
-    <div id="app-shell" class="w-full max-w-6xl mx-auto flex flex-col h-[100dvh] max-h-[100dvh] relative shadow-2xl bg-parchment overflow-hidden border-x border-parchmentDark">
+    <div id="app-shell" class="w-full max-w-6xl mx-auto flex flex-col h-[100dvh] max-h-[100dvh] relative shadow-2xl bg-white overflow-hidden border-x border-parchmentDark">
         
         <header id="main-header" class="text-forest transition-all" translate="no">
             <div class="app-header-brand">
@@ -1881,7 +2060,7 @@
         let showFavoritesOnly = false;
         let draftIngredients = [];
         let draftSteps = [];
-        let draftProfile = null; 
+        var draftProfile = null; 
         let editingRecipeId = null;
         let recipeSubmitAction = 'save';
         let hasLoadedPublishedRecipesCache = false;
@@ -2070,7 +2249,7 @@
             return {
                 state: 'free',
                 badge: 'Free Plan',
-                summary: 'Free stays local-only with up to 8 recipes on this device. Premium unlocks notebook mode, sharing, downloads, cloud sync, publishing, and families.',
+                summary: 'Free stays local-only with up to 8 recipes on this device and 1 image upload/15m. Premium unlocks notebook mode, 15 uploads/day, sharing, downloads, cloud sync, publishing, and families.',
                 sourceLabel: 'Local free tier',
                 actionLabel: 'Unlock Local Premium Preview'
             };
@@ -2425,8 +2604,9 @@
             return sizes[size] || sizes.md;
         }
 
-        function getDefaultNotebookStickyNote(seed = 0) {
-            const preset = { x: 66, y: 24, rotation: -4, color: 'butter', size: 'md' };
+        function getDefaultNotebookStickyNote(seed = 0, side = 'right') {
+            const normalizedSide = side === 'left' ? 'left' : 'right';
+            const preset = { side: normalizedSide, x: 76, y: 24, rotation: -4, color: 'butter', size: 'md' };
 
             return {
                 id: `notebook-note-${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -2435,9 +2615,16 @@
                 size: preset.size,
                 scale: 1,
                 rotation: preset.rotation,
+                side: preset.side,
                 x: preset.x,
                 y: preset.y
             };
+        }
+
+        function normalizeNotebookStickyNoteSide(value, fallback = 'right') {
+            const side = String(value || '').toLowerCase();
+            if (side === 'left' || side === 'right') return side;
+            return fallback === 'left' ? 'left' : 'right';
         }
 
         function clampNotebookStickyNoteX(value) {
@@ -2477,6 +2664,66 @@
             return `${rawText.slice(0, Math.max(0, previewLimit - 3)).trimEnd()}...`;
         }
 
+        function getNotebookStickyNotePreviewMarkup(note) {
+            const rawText = String(note?.text ?? '').trim();
+            const seedSource = `${note?.id || ''}${rawText || 'preview'}`;
+            const seed = Array.from(seedSource).reduce((total, char, index) => total + (char.charCodeAt(0) * (index + 3)), 0) || 97;
+            const lineCount = rawText ? Math.max(4, Math.min(6, Math.ceil(rawText.length / 24))) : 4;
+            const fragments = ['mn', 'ul', 're', 'va', 'cl', 'ae', 'so', 'ni', 'tra', 'xo', 'lia', 'ves', 'quo'];
+
+            const buildPseudoWord = (wordSeed, isSignature = false) => {
+                const chunkCount = isSignature ? 2 + (wordSeed % 2) : 2 + (wordSeed % 3);
+                let word = '';
+                for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex += 1) {
+                    word += fragments[(wordSeed + chunkIndex * 5) % fragments.length];
+                }
+                return word;
+            };
+
+            const buildPseudoLine = (lineSeed, { header = false, signature = false } = {}) => {
+                const wordCount = header ? 2 : signature ? 2 : 3 + (lineSeed % 2);
+                const words = header ? ['Rx'] : [];
+
+                for (let wordIndex = 0; wordIndex < wordCount; wordIndex += 1) {
+                    words.push(buildPseudoWord(lineSeed + wordIndex * 17, signature));
+                }
+
+                if (signature && words.length) {
+                    words[words.length - 1] = `${words[words.length - 1]}.`;
+                }
+
+                return words.join(' ');
+            };
+
+            return `
+                <div class="notebook-sticky-note__scribble-stack" aria-hidden="true">
+                    ${Array.from({ length: lineCount }, (_, index) => {
+                        const isHeader = index === 0;
+                        const isSignature = index === lineCount - 1;
+                        const width = isHeader
+                            ? 42 + ((seed + index * 9) % 18)
+                            : isSignature
+                                ? 34 + ((seed + index * 7) % 14)
+                                : 58 + ((seed + index * 17) % 24);
+                        const indent = isHeader
+                            ? ((seed + index * 5) % 4)
+                            : isSignature
+                                ? 16 + ((seed + index * 11) % 10)
+                                : 2 + ((seed + index * 13) % 7);
+                        const tilt = isHeader
+                            ? -8 + ((seed + index * 3) % 7)
+                            : isSignature
+                                ? -12 + ((seed + index * 5) % 9)
+                                : -6 + ((seed + index * 7) % 8);
+                        const opacity = (isHeader ? 0.72 : isSignature ? 0.54 : 0.58 + (((seed + index * 5) % 3) * 0.06)).toFixed(2);
+                        const lineClass = `notebook-sticky-note__scribble-line${isHeader ? ' is-header' : ''}${isSignature ? ' is-signature' : ''}`;
+                        const lineText = buildPseudoLine(seed + index * 19, { header: isHeader, signature: isSignature });
+                        return `<span class="${lineClass}" style="--scribble-width:${width}%;--scribble-indent:${indent}%;--scribble-tilt:${tilt}deg;--scribble-opacity:${opacity};">${lineText}</span>`;
+                    }).join('')}
+                </div>
+            `;
+        }
+
         function normalizeNotebookStickyNotes(notes) {
             const allowedColors = ['butter', 'rose', 'sage', 'sky', 'lavender'];
             const allowedSizes = ['sm', 'md', 'lg'];
@@ -2485,6 +2732,16 @@
             return incomingNotes.map((note, index) => {
                 const defaults = getDefaultNotebookStickyNote(index);
                 const rawText = String(note?.text ?? '').slice(0, 160);
+                const rawX = Number(note?.x);
+                const hasExplicitSide = note?.side === 'left' || note?.side === 'right';
+                const resolvedSide = hasExplicitSide
+                    ? normalizeNotebookStickyNoteSide(note.side, defaults.side)
+                    : normalizeNotebookStickyNoteSide(rawX < 50 ? 'left' : 'right', defaults.side);
+                const resolvedX = hasExplicitSide
+                    ? clampNotebookStickyNoteX(Number(note?.x ?? defaults.x) || defaults.x)
+                    : clampNotebookStickyNoteX(resolvedSide === 'left'
+                        ? (Number.isFinite(rawX) ? rawX * 2 : defaults.x)
+                        : ((Number.isFinite(rawX) ? rawX : 50 + defaults.x / 2) - 50) * 2);
 
                 return {
                     ...defaults,
@@ -2495,7 +2752,8 @@
                     size: allowedSizes.includes(note?.size) ? note.size : defaults.size,
                     scale: clampNotebookStickyNoteScale(note?.scale ?? defaults.scale),
                     rotation: clampNotebookStickyNoteRotation(note?.rotation ?? defaults.rotation),
-                    x: clampNotebookStickyNoteX(Number(note?.x ?? defaults.x) || defaults.x),
+                    side: resolvedSide,
+                    x: resolvedX,
                     y: clampNotebookStickyNoteY(Number(note?.y ?? defaults.y) || defaults.y)
                 };
             });
@@ -2504,32 +2762,32 @@
         function getNotebookStickyNotePalette(color) {
             const palettes = {
                 butter: {
-                    bg: 'linear-gradient(180deg, rgba(255,255,255,0.26), rgba(255,255,255,0) 22%), #e9d598',
-                    border: '#c8a963',
+                    bg: 'linear-gradient(180deg, rgba(255,255,255,0.34), rgba(255,255,255,0) 16%), #f3dc57',
+                    border: '#ccae2d',
                     ink: '#5a461b',
                     tape: 'linear-gradient(180deg, rgba(255,248,224,0.94), rgba(234,215,171,0.82))'
                 },
                 rose: {
-                    bg: 'linear-gradient(180deg, rgba(255,255,255,0.24), rgba(255,255,255,0) 22%), #dfb1a3',
-                    border: '#bb8a7c',
+                    bg: 'linear-gradient(180deg, rgba(255,255,255,0.32), rgba(255,255,255,0) 16%), #efc0b2',
+                    border: '#c58d7f',
                     ink: '#55312c',
                     tape: 'linear-gradient(180deg, rgba(255,245,241,0.94), rgba(228,202,194,0.82))'
                 },
                 sage: {
-                    bg: 'linear-gradient(180deg, rgba(255,255,255,0.24), rgba(255,255,255,0) 22%), #c2cfb2',
-                    border: '#8ea081',
+                    bg: 'linear-gradient(180deg, rgba(255,255,255,0.32), rgba(255,255,255,0) 16%), #cadbb5',
+                    border: '#90a57a',
                     ink: '#2d4131',
                     tape: 'linear-gradient(180deg, rgba(247,250,242,0.94), rgba(214,224,199,0.82))'
                 },
                 sky: {
-                    bg: 'linear-gradient(180deg, rgba(255,255,255,0.24), rgba(255,255,255,0) 22%), #bfd2df',
-                    border: '#8da8ba',
+                    bg: 'linear-gradient(180deg, rgba(255,255,255,0.32), rgba(255,255,255,0) 16%), #c7dcf1',
+                    border: '#90acc4',
                     ink: '#2d495d',
                     tape: 'linear-gradient(180deg, rgba(246,250,255,0.94), rgba(211,224,236,0.82))'
                 },
                 lavender: {
-                    bg: 'linear-gradient(180deg, rgba(255,255,255,0.24), rgba(255,255,255,0) 22%), #d4c6dd',
-                    border: '#ae9ab9',
+                    bg: 'linear-gradient(180deg, rgba(255,255,255,0.32), rgba(255,255,255,0) 16%), #d8caee',
+                    border: '#b29fbd',
                     ink: '#4b3a53',
                     tape: 'linear-gradient(180deg, rgba(251,246,255,0.94), rgba(223,211,233,0.82))'
                 }
@@ -2548,14 +2806,19 @@
             return sizes[size] || sizes.md;
         }
 
-        function renderNotebookStickyNotes(recipeId, notes, isVisible = true) {
-            if (!isVisible || !notes.length) return '';
+        function renderNotebookStickyNotes(recipeId, notes, side, isVisible = true) {
+            if (!isVisible) return '';
+
+            const noteSide = normalizeNotebookStickyNoteSide(side, 'right');
+            const sideNotes = notes.filter(note => normalizeNotebookStickyNoteSide(note?.side, noteSide) === noteSide);
 
             return `
-                <div class="pointer-events-none absolute inset-0 z-20">
-                    ${notes.map((note, index) => {
+                <div class="notebook-sticky-note-page-layer" data-notebook-note-layer="${noteSide}">
+                    ${sideNotes.map(note => {
+                        const index = notes.indexOf(note);
                         const palette = getNotebookStickyNotePalette(note.color);
-                        const noteText = escapeHTML(getNotebookStickyNotePreviewText(note)).replace(/\n/g, '<br>');
+                        const noteText = String(note?.text ?? '').trim();
+                        const notePreviewMarkup = getNotebookStickyNotePreviewMarkup(note);
                         const noteRotation = clampNotebookStickyNoteRotation(note.rotation);
                         const noteScale = clampNotebookStickyNoteScale(note.scale);
                         const noteIsActive = activeNotebookStickyNoteMenu?.recipeId === recipeId && activeNotebookStickyNoteMenu?.noteIndex === index;
@@ -2563,32 +2826,33 @@
                         const menuAlignmentClass = Number(note.x) < 34 ? 'is-left-aligned' : Number(note.x) > 66 ? 'is-right-aligned' : '';
                         const swatches = ['butter', 'rose', 'sage', 'sky', 'lavender'].map(color => {
                             const swatchPalette = getNotebookStickyNotePalette(color);
-                            return `<button type="button" onclick="setNotebookStickyNoteColor(${recipeId}, ${index}, '${color}')" class="notebook-sticky-note-menu-swatch ${note.color === color ? 'is-active' : ''}" style="background:${swatchPalette.bg};" aria-label="Set sticky note color to ${color}"></button>`;
+                            return `<button type="button" onpointerdown="event.stopPropagation()" onclick="setNotebookStickyNoteColor(${recipeId}, ${index}, '${color}')" class="notebook-sticky-note-menu-swatch ${note.color === color ? 'is-active' : ''}" style="background:${swatchPalette.bg};" aria-label="Set sticky note color to ${color}"></button>`;
                         }).join('');
                         return `
-                            <div class="notebook-sticky-note-anchor ${noteIsActive ? 'is-active' : ''}" data-notebook-note-index="${index}" style="left:${clampNotebookStickyNoteX(note.x)}%;top:${clampNotebookStickyNoteY(note.y)}%;">
+                            <div class="notebook-sticky-note-anchor ${noteIsActive ? 'is-active' : ''}" data-notebook-note-index="${index}" data-notebook-note-side="${noteSide}" style="left:${clampNotebookStickyNoteX(note.x)}%;top:${clampNotebookStickyNoteY(note.y)}%;">
                                 <article class="notebook-sticky-note ${getNotebookStickyNoteSizeClass(note.size)}" data-notebook-note-card="true" style="--sticky-note-bg:${palette.bg};--sticky-note-border:${palette.border};--sticky-note-ink:${palette.ink};--sticky-note-tape:${palette.tape};transform:rotate(${noteRotation}deg) scale(${noteScale});">
                                     <button type="button" class="notebook-sticky-note-handle top-left" data-notebook-note-handle="top-left" aria-label="Resize and rotate sticky note"></button>
                                     <button type="button" class="notebook-sticky-note-handle top-right" data-notebook-note-handle="top-right" aria-label="Resize and rotate sticky note"></button>
                                     <button type="button" class="notebook-sticky-note-handle bottom-left" data-notebook-note-handle="bottom-left" aria-label="Resize and rotate sticky note"></button>
                                     <button type="button" class="notebook-sticky-note-handle bottom-right" data-notebook-note-handle="bottom-right" aria-label="Resize and rotate sticky note"></button>
-                                    <span class="notebook-sticky-note-tape" aria-hidden="true"></span>
                                     <div class="notebook-sticky-note__body">
-                                        <p class="notebook-sticky-note__text font-semibold" data-notebook-note-preview="${note.id}">${noteText}</p>
+                                        <div class="notebook-sticky-note__preview" data-notebook-note-preview="${note.id}">${notePreviewMarkup}</div>
+                                        <span class="sr-only" data-notebook-note-plaintext="${note.id}">${escapeHTML(noteText || 'Empty sticky note. Click to edit.')}</span>
                                     </div>
                                 </article>
                                 ${noteIsActive ? `
-                                    <div class="notebook-sticky-note-menu ${menuPlacementClass} ${menuAlignmentClass}" data-notebook-note-menu="true">
+                                    <div class="notebook-sticky-note-menu ${menuPlacementClass} ${menuAlignmentClass}" data-notebook-note-menu="true" onpointerdown="event.stopPropagation()">
                                         <div class="flex items-center justify-between gap-3">
                                             <p class="text-[10px] font-bold uppercase tracking-[0.22em] text-sage">Sticky note</p>
-                                            <button type="button" onclick="closeNotebookStickyNoteMenu()" class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-parchmentDark bg-white text-sage shadow-sm">
+                                            <button type="button" onpointerdown="event.stopPropagation()" onclick="closeNotebookStickyNoteMenu()" class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-parchmentDark bg-white text-sage shadow-sm">
                                                 <i data-lucide="x" class="h-4 w-4"></i>
                                             </button>
                                         </div>
-                                        <textarea maxlength="160" data-notebook-note-editor="${recipeId}-${index}" aria-label="Sticky note text" oninput="updateNotebookStickyNoteText(${recipeId}, ${index}, this.value)" class="mt-3 w-full min-h-[6.5rem] rounded-xl border border-sage border-opacity-20 bg-white px-4 py-3 text-sm font-semibold text-forest shadow-sm outline-none focus:border-gold resize-y md:min-h-[7rem]" placeholder="Add a quick reminder...">${escapeHTML(note.text || '')}</textarea>
+                                        <textarea maxlength="160" data-notebook-note-editor="${recipeId}-${index}" aria-label="Sticky note text" onpointerdown="event.stopPropagation()" oninput="updateNotebookStickyNoteText(${recipeId}, ${index}, this.value)" class="mt-3 w-full min-h-[6.5rem] rounded-xl border border-sage border-opacity-20 bg-white px-4 py-3 text-sm font-semibold text-forest shadow-sm outline-none focus:border-gold resize-y md:min-h-[7rem]" placeholder="Add a quick reminder...">${escapeHTML(note.text || '')}</textarea>
+                                        <p class="mt-2 text-[10px] font-bold uppercase tracking-[0.18em] text-sage opacity-65">Saves automatically while you type</p>
                                         <div class="mt-3 flex items-center justify-between gap-3">
                                             <div class="flex flex-nowrap items-center gap-1.5">${swatches}</div>
-                                            <button type="button" title="Delete sticky note" aria-label="Delete sticky note" onclick="deleteNotebookStickyNote(${recipeId}, ${index})" class="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-parchmentDark bg-white text-sage shadow-sm transition-all hover:border-red-400 hover:text-red-500">
+                                            <button type="button" title="Delete sticky note" aria-label="Delete sticky note" onpointerdown="event.stopPropagation()" onclick="deleteNotebookStickyNote(${recipeId}, ${index})" class="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-parchmentDark bg-white text-sage shadow-sm transition-all hover:border-red-400 hover:text-red-500">
                                                 <i data-lucide="trash-2" class="h-4 w-4"></i>
                                             </button>
                                         </div>
@@ -2934,7 +3198,7 @@
             }
 
             if (!recipe.notebookStickyNotes.length) {
-                recipe.notebookStickyNotes = [getDefaultNotebookStickyNote()];
+                recipe.notebookStickyNotes = [getDefaultNotebookStickyNote(0, window.innerWidth < 768 ? notebookMobileSide : 'right')];
                 shouldSave = true;
                 createdNote = true;
             }
@@ -2951,7 +3215,7 @@
             openNotebookStickyNoteMenu(recipeId, 0);
 
             if (createdNote) {
-                showToast('Sticky note added. Type directly on the spread.', 'sticky-note');
+                showToast('Sticky note added. Click it to enlarge and edit.', 'sticky-note');
             }
         }
 
@@ -2962,6 +3226,20 @@
             if (savedSettings) {
                 const parsedSettings = JSON.parse(savedSettings);
                 userSettings = { ...userSettings, ...parsedSettings };
+            } else {
+                // First launch: detect language
+                try {
+                    const browserLang = (navigator.language || navigator.userLanguage || '').substring(0, 2).toLowerCase();
+                    const supportedLangs = ['en', 'nl', 'es', 'fr', 'de', 'it'];
+                    if (supportedLangs.includes(browserLang)) {
+                        userSettings.language = browserLang;
+                    } else {
+                        userSettings.language = 'en';
+                    }
+                } catch (e) {
+                    userSettings.language = 'en';
+                }
+                shouldResaveSettings = true;
             }
 
             if (Object.prototype.hasOwnProperty.call(userSettings, 'themeMode')) {
@@ -3620,6 +3898,47 @@
 
         function normalizeRecipeInstructions(steps) {
             return (steps || []).map(normalizeRecipeInstructionStep).filter(Boolean);
+        }
+
+        function runUculiAI() {
+            if (draftIngredients.length === 0 && draftSteps.length === 0) {
+                showToast('Add ingredients or instructions first for the AI to analyze.', 'alert-circle');
+                return;
+            }
+
+            let prepMins = 5 + (draftIngredients.length * 2);
+            let cookMins = 0;
+            let combinedText = [...draftIngredients, ...draftSteps.map(s => getRecipeInstructionText(s))].join(' ').toLowerCase();
+
+            if (combinedText.match(/bake|roast|oven|horno|hornear|cuire|backen|forno/)) cookMins += 30;
+            if (combinedText.match(/boil|simmer|hervir|bouillir|kochen|bollire/)) cookMins += 15;
+            if (combinedText.match(/fry|saute|freir|frire|braten|friggere/)) cookMins += 10;
+
+            let servings = 4;
+            let diff = draftSteps.length > 10 ? 'Hard' : (draftSteps.length > 5 ? 'Medium' : 'Easy');
+
+            let cuisine = 'European';
+            if (combinedText.match(/soy|tofu|ginger|rice|noodle|sesame|soya/)) cuisine = 'Asian';
+            if (combinedText.match(/pasta|tomato|basil|mozzarella|parmesan|pizza/)) cuisine = 'Italian';
+            if (combinedText.match(/cumin|coriander|chili|tortilla|taco|curry|garam/)) cuisine = combinedText.includes('tortilla') ? 'Mexican' : 'Indian';
+
+            let isVegetarian = !combinedText.match(/chicken|beef|pork|meat|fish|salmon|shrimp|pollo|carne|pescado|poulet|viande|poisson/);
+            let isVegan = isVegetarian && !combinedText.match(/cheese|milk|butter|egg|cream|queso|leche|mantequilla|huevo|fromage|lait|beurre|oeuf/);
+
+            document.getElementById('r-prepTime').value = prepMins;
+            document.getElementById('r-cookTime').value = cookMins;
+            document.getElementById('r-servings').value = servings;
+            document.getElementById('r-difficulty').value = diff;
+            document.getElementById('r-cuisine').value = cuisine;
+
+            const dietCheckboxes = document.querySelectorAll('.diet-checkbox');
+            dietCheckboxes.forEach(cb => {
+                cb.checked = false;
+                if (isVegetarian && cb.value === 'Vegetarian') cb.checked = true;
+                if (isVegan && cb.value === 'Vegan') cb.checked = true;
+            });
+
+            showToast('Uculi AI has populated the recipe fields!', 'sparkles');
         }
 
         function cloneRecipeInstructionStep(step) {
@@ -4981,11 +5300,37 @@
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    const base64 = e.target.result;
-                    document.getElementById(targetElementId).style.backgroundImage = `url(${base64})`;
-                    document.getElementById(targetElementId).innerHTML = ''; 
-                    if(isUserSetting) userSettings[targetVarName] = base64;
-                    else window[targetVarName] = base64;
+                    const img = new Image();
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        const MAX_WIDTH = 800;
+                        const MAX_HEIGHT = 800;
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > height) {
+                            if (width > MAX_WIDTH) {
+                                height *= MAX_WIDTH / width;
+                                width = MAX_WIDTH;
+                            }
+                        } else {
+                            if (height > MAX_HEIGHT) {
+                                width *= MAX_HEIGHT / height;
+                                height = MAX_HEIGHT;
+                            }
+                        }
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        const base64 = canvas.toDataURL('image/jpeg', 0.8);
+                        document.getElementById(targetElementId).style.backgroundImage = `url(${base64})`;
+                        document.getElementById(targetElementId).innerHTML = ''; 
+                        if(isUserSetting) userSettings[targetVarName] = base64;
+                        else window[targetVarName] = base64;
+                    };
+                    img.src = e.target.result;
                 }
                 reader.readAsDataURL(file);
             }
@@ -5756,6 +6101,16 @@
                 <div class="space-y-4 text-inkDark p-4 max-h-[70vh] overflow-y-auto w-[680px] max-w-[90vw]">
                     <p class="text-sm font-semibold text-sage">This is a launch-draft summary for in-app visibility. Replace it with your reviewed legal terms before public release.</p>
                     <div class="rounded-md border border-parchmentDark bg-parchment p-4 space-y-3 text-sm">
+                        <p class="font-bold">1. Content Policy</p>
+                        <p>We are a family-friendly community. Users must not upload recipes that contain profanity, hate speech, or NSFW content. Violating content will be blocked by our automated filters or removed manually, and repeat offenders may have their access revoked.</p>
+                        <p class="font-bold mt-4">2. Your Data</p>
+                        <p>You own your recipes. By publishing them, you grant Uculi permission to display them in the Browse section. We do not sell your data.</p>
+                        <p class="font-bold mt-4">3. Local AI Usage</p>
+                        <p>AI features (like Uculi AI Auto-Fill and Translations) are provided "as is" to help you quickly fill metadata or change languages, but Uculi makes no guarantees about their accuracy.</p>
+                        <p class="font-bold mt-4">4. Usage Limits</p>
+                        <p>Free users are limited to 1 image upload per 15 minutes to preserve system resources. Premium users are allowed up to 15 image uploads per day.</p>
+                    </div>
+                </div>
                         <p><strong>Your content:</strong> You are responsible for the recipes, notes, and profile content you add or publish through Uculi.</p>
                         <p><strong>Premium access:</strong> Premium features include notebook mode, sharing, downloads, cloud sync, publishing, and families. The current in-app Premium preview is only for local testing until billing is connected.</p>
                         <p><strong>Collaboration:</strong> Shared family recipes can be edited by active family members, so collaborators should agree before making changes.</p>
@@ -6010,7 +6365,7 @@
 
         function isNotebookShortViewport() {
             const viewportHeight = contentDiv?.clientHeight || window.innerHeight || 0;
-            return viewportHeight > 0 && viewportHeight < 560;
+            return viewportHeight > 0 && viewportHeight < 760;
         }
 
         function getNotebookRecipeSpreads(recipe) {
@@ -6121,20 +6476,27 @@
             const notebookSurface = notebookFrame?.querySelector('.notebook-book-spread-surface');
             if (!notebookFrame || !notebookSurface) return;
 
-            if (window.innerWidth >= 768 && !isNotebookShortViewport()) {
-                notebookSurface.style.height = '';
-                notebookSurface.style.minHeight = '';
+            const frameRect = notebookFrame.getBoundingClientRect();
+            const navRect = document.getElementById('main-nav')?.getBoundingClientRect();
+            const bottomLimit = navRect ? navRect.top : window.innerHeight;
+            const bottomReserve = window.innerWidth < 768 ? 18 : 24;
+            const fallbackHeight = window.innerWidth < 768 ? 420 : 560;
+            const availableHeight = Math.max(window.innerWidth < 768 ? 280 : 360, Math.floor(bottomLimit - frameRect.top - bottomReserve));
+            const fittedHeight = availableHeight || fallbackHeight;
+
+            notebookFrame.style.setProperty('--notebook-spread-max-height', `${fittedHeight}px`);
+
+            if (window.innerWidth < 768) {
+                notebookFrame.style.setProperty('--notebook-spread-fit-width', '100%');
+                notebookSurface.style.height = `${fittedHeight}px`;
+                notebookSurface.style.minHeight = `${fittedHeight}px`;
                 return;
             }
 
-            const contentRect = contentDiv.getBoundingClientRect();
-            const frameRect = notebookFrame.getBoundingClientRect();
-            const topOffset = Math.max(0, frameRect.top - contentRect.top);
-            const reservedGap = window.innerWidth < 768 ? 14 : 18;
-            const availableHeight = Math.max(220, Math.floor(contentDiv.clientHeight - topOffset - reservedGap));
-
-            notebookSurface.style.height = `${availableHeight}px`;
-            notebookSurface.style.minHeight = `${availableHeight}px`;
+            const fittedWidth = Math.floor(fittedHeight * 1.414);
+            notebookFrame.style.setProperty('--notebook-spread-fit-width', `${fittedWidth}px`);
+            notebookSurface.style.height = `${fittedHeight}px`;
+            notebookSurface.style.minHeight = `${fittedHeight}px`;
         }
 
         function goToNotebookPage(direction) {
@@ -6244,9 +6606,12 @@
             saveData();
 
             const noteId = recipe.notebookStickyNotes[noteIndex].id;
-            const nextPreviewMarkup = escapeHTML(getNotebookStickyNotePreviewText(recipe.notebookStickyNotes[noteIndex])).replace(/\n/g, '<br>');
+            const nextPreviewMarkup = getNotebookStickyNotePreviewMarkup(recipe.notebookStickyNotes[noteIndex]);
             document.querySelectorAll(`[data-notebook-note-preview="${noteId}"]`).forEach(node => {
                 node.innerHTML = nextPreviewMarkup;
+            });
+            document.querySelectorAll(`[data-notebook-note-plaintext="${noteId}"]`).forEach(node => {
+                node.textContent = nextText || 'Empty sticky note. Click to edit.';
             });
         }
 
@@ -6282,6 +6647,28 @@
             if (!recipe) return;
 
             recipe.notebookStickyNotes = normalizeNotebookStickyNotes(recipe.notebookStickyNotes);
+
+            const getNotebookTargetPage = (clientX, clientY) => {
+                const visiblePages = Array.from(surface.querySelectorAll('[data-notebook-paper-side]')).filter(page => page.offsetParent !== null);
+                if (!visiblePages.length) return null;
+
+                const containingPage = visiblePages.find(page => {
+                    const rect = page.getBoundingClientRect();
+                    return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+                });
+                if (containingPage) return containingPage;
+
+                return visiblePages.reduce((closestPage, page) => {
+                    const rect = page.getBoundingClientRect();
+                    const clampX = Math.max(rect.left, Math.min(clientX, rect.right));
+                    const clampY = Math.max(rect.top, Math.min(clientY, rect.bottom));
+                    const distance = Math.hypot(clampX - clientX, clampY - clientY);
+                    if (!closestPage || distance < closestPage.distance) {
+                        return { element: page, distance };
+                    }
+                    return closestPage;
+                }, null)?.element || visiblePages[0];
+            };
 
             surface.querySelectorAll('[data-notebook-note-index]').forEach(noteEl => {
                 const noteIndex = Number(noteEl.dataset.notebookNoteIndex);
@@ -6334,9 +6721,11 @@
                     });
                 });
 
-                noteEl.addEventListener('pointerdown', event => {
+                noteCard?.addEventListener('pointerdown', event => {
                     if (event.pointerType === 'mouse' && event.button !== 0) return;
                     if (event.target.closest('[data-notebook-note-handle]')) return;
+                    if (event.target.closest('[data-notebook-note-menu]')) return;
+                    if (event.target.closest('button, textarea, input, select, a')) return;
 
                     event.preventDefault();
                     event.stopPropagation();
@@ -6352,10 +6741,21 @@
                         if (Math.abs(moveEvent.clientX - startX) > 4 || Math.abs(moveEvent.clientY - startY) > 4) {
                             didDrag = true;
                         }
-                        const nextX = clampNotebookStickyNoteX(((moveEvent.clientX - rect.left) / rect.width) * 100);
-                        const nextY = clampNotebookStickyNoteY(((moveEvent.clientY - rect.top) / rect.height) * 100);
+
+                        const targetPage = getNotebookTargetPage(moveEvent.clientX, moveEvent.clientY);
+                        const pageRect = targetPage?.getBoundingClientRect() || rect;
+                        const targetSide = normalizeNotebookStickyNoteSide(targetPage?.dataset?.notebookPaperSide, recipe.notebookStickyNotes[noteIndex].side);
+                        const targetLayer = targetPage?.querySelector(`[data-notebook-note-layer="${targetSide}"]`);
+                        if (targetLayer && noteEl.parentElement !== targetLayer) {
+                            targetLayer.appendChild(noteEl);
+                        }
+
+                        const nextX = clampNotebookStickyNoteX(((moveEvent.clientX - pageRect.left) / pageRect.width) * 100);
+                        const nextY = clampNotebookStickyNoteY(((moveEvent.clientY - pageRect.top) / pageRect.height) * 100);
+                        recipe.notebookStickyNotes[noteIndex].side = targetSide;
                         recipe.notebookStickyNotes[noteIndex].x = nextX;
                         recipe.notebookStickyNotes[noteIndex].y = nextY;
+                        noteEl.dataset.notebookNoteSide = targetSide;
                         noteEl.style.left = `${nextX}%`;
                         noteEl.style.top = `${nextY}%`;
                     };
@@ -6597,26 +6997,37 @@
 
                 return `
                     <div class="notebook-paper__body">
-                        <p class="text-[11px] font-bold uppercase tracking-[0.3em] text-sage opacity-80">Recipe page</p>
-                        <h3 class="mt-2 font-fantasy ${isShortNotebook ? 'text-2xl md:text-3xl' : 'text-3xl md:text-5xl'} font-bold text-forest leading-[1.02]">${safeRecipeTitle}</h3>
-                        <div class="notebook-paper__section notebook-ruled-block ${isShortNotebook ? 'mt-3 text-xs' : 'mt-4 text-sm'} font-semibold text-sage">
-                            <div class="notebook-line-row">${recipeMood}</div>
-                            <div class="notebook-line-row ${isShortNotebook ? 'text-[10px]' : 'text-[11px]'} font-bold uppercase tracking-[0.22em]">
-                                <span>${safeRecipeCategory}</span>
-                                ${recipe.difficulty ? `<span>· ${escapeHTML(recipe.difficulty)}</span>` : ''}
-                                ${recipe.country ? `<span>· ${escapeHTML(recipe.country)}</span>` : ''}
-                            </div>
-                        </div>
-
                         ${isShortNotebook ? `
+                            <p class="text-[11px] font-bold uppercase tracking-[0.3em] text-sage opacity-80">Recipe page</p>
+                            <h3 class="mt-2 font-fantasy text-2xl md:text-3xl font-bold text-forest leading-[1.02]">${safeRecipeTitle}</h3>
+                            <div class="notebook-paper__section notebook-ruled-block mt-3 text-xs font-semibold text-sage">
+                                <div class="notebook-line-row">${recipeMood}</div>
+                                <div class="notebook-line-row text-[10px] font-bold uppercase tracking-[0.22em]">
+                                    <span>${safeRecipeCategory}</span>
+                                    ${recipe.difficulty ? `<span>· ${escapeHTML(recipe.difficulty)}</span>` : ''}
+                                    ${recipe.country ? `<span>· ${escapeHTML(recipe.country)}</span>` : ''}
+                                </div>
+                            </div>
                             <div class="notebook-paper__section notebook-ruled-block mt-3 text-xs font-semibold text-sage">
                                 <div class="notebook-line-row">${recipe.prepTime || 0}m prep · ${recipe.cookTime || 0}m cook · serves ${recipe.servings || 0}</div>
                             </div>
                         ` : `
-                            <div class="notebook-paper__section notebook-page-photo-card" style="background-image:url('${recipe.profile || defaultPlaceholderProfile}')">
-                                <div class="notebook-page-photo-label">
-                                    <i data-lucide="image" class="h-3.5 w-3.5"></i>
-                                    Recipe photo
+                            <div class="notebook-page-hero">
+                                <div class="notebook-page-photo-cluster">
+                                    <div class="notebook-page-photo-frame">
+                                        <span class="notebook-page-photo-clothespin" aria-hidden="true"></span>
+                                        <div class="notebook-page-photo-card" style="background-image:url('${recipe.profile || defaultPlaceholderProfile}')"></div>
+                                    </div>
+                                </div>
+                                <p class="text-[11px] font-bold uppercase tracking-[0.3em] text-sage opacity-80">Recipe page</p>
+                                <h3 class="mt-2 font-fantasy text-3xl md:text-5xl font-bold text-forest leading-[1.02]">${safeRecipeTitle}</h3>
+                                <div class="notebook-ruled-block mt-3 text-sm font-semibold text-sage">
+                                    <div class="notebook-line-row">${recipeMood}</div>
+                                    <div class="notebook-line-row text-[11px] font-bold uppercase tracking-[0.22em]">
+                                        <span>${safeRecipeCategory}</span>
+                                        ${recipe.difficulty ? `<span>· ${escapeHTML(recipe.difficulty)}</span>` : ''}
+                                        ${recipe.country ? `<span>· ${escapeHTML(recipe.country)}</span>` : ''}
+                                    </div>
                                 </div>
                             </div>
 
@@ -6713,16 +7124,12 @@
                 const activeFilterPills = hasActiveFilters
                     ? activeFilters.map(filter => `<span class="notebook-landing-pill">${escapeHTML(filter)}</span>`).join('')
                     : '';
+                const noteCount = notebookStickyNotes.length;
 
                 return `
-                    <div class="mb-8">
+                    <div class="mb-6">
                         <section class="notebook-landing-hero">
                             <div class="notebook-landing-stack">
-                                <div class="notebook-landing-heading">
-                                    <p class="text-[11px] font-bold uppercase tracking-[0.32em] text-sage opacity-80">Notebook mode</p>
-                                    <h2 class="mt-3 max-w-3xl font-fantasy text-4xl font-bold leading-[0.95] text-forest md:text-5xl">Open your recipe notebook from the cover.</h2>
-                                </div>
-
                                 <div class="notebook-landing-cover-column">
                                     <div class="notebook-cover-shell notebook-book-cover-frame notebook-landing-cover-frame">
                                         <div id="notebook-cover-surface" class="notebook-book-cover-surface notebook-cover-panel notebook-landing-cover-surface overflow-hidden rounded-[32px] border px-6 py-6 text-[#2b241a] md:px-8 md:py-8" style="${getNotebookCoverPanelStyle(coverConfig)}" role="button" tabindex="0" aria-label="Open notebook" data-cover-openable="true" onclick="openNotebookCover()" onkeydown="if (event.target !== event.currentTarget) return; if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openNotebookCover(); }">
@@ -6730,11 +7137,51 @@
                                         </div>
                                     </div>
                                 </div>
-                                ${hasActiveFilters ? `
-                                    <div class="notebook-landing-copy">
-                                        <div class="notebook-landing-pill-row">${activeFilterPills}</div>
+
+                                <div class="notebook-landing-copy">
+                                    <div class="notebook-landing-copy-main">
+                                        <div class="notebook-landing-heading">
+                                            <p class="text-[11px] font-bold uppercase tracking-[0.32em] text-sage opacity-80">Notebook mode</p>
+                                            <h2 class="mt-3 max-w-none font-fantasy text-[2.4rem] font-bold leading-[0.98] text-forest md:text-[2.9rem]">Open your recipe notebook without losing the recipe overview.</h2>
+                                            <p class="mt-3 max-w-md text-sm font-semibold leading-relaxed text-sage md:text-base">Use the cover as a compact entry point, then drop straight into the spread when you want to cook, annotate, or review the full recipe.</p>
+                                        </div>
+
+                                        <div class="notebook-landing-action-row">
+                                            <button onclick="openNotebookCover()" class="${getAppButtonClasses('primary', { size: 'lg' })} rounded-2xl shadow-[0_16px_28px_rgba(45,77,52,0.24)]" translate="no">
+                                                <i data-lucide="book-open" class="h-4 w-4"></i>Open notebook
+                                            </button>
+                                            <p class="text-xs font-semibold text-sage">Click or swipe the cover when you want the full spread.</p>
+                                        </div>
                                     </div>
-                                ` : ''}
+
+                                    <div class="notebook-landing-copy-side">
+                                        <div class="notebook-landing-stat-grid">
+                                            <div class="notebook-landing-stat">
+                                                <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-sage opacity-75">Spreads</p>
+                                                <p class="mt-2 font-fantasy text-3xl font-bold leading-none text-forest">${notebookRecipeSpreads.length}</p>
+                                                <p class="mt-2 text-xs font-semibold text-sage">Across this recipe notebook</p>
+                                            </div>
+                                            <div class="notebook-landing-stat">
+                                                <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-sage opacity-75">Notes</p>
+                                                <p class="mt-2 font-fantasy text-3xl font-bold leading-none text-forest">${noteCount}</p>
+                                                <p class="mt-2 text-xs font-semibold text-sage">Sticky note${noteCount === 1 ? '' : 's'} attached</p>
+                                            </div>
+                                        </div>
+
+                                        <div class="notebook-landing-section">
+                                            <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-sage opacity-75">Current recipe</p>
+                                            <p class="mt-2 font-fantasy text-2xl font-bold leading-tight text-forest">${safeRecipeTitle}</p>
+                                            <p class="mt-3 text-sm font-semibold leading-relaxed text-sage">${recipeMood}. ${totalIngredients} ingredient${totalIngredients === 1 ? '' : 's'}, ${totalInstructions} instruction step${totalInstructions === 1 ? '' : 's'}.</p>
+                                        </div>
+
+                                        ${hasActiveFilters ? `
+                                            <div class="notebook-landing-section">
+                                                <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-sage opacity-75">Filters in view</p>
+                                                <div class="mt-3 notebook-landing-pill-row md:justify-start">${activeFilterPills}</div>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
                             </div>
                         </section>
                     </div>
@@ -6743,34 +7190,42 @@
 
             return `
                 <div>
-                    <div class="mb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                        <div>
+                    <div class="mb-3 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div class="min-w-0">
                             <p class="text-[11px] font-bold uppercase tracking-[0.3em] text-sage opacity-80">Notebook mode</p>
                             ${hasActiveFilters ? `<p class="mt-2 text-[11px] font-bold uppercase tracking-[0.24em] text-gold">Filtered spread: ${activeFilters.length} active filter${activeFilters.length === 1 ? '' : 's'}</p>` : ''}
                         </div>
-                        <div class="flex flex-row flex-wrap items-center justify-end gap-2">
-                            <div class="inline-flex rounded-xl border border-parchmentDark bg-white p-1 shadow-sm">
-                                <button onclick="setIndexViewMode('cards')" class="inline-flex h-9 w-11 items-center justify-center rounded-lg transition-all text-sage hover:text-forest" title="Cards view">
+                        <div class="w-full lg:w-auto">
+                            <div class="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center md:justify-end">
+                                <div class="inline-flex w-full items-center justify-between gap-1 rounded-xl border border-parchmentDark bg-white p-1 shadow-sm md:w-auto md:justify-start md:flex-wrap lg:flex-nowrap">
+                                <button onclick="setIndexViewMode('cards')" class="inline-flex h-9 w-10 items-center justify-center rounded-lg transition-all text-sage hover:text-forest hover:bg-surface-muted md:h-10 md:w-12" title="Cards view">
                                     <i data-lucide="layout-grid" class="h-4 w-4"></i>
                                 </button>
-                                <button onclick="setIndexViewMode('list')" class="inline-flex h-9 w-11 items-center justify-center rounded-lg transition-all text-sage hover:text-forest" title="List view">
+                                <button onclick="setIndexViewMode('list')" class="inline-flex h-9 w-10 items-center justify-center rounded-lg transition-all text-sage hover:text-forest hover:bg-surface-muted md:h-10 md:w-12" title="List view">
                                     <i data-lucide="list" class="h-4 w-4"></i>
                                 </button>
-                                <button onclick="setIndexViewMode('book')" class="inline-flex h-9 w-11 items-center justify-center rounded-lg transition-all bg-forest text-white shadow-sm" title="Notebook view">
+                                <button onclick="setIndexViewMode('book')" class="inline-flex h-9 w-10 items-center justify-center rounded-lg transition-all bg-forest text-white shadow-sm md:h-10 md:w-12" title="Notebook view">
                                     <i data-lucide="book-open" class="h-4 w-4"></i>
                                 </button>
+                                <div class="hidden h-6 w-px bg-parchmentDark mx-1 md:block"></div>
+                                <button type="button" title="${notebookNoteActionLabel}" aria-label="${notebookNoteActionLabel}" onclick="openNotebookStickyNotesEditor(${recipe.id})" class="inline-flex h-9 w-10 items-center justify-center rounded-lg transition-all text-gold hover:text-forest hover:bg-surface-muted notebook-note-control notebook-note-control--manage notebook-note-control--icon md:h-10 md:w-12" data-notebook-note-control="manage-notes">
+                                    <i data-lucide="sticky-note" class="h-4 w-4"></i>
+                                </button>
+                                <button type="button" title="${notebookVisibilityActionLabel}" aria-label="${notebookVisibilityActionLabel}" onclick="toggleNotebookStickyNotesVisibility()" class="inline-flex h-9 w-10 items-center justify-center rounded-lg transition-all ${showNotebookStickyNotes ? 'text-sage' : 'text-gold'} hover:text-forest hover:bg-surface-muted notebook-note-control notebook-note-control--toggle notebook-note-control--icon md:h-10 md:w-12" data-notebook-note-control="toggle-visibility">
+                                    <i data-lucide="${showNotebookStickyNotes ? 'eye-off' : 'eye'}" class="h-4 w-4"></i>
+                                </button>
+                                <div class="hidden h-6 w-px bg-parchmentDark mx-1 md:block"></div>
+                                <span class="hidden md:inline-flex h-10 min-w-[7rem] items-center justify-center rounded-lg px-3 text-[10px] font-bold uppercase tracking-[0.24em] text-sage">Page ${notebookSpreadPageIndex + 1} / ${notebookRecipeSpreads.length}</span>
+                                </div>
+                                <button type="button" title="${notebookCookActionLabel}" aria-label="${notebookCookActionLabel}" onclick="openNotebookRecipeForCooking(${recipe.id})" class="hidden h-10 px-4 items-center justify-center gap-2 rounded-lg transition-all bg-gold text-white font-bold text-xs uppercase tracking-wider hover:bg-opacity-90 shadow-sm notebook-note-control notebook-note-control--cook md:inline-flex" data-notebook-note-control="open-cook">
+                                    <i data-lucide="chef-hat" class="h-4 w-4"></i>
+                                    <span>Cook</span>
+                                </button>
+                                <button type="button" title="${notebookCookActionLabel}" aria-label="${notebookCookActionLabel}" onclick="openNotebookRecipeForCooking(${recipe.id})" class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl transition-all bg-gold text-white font-bold text-xs uppercase tracking-[0.2em] hover:bg-opacity-90 shadow-sm notebook-note-control notebook-note-control--cook md:hidden" data-notebook-note-control="open-cook">
+                                    <i data-lucide="chef-hat" class="h-4 w-4"></i>
+                                    <span>Cook</span>
+                                </button>
                             </div>
-                            <button type="button" title="${notebookNoteActionLabel}" aria-label="${notebookNoteActionLabel}" onclick="openNotebookStickyNotesEditor(${recipe.id})" class="notebook-note-control notebook-note-control--manage notebook-note-control--icon" data-notebook-note-control="manage-notes">
-                                <i data-lucide="sticky-note" class="h-4 w-4 text-gold"></i>
-                            </button>
-                            <button type="button" title="${notebookVisibilityActionLabel}" aria-label="${notebookVisibilityActionLabel}" onclick="toggleNotebookStickyNotesVisibility()" class="notebook-note-control notebook-note-control--toggle notebook-note-control--icon" data-notebook-note-control="toggle-visibility">
-                                <i data-lucide="${showNotebookStickyNotes ? 'eye-off' : 'eye'}" class="h-4 w-4 ${showNotebookStickyNotes ? 'text-sage' : 'text-gold'}"></i>
-                            </button>
-                            <span class="inline-flex h-11 items-center rounded-xl border border-parchmentDark bg-white px-4 text-xs font-bold uppercase tracking-[0.24em] text-sage shadow-sm">Page ${notebookSpreadPageIndex + 1} / ${notebookRecipeSpreads.length}</span>
-                            <button type="button" title="${notebookCookActionLabel}" aria-label="${notebookCookActionLabel}" onclick="openNotebookRecipeForCooking(${recipe.id})" class="notebook-note-control notebook-note-control--cook" data-notebook-note-control="open-cook">
-                                <i data-lucide="chef-hat" class="h-4 w-4"></i>
-                                <span>Cook</span>
-                            </button>
                         </div>
                     </div>
 
@@ -6778,30 +7233,42 @@
                         <div id="notebook-swipe-surface" data-recipe-id="${recipe.id}" class="notebook-book-spread-surface notebook-swipe-surface notebook-spread relative overflow-hidden rounded-[28px] border border-sage border-opacity-20 px-4 py-4 shadow-[0_30px_60px_rgba(44,61,46,0.16)] md:px-7 md:py-7 ${pageTurnClass}">
                             <div class="pointer-events-none absolute inset-y-6 left-7 hidden w-8 rounded-full border-x border-parchmentDark bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.95)_0,rgba(255,255,255,0.7)_58%,rgba(239,239,239,0.88)_100%)] md:block"></div>
                             <div class="pointer-events-none absolute inset-y-8 left-[3.65rem] hidden w-px bg-gradient-to-b from-transparent via-sage/20 to-transparent md:block"></div>
-                            ${renderNotebookStickyNotes(recipe.id, notebookStickyNotes, showNotebookStickyNotes)}
-
                             <div class="grid h-full grid-cols-1 gap-4 md:grid-cols-2 md:gap-0">
-                                <section class="notebook-paper notebook-paper-left relative rounded-[24px] border border-white border-opacity-70 px-6 py-6 md:h-full md:rounded-r-none md:border-r-0 ${notebookMobileSide !== 'left' ? 'hidden md:flex' : ''}">
+                                <section class="notebook-paper notebook-paper-left relative rounded-[24px] border border-white border-opacity-70 px-4 py-4 md:h-full md:rounded-r-none md:border-r-0 md:px-6 md:py-6 ${notebookMobileSide !== 'left' ? 'hidden md:flex' : ''}" data-notebook-paper-side="left">
                                     ${renderNotebookLeftPage(currentSpread.left)}
 
-                                    <div class="notebook-paper__footer flex items-end justify-start">
+                                    <div class="notebook-paper__footer hidden items-end justify-start md:flex">
                                         <button type="button" title="Previous page" aria-label="Previous page" onclick="goToNotebookPage(-1)" ${hasPreviousNotebookPage ? '' : 'disabled'} class="notebook-page-nav">
                                             <i data-lucide="chevron-left" class="h-4 w-4"></i>
                                         </button>
                                     </div>
+
+                                    ${renderNotebookStickyNotes(recipe.id, notebookStickyNotes, 'left', showNotebookStickyNotes)}
                                 </section>
 
-                                <section class="notebook-paper notebook-paper-right relative rounded-[24px] border border-white border-opacity-70 px-6 py-6 md:h-full md:rounded-l-none ${notebookMobileSide !== 'right' ? 'hidden md:flex' : ''}">
+                                <section class="notebook-paper notebook-paper-right relative rounded-[24px] border border-white border-opacity-70 px-4 py-4 md:h-full md:rounded-l-none md:px-6 md:py-6 ${notebookMobileSide !== 'right' ? 'hidden md:flex' : ''}" data-notebook-paper-side="right">
                                     ${renderNotebookRightPage(currentSpread.right)}
 
-                                    <div class="notebook-paper__footer flex items-end justify-end">
+                                    <div class="notebook-paper__footer hidden items-end justify-end md:flex">
                                         <button type="button" title="Next page" aria-label="Next page" onclick="goToNotebookPage(1)" ${hasNextNotebookPage ? '' : 'disabled'} class="notebook-page-nav notebook-page-nav--primary">
                                             <i data-lucide="chevron-right" class="h-4 w-4"></i>
                                         </button>
                                     </div>
+
+                                    ${renderNotebookStickyNotes(recipe.id, notebookStickyNotes, 'right', showNotebookStickyNotes)}
                                 </section>
                             </div>
                         </div>
+                    </div>
+
+                    <div class="mt-4 flex items-center justify-between gap-3 md:hidden">
+                        <button type="button" title="Previous page" aria-label="Previous page" onclick="goToNotebookPage(-1)" ${hasPreviousNotebookPage ? '' : 'disabled'} class="notebook-page-nav">
+                            <i data-lucide="chevron-left" class="h-4 w-4"></i>
+                        </button>
+                        <span class="inline-flex h-11 flex-1 items-center justify-center rounded-xl border border-parchmentDark bg-white/90 px-3 text-[10px] font-bold uppercase tracking-[0.24em] text-sage shadow-sm">Page ${notebookSpreadPageIndex + 1} / ${notebookRecipeSpreads.length}</span>
+                        <button type="button" title="Next page" aria-label="Next page" onclick="goToNotebookPage(1)" ${hasNextNotebookPage ? '' : 'disabled'} class="notebook-page-nav notebook-page-nav--primary">
+                            <i data-lucide="chevron-right" class="h-4 w-4"></i>
+                        </button>
                     </div>
                 </div>
             `;
@@ -7143,7 +7610,7 @@
                 html += '</div>';
             }
             contentDiv.innerHTML = html;
-            contentDiv.style.overflowY = isNotebookMode ? 'hidden' : 'auto';
+            contentDiv.style.overflowY = 'auto';
             lucide.createIcons();
             if (indexViewMode === 'book' && filteredRecipes.length > 0) {
                 attachNotebookInteractions();
@@ -7186,14 +7653,21 @@
             const checkedMarkup = checkedItems.length > 0
                 ? checkedItems.map(item => renderShoppingListItem(item)).join('')
                 : `
-                    <div class="rounded-2xl border border-dashed border-parchmentDark bg-white p-6 text-center shadow-sm">
-                        <i data-lucide="check-check" class="mx-auto h-10 w-10 text-sage opacity-70"></i>
-                        <p class="mt-4 font-fantasy text-2xl font-bold text-forest">Empty</p>
+                    <div class="rounded-2xl border border-dashed border-parchmentDark bg-white p-5 shadow-sm">
+                        <div class="flex items-start gap-3">
+                            <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-parchmentDark bg-parchment text-sage">
+                                <i data-lucide="check-check" class="h-5 w-5 opacity-80"></i>
+                            </div>
+                            <div>
+                                <p class="text-[11px] font-bold uppercase tracking-[0.24em] text-sage">Checked items</p>
+                                <p class="mt-2 text-sm font-semibold leading-relaxed text-forest">Completed groceries will collect here once you start checking things off.</p>
+                            </div>
+                        </div>
                     </div>
                 `;
 
             contentDiv.innerHTML = `
-                <div class="mb-8 overflow-hidden rounded-2xl border border-parchmentDark bg-white shadow-lg">
+                <div class="mx-auto mb-8 max-w-6xl overflow-hidden rounded-2xl border border-parchmentDark bg-white shadow-lg">
                     <div class="border-b border-parchmentDark bg-gradient-to-r from-accent via-white to-parchment px-5 py-5">
                         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                             <div class="flex flex-wrap items-center gap-3">
@@ -7230,7 +7704,7 @@
                             </div>
                         </div>
 
-                        <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
+                        <div class="space-y-5">
                             <section class="space-y-4 relative pt-10">
                                 <div class="absolute top-0 right-0 z-10">
                                     <span class="inline-flex items-center gap-1.5 rounded-full border border-parchmentDark bg-white px-3 py-1 text-xs font-bold text-sage shadow-sm" title="${pendingItems.length} pending">
@@ -7240,16 +7714,23 @@
                                 <div class="space-y-3">${pendingMarkup}</div>
                             </section>
 
-                            <section class="space-y-4 relative pt-10">
-                                <div class="absolute top-0 right-0 z-10">
-                                    ${checkedItems.length > 0 ? `
+                            ${checkedItems.length > 0 ? `
+                                <section class="space-y-4 relative pt-10">
+                                    <div class="absolute top-0 right-0 z-10 flex items-center gap-2">
+                                        <span class="inline-flex items-center gap-1.5 rounded-full border border-parchmentDark bg-white px-3 py-1 text-xs font-bold text-sage shadow-sm" title="${checkedItems.length} checked">
+                                            <i data-lucide="check-check" class="h-4 w-4 text-forest"></i> ${checkedItems.length}
+                                        </span>
                                         <button type="button" onclick="clearCheckedShoppingListItems()" class="${getAppButtonClasses('muted', { size: 'sm', iconOnly: true })} shadow-sm border border-parchmentDark bg-white hover:bg-coral hover:text-white" title="Clear checked items">
                                             <i data-lucide="trash-2" class="h-4 w-4"></i>
                                         </button>
-                                    ` : ''}
-                                </div>
-                                <div class="space-y-3">${checkedMarkup}</div>
-                            </section>
+                                    </div>
+                                    <div class="space-y-3">${checkedMarkup}</div>
+                                </section>
+                            ` : `
+                                <section class="space-y-3">
+                                    ${checkedMarkup}
+                                </section>
+                            `}
                         </div>
                     </div>
                 </div>
@@ -7573,7 +8054,7 @@
                         <i data-lucide="crown" class="w-8 h-8 text-gold"></i>
                     </div>
                     <h3 class="text-2xl font-fantasy font-bold text-forest mb-2">Premium Feature</h3>
-                    <p class="text-sage mb-6 text-sm font-semibold">You need Premium to ${featureName}. Free stays local-only with up to 8 recipes on this device, while Premium unlocks notebook mode, sharing, downloads, cloud sync, and families.</p>
+                    <p class="text-sage mb-6 text-sm font-semibold">You need Premium to ${featureName}. Free stays local-only with up to 8 recipes on this device (1 image upload per 15 minutes), while Premium unlocks notebook mode, 15 image uploads per day, sharing, downloads, cloud sync, and families.</p>
                     
                     <div class="space-y-3 text-left bg-parchment p-4 rounded-md border border-parchmentDark mb-6">
                         <p class="flex items-center gap-2 text-sm text-forest font-bold"><i data-lucide="check" class="w-4 h-4 text-gold"></i> Unlimited Local Recipes</p>
@@ -8084,15 +8565,19 @@
                 : (nextUnfinishedStepIndex === -1
                     ? `All ${instructionCount} steps are checked off. You can re-read from step 1 or uncheck a step to continue.`
                     : `${remainingStepCount} step${remainingStepCount === 1 ? '' : 's'} left. Next up: ${escapeHTML(nextStepPreview)}`);
-            const focusSecondaryActionClass = getAppButtonClasses('secondary', { fullWidth: true });
-            const focusPrimaryActionClass = getAppButtonClasses('accent', { fullWidth: true });
+            const primarySupportActionClass = getAppButtonClasses('secondary', { size: 'lg' });
             const primarySupportAction = canEditExistingRecipe
-                ? `<button onclick="renderAddForm(${recipe.id})" class="${focusSecondaryActionClass}" translate="no"><i data-lucide="pencil-line" class="h-4 w-4 text-gold"></i>Edit recipe</button>`
-                : `<button onclick="renderPublishedRecipeDetail('${recipe.publishedId}')" class="${focusSecondaryActionClass}"><i data-lucide="external-link" class="h-4 w-4 text-gold"></i>${savedRecipeIsOutdated ? 'Open latest' : 'Browse original'}</button>`;
+                ? `<button onclick="renderAddForm(${recipe.id})" class="${primarySupportActionClass}" translate="no"><i data-lucide="pencil-line" class="h-4 w-4 text-gold"></i>Edit recipe</button>`
+                : `<button onclick="renderPublishedRecipeDetail('${recipe.publishedId}')" class="${primarySupportActionClass}"><i data-lucide="external-link" class="h-4 w-4 text-gold"></i>${savedRecipeIsOutdated ? 'Open latest' : 'Browse original'}</button>`;
             const publishDetailVariant = !isSavedCommunityRecipe && recipe.publishedId ? 'accent' : 'secondary';
             const detailActionButtonsMarkup = `
-                <div class="flex flex-wrap items-center gap-2.5 xl:justify-end">
+                <div class="flex flex-wrap items-center gap-2 xl:justify-end">
                     ${savedRecipeIsOutdated ? renderDetailIconAction('Update warning', 'alert-circle', `toggleSavedRecipeUpdateNotice(${recipe.id})`, 'warning', '', true) : ''}
+                    <button onclick="toggleCookingMode(${recipe.id})" class="inline-flex h-11 items-center justify-center gap-2 rounded-lg transition-all bg-gold text-white font-bold text-xs uppercase tracking-wider px-4 shadow-sm hover:bg-opacity-90">
+                        <i id="focus-btn-icon" data-lucide="${isCookingMode ? 'x-circle' : 'chef-hat'}" class="h-4 w-4"></i>
+                        <span id="focus-btn-text">${isCookingMode ? 'Exit Cooking' : 'Cook Mode'}</span>
+                    </button>
+                    ${primarySupportAction}
                     ${hasPremiumAccess()
                         ? renderDetailIconAction('Share', 'share-2', `shareRecipe(${recipe.id})`, 'secondary', '', true)
                         : renderDetailIconAction('Share', 'lock', "showPremiumModal('share recipes')", 'muted', '', true)}
@@ -8109,6 +8594,9 @@
             }
 
             contentDiv.innerHTML = `
+                <button onclick="toggleCookingMode(${recipe.id})" id="cooking-mode-exit-btn" class="cooking-mode-exit-btn h-12 items-center gap-2 rounded-full bg-forest px-6 text-sm font-bold text-white shadow-xl transition-all hover:bg-gold hover:text-forest border-2 border-white">
+                    <i data-lucide="x-circle" class="w-5 h-5"></i> Exit Cooking Mode
+                </button>
                 <div class="detail-shell bg-white rounded-sm shadow-sm mb-6 border border-parchmentDark relative w-full">
                     <div class="detail-hero-shell w-full h-48 md:h-64 relative bg-forest rounded-t-sm">
                         <div class="absolute inset-0 overflow-hidden rounded-t-sm">
@@ -8131,10 +8619,10 @@
                         </div>
                     </div>
 
-                    <div class="h-12 md:h-16 w-full bg-white rounded-b-sm"></div>
+                    <div class="h-8 md:h-12 w-full bg-white rounded-b-sm"></div>
 
                     <div class="detail-content-shell p-4 md:p-10">
-                        <div class="detail-meta-grid grid grid-cols-1 gap-4 mb-8 rounded-md border border-sage border-opacity-10 bg-accent bg-opacity-30 p-4 sm:grid-cols-2 md:grid-cols-5">
+                        <div class="detail-meta-grid grid grid-cols-1 gap-4 mb-6 rounded-md border border-sage border-opacity-10 bg-accent bg-opacity-30 p-4 sm:grid-cols-2 md:grid-cols-5">
                             ${recipe.prepTime ? `<div class="text-center"><div class="flex justify-center mb-2"><i data-lucide="clock" class="w-5 h-5 text-gold"></i></div><div class="text-xs uppercase font-bold text-sage">Prep</div><div class="text-lg font-bold text-forest">${recipe.prepTime}m</div></div>` : ''}
                             ${recipe.cookTime ? `<div class="text-center"><div class="flex justify-center mb-2"><i data-lucide="flame" class="w-5 h-5 text-gold"></i></div><div class="text-xs uppercase font-bold text-sage">Cook</div><div class="text-lg font-bold text-forest">${recipe.cookTime}m</div></div>` : ''}
                             ${recipe.servings ? `<div class="text-center"><div class="flex justify-center mb-2"><i data-lucide="users" class="w-5 h-5 text-gold"></i></div><div class="text-xs uppercase font-bold text-sage">Servings</div><div class="text-lg font-bold text-forest">${recipe.servings}</div></div>` : ''}
@@ -8142,7 +8630,7 @@
                             ${recipe.cuisine ? `<div class="text-center"><div class="flex justify-center mb-2"><i data-lucide="globe" class="w-5 h-5 text-gold"></i></div><div class="text-xs uppercase font-bold text-sage">Cuisine</div><div class="text-lg font-bold text-forest">${recipe.cuisine}</div></div>` : ''}
                         </div>
 
-                        <div class="mb-8 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                        <div class="mb-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
                             <div class="detail-status-chips flex flex-wrap items-center gap-2">
                                 <span class="text-[10px] bg-white text-sage font-bold px-2.5 py-1.5 rounded-sm uppercase tracking-[0.24em] border border-parchmentDark">${recipe.category || 'Recipe'}</span>
                                 ${recipe.diet && recipe.diet.length > 0 ? recipe.diet.map(d => `<span class="text-[10px] bg-gold bg-opacity-20 text-sage font-bold px-2.5 py-1.5 rounded-sm uppercase tracking-[0.16em]">${d}</span>`).join('') : ''}
@@ -8358,10 +8846,6 @@
                             <h2 class="font-fantasy font-bold text-3xl text-forest flex items-center gap-2"><i data-lucide="file-plus-2" class="w-8 h-8 text-gold"></i> ${formTitle}</h2>
                             <p class="mt-2 text-sm font-semibold text-sage">${editorGuidance}</p>
                         </div>
-                        <div class="rounded-md border border-sage border-opacity-10 bg-accent bg-opacity-30 p-4 md:max-w-xs">
-                            <p class="text-[11px] font-bold uppercase tracking-[0.24em] text-sage">Measurements stay smart</p>
-                            <p class="mt-2 text-xs font-semibold leading-relaxed text-forest">Write ingredients in your own words. Uculi keeps the text editable and still converts measurements for display based on your settings.</p>
-                        </div>
                     </div>
                     
                     <form id="add-recipe-form" class="space-y-8" onsubmit="saveRecipe(event)">
@@ -8434,6 +8918,11 @@
                                 </div>
 
                                 <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                    <div class="md:col-span-4 flex justify-end">
+                                        <button type="button" onclick="runUculiAI()" class="inline-flex h-9 items-center justify-center gap-2 rounded-lg transition-all bg-gold text-white font-bold text-[10px] uppercase tracking-wider px-4 shadow-sm hover:bg-opacity-90">
+                                            <i data-lucide="wand-2" class="h-3 w-3"></i> Uculi AI Auto-Fill
+                                        </button>
+                                    </div>
                                     <div>
                                         <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Prep Time (min)</label>
                                         <input type="number" id="r-prepTime" min="0" max="1440" placeholder="15" class="${inputClass}">
@@ -9414,14 +9903,15 @@
             recordLaunchError('unhandledrejection', event.reason || 'Unhandled promise rejection');
         });
         
-                // Initialize Firebase if available (Phase 2)
-                if (typeof firebase !== 'undefined') {
-                    try {
-                        initializeFirebase();
-                    } catch (error) {
-                        console.log("Firebase SDK not loaded - local mode only");
-                    }
+        window.addEventListener('DOMContentLoaded', () => {
+            if (typeof firebase !== 'undefined') {
+                try {
+                    initializeFirebase();
+                } catch (error) {
+                    console.log("Firebase SDK not loaded - local mode only");
                 }
+            }
+        });
         renderList();
         showAppLanding();
     </script>
