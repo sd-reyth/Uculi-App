@@ -694,6 +694,36 @@
             z-index: 8;
         }
 
+        .notebook-sticky-note-anchor::before {
+            content: '';
+            position: absolute;
+            top: -0.84rem;
+            left: 50%;
+            z-index: 12;
+            width: 0.96rem;
+            height: 0.96rem;
+            border-radius: 999px;
+            background: radial-gradient(circle at 34% 32%, #ffc8c1 0 18%, #ef4b43 38%, #a91212 100%);
+            box-shadow: 0 2px 0 rgba(255, 255, 255, 0.34) inset, 0 8px 12px rgba(93, 30, 22, 0.22);
+            transform: translateX(-50%);
+            pointer-events: none;
+        }
+
+        .notebook-sticky-note-anchor::after {
+            content: '';
+            position: absolute;
+            top: -0.18rem;
+            left: 50%;
+            z-index: 11;
+            width: 0.12rem;
+            height: 1.05rem;
+            border-radius: 999px;
+            background: linear-gradient(180deg, #dce3e5 0%, #8ca0a5 40%, #5f7178 100%);
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22);
+            transform: translateX(-50%) rotate(5deg);
+            pointer-events: none;
+        }
+
         .notebook-sticky-note-anchor:active {
             cursor: grabbing;
         }
@@ -745,18 +775,7 @@
         }
 
         .notebook-sticky-note::before {
-            content: '';
-            position: absolute;
-            top: -0.62rem;
-            left: 50%;
-            z-index: 3;
-            width: 0.94rem;
-            height: 0.94rem;
-            border-radius: 999px;
-            background: radial-gradient(circle at 34% 32%, #ffc8c1 0 18%, #ef4b43 38%, #a91212 100%);
-            box-shadow: 0 2px 0 rgba(255, 255, 255, 0.34) inset, 0 8px 12px rgba(93, 30, 22, 0.22);
-            transform: translateX(-50%);
-            pointer-events: none;
+            content: none;
         }
 
         .notebook-sticky-note::after {
@@ -844,18 +863,7 @@
         }
 
         .notebook-sticky-note__body::after {
-            content: '';
-            position: absolute;
-            top: -0.06rem;
-            left: 50%;
-            z-index: 2;
-            width: 0.12rem;
-            height: 1rem;
-            border-radius: 999px;
-            background: linear-gradient(180deg, #dce3e5 0%, #8ca0a5 40%, #5f7178 100%);
-            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22);
-            transform: translateX(-50%) rotate(5deg);
-            pointer-events: none;
+            content: none;
         }
 
         .notebook-sticky-note__preview {
@@ -983,8 +991,8 @@
         }
 
         .notebook-sticky-note--sm {
-            width: 7.5rem;
-            min-height: 6.7rem;
+            width: 7rem;
+            min-height: 6.15rem;
             font-size: 0.69rem;
         }
 
@@ -1371,8 +1379,8 @@
             }
 
             .notebook-sticky-note--sm {
-                width: 6.7rem;
-                min-height: 5.9rem;
+                width: 6.2rem;
+                min-height: 5.45rem;
             }
 
             .notebook-sticky-note--md {
@@ -1847,7 +1855,7 @@
             new google.translate.TranslateElement({pageLanguage: 'en', autoDisplay: false}, 'google_translate_element');
         }
     </script>
-    <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+    <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 
     <script>
         // --- 0. LOCAL AI SETUP ---
