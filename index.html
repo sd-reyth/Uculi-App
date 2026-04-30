@@ -3877,6 +3877,12 @@
 
         function getReadableAuthErrorMessage(error) {
             const code = String(error?.code || '');
+            const backendDetail = String(
+                error?.customData?._tokenResponse?.errorMessage
+                || error?.customData?.serverResponse
+                || error?.message
+                || ''
+            );
             if (code.includes('invalid-email')) return 'Use a valid email address.';
             if (code.includes('missing-password') || code.includes('wrong-password') || code.includes('invalid-credential')) return 'Your email or password is incorrect.';
             if (code.includes('email-already-in-use')) return 'This email address already has an account.';
@@ -3888,7 +3894,12 @@
             if (code.includes('redirect-uri-mismatch')) return 'Google OAuth redirect URI mismatch. Add the required Firebase auth handler URL in Google Cloud OAuth client settings.';
             if (code.includes('popup-blocked') || code.includes('popup-closed-by-user')) return 'Google sign-in popup was blocked or closed. Try again or use redirect sign-in.';
             if (code.includes('network-request-failed')) return 'Network error. Check your internet connection and try again.';
-            if (code.includes('internal-error')) return `Server error from authentication provider. [${code}]`;
+            if (code.includes('internal-error')) {
+                if (backendDetail) {
+                    return `Server error from authentication provider: ${backendDetail}`;
+                }
+                return `Server error from authentication provider. [${code}]`;
+            }
             const displayCode = code || 'unknown';
             return `Authentication failed [${displayCode}]: ${error?.message || 'Please try again.'}`;
         }
@@ -4039,18 +4050,10 @@
             return false;
         }
 
-        function resolveFirebaseAuthDomain() {
-            const host = String(window.location.hostname || '').toLowerCase();
-            if (host === 'www.uculi.com' || host === 'uculi.com') {
-                return host;
-            }
-            return 'uculi-24ecd.firebaseapp.com';
-        }
-
         function initializeFirebase() {
             const firebaseConfig = {
                 apiKey: "AIzaSyD7JnQgnVrzsueRRKVc1GKZ9jRhb1iS51Q",
-                authDomain: resolveFirebaseAuthDomain(),
+                authDomain: "uculi-24ecd.firebaseapp.com",
                 projectId: "uculi-24ecd",
                 storageBucket: "uculi-24ecd.firebasestorage.app",
                 messagingSenderId: "522301414957",
@@ -4167,9 +4170,7 @@
         }
 
         function shouldUseRedirectForGoogleSignIn() {
-            const host = String(window.location.hostname || '').toLowerCase();
-            if (host === 'localhost' || host === '127.0.0.1') return false;
-            return true;
+            return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
         }
 
         async function signInWithGoogle(origin = 'app') {
@@ -4182,21 +4183,32 @@
                 const provider = new firebase.auth.GoogleAuthProvider();
                 if (shouldUseRedirectForGoogleSignIn()) {
                     await firebase.auth().signInWithRedirect(provider);
-                    // page will reload; result handled in initFirebase via getRedirectResult
-                } else {
-                    const result = await firebase.auth().signInWithPopup(provider);
-                    currentUser = result.user;
-                    isAuthenticated = true;
-                    userSettings.email = currentUser.email || userSettings.email || '';
-                    userSettings.name = currentUser.displayName || userSettings.name;
-                    userSettings.profilePic = currentUser.photoURL || userSettings.profilePic;
-                    saveData();
-                    await syncToFirestore();
-                    showToast(`Welcome, ${currentUser.displayName || 'Chef'}!`, 'check-circle');
+                    return;
                 }
+
+                const result = await firebase.auth().signInWithPopup(provider);
+                currentUser = result.user;
+                isAuthenticated = true;
+                userSettings.email = currentUser.email || userSettings.email || '';
+                userSettings.name = currentUser.displayName || userSettings.name;
+                userSettings.profilePic = currentUser.photoURL || userSettings.profilePic;
+                saveData();
+                await syncToFirestore();
+                showToast(`Welcome, ${currentUser.displayName || 'Chef'}!`, 'check-circle');
             } catch (error) {
-                const code = String(error?.code || 'unknown');
-                showToast(`${getReadableAuthErrorMessage(error)} [${code}]`, 'alert-circle');
+                const errorCode = String(error?.code || '');
+                if (errorCode.includes('popup-blocked') || errorCode.includes('operation-not-supported-in-this-environment')) {
+                    try {
+                        const provider = new firebase.auth.GoogleAuthProvider();
+                        await firebase.auth().signInWithRedirect(provider);
+                        return;
+                    } catch (fallbackError) {
+                        const fallbackCode = String(fallbackError?.code || 'unknown');
+                        showToast(`${getReadableAuthErrorMessage(fallbackError)} [${fallbackCode}]`, 'alert-circle');
+                        return;
+                    }
+                }
+                showToast(`${getReadableAuthErrorMessage(error)} [${errorCode || 'unknown'}]`, 'alert-circle');
             }
         }
 
