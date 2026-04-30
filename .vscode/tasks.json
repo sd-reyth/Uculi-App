@@ -1,0 +1,115 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Deploy Uculi Hosting",
+			"type": "shell",
+			"command": "firebase.cmd",
+			"args": [
+				"deploy",
+				"--only",
+				"hosting",
+				"--project",
+				"uculi-24ecd"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Deploy Uculi Hosting",
+			"type": "shell",
+			"command": "firebase.cmd",
+			"args": [
+				"deploy",
+				"--only",
+				"hosting",
+				"--project",
+				"uculi-24ecd"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Prepare Uculi Hosting",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				".\\scripts\\prepare-hosting.ps1"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Prepare Uculi Hosting",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				".\\scripts\\prepare-hosting.ps1"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Prepare Uculi Hosting",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				".\\scripts\\prepare-hosting.ps1"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Prepare Uculi Hosting",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				".\\scripts\\prepare-hosting.ps1"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Prepare Uculi Hosting",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				".\\scripts\\prepare-hosting.ps1"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Prepare Uculi Hosting",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				".\\scripts\\prepare-hosting.ps1"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Prepare Uculi Hosting",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				".\\scripts\\prepare-hosting.ps1"
+			],
+			"isBackground": false
+		}
+	]
+}

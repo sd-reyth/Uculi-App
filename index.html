@@ -95,7 +95,6 @@
             align-items: center;
             justify-content: center;
             width: 2.85rem;
-            height: 2.85rem;
             flex-shrink: 0;
             border-radius: 1rem;
             border: 1px solid rgba(255, 255, 255, 0.22);
@@ -1754,9 +1753,6 @@
     </style>
 </head>
 <body class="font-body text-forest min-h-screen selection:bg-gold selection:text-white transition-all duration-300" id="body">
-
-    <div id="google_translate_element" style="display:none;"></div>
-
     <div id="app-shell" class="w-full max-w-6xl mx-auto flex flex-col h-[100dvh] max-h-[100dvh] relative shadow-2xl bg-white overflow-hidden border-x border-parchmentDark">
         
         <header id="main-header" class="text-forest transition-all" translate="no">
@@ -1849,13 +1845,6 @@
             <span id="toast-message"></span>
         </div>
     </div>
-
-    <script type="text/javascript">
-        function googleTranslateElementInit() {
-            new google.translate.TranslateElement({pageLanguage: 'en', autoDisplay: false}, 'google_translate_element');
-        }
-    </script>
-    <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 
     <script>
         // --- 0. LOCAL AI SETUP ---
@@ -1986,6 +1975,10 @@
         const inputClass = "w-full h-12 bg-white border border-sage border-opacity-30 rounded-sm focus:border-gold outline-none px-4 text-forest font-semibold text-sm shadow-sm transition-all";
         const mutedInputClass = inputClass.replace('bg-white', 'bg-parchment');
         const textareaClass = "w-full min-h-[120px] bg-white border border-sage border-opacity-30 rounded-sm focus:border-gold outline-none p-4 text-forest font-semibold text-sm shadow-sm transition-all resize-y";
+        const legacyRecipeSettingsStorageKey = 'recipeArchiveSettings';
+        const legacyRecipeDataStorageKey = 'recipeArchiveData';
+        const legacyRecipeFamiliesStorageKey = 'recipeArchiveFamilies';
+        const accountStorageMigrationPrefix = 'recipeArchiveMigrated';
 
         function getDefaultBillingProfile() {
             return {
@@ -2020,31 +2013,68 @@
             };
         }
 
-        let userSettings = {
-            name: "",
-            country: "",
-            bio: "",
-            isPublic: false,
-            profilePic: null,
-            bannerPic: null,
-            email: "",
-            measurementSystem: "Metric", 
-            language: "en",
-            autoPublish: false,
-            indexViewMode: "cards",
-            notebookCover: getDefaultNotebookCover(),
-            showNotebookStickyNotes: true,
-            premium: false,
-            billing: getDefaultBillingProfile(),
-            shoppingList: getDefaultShoppingList(),
-            favorites: [],
-            myRecipeRatings: {}
-        };
+        function createDefaultUserSettings() {
+            return {
+                name: "",
+                country: "",
+                bio: "",
+                isPublic: false,
+                profilePic: null,
+                bannerPic: null,
+                email: "",
+                measurementSystem: "Metric",
+                language: "en",
+                autoPublish: false,
+                indexViewMode: "cards",
+                notebookCover: getDefaultNotebookCover(),
+                showNotebookStickyNotes: true,
+                premium: false,
+                billing: getDefaultBillingProfile(),
+                shoppingList: getDefaultShoppingList(),
+                favorites: [],
+                myRecipeRatings: {}
+            };
+        }
+
+        function createDefaultStarterRecipe() {
+            return {
+                id: 1,
+                title: "Forester's Mushroom Stew",
+                author: "House Recipe",
+                source: "local",
+                category: "Cooking",
+                country: "🇳🇱 Netherlands",
+                profile: defaultPlaceholderProfile,
+                prepTime: 15,
+                cookTime: 40,
+                servings: 4,
+                difficulty: "Easy",
+                diet: [],
+                cuisine: "European",
+                ingredients: ["500g Mushrooms", "4 Potatoes", "2 cloves of Garlic", "100ml Red Wine", "2 Carrots", "1 Onion"],
+                instructions: [
+                    "Chop all vegetables and mushrooms into rough chunks.",
+                    "Fry the onions until translucent, then add the mushrooms and garlic.",
+                    "Deglaze the pan with red wine.",
+                    "Bake at 180°C or let simmer for 40 minutes."
+                ],
+                tips: "Serve with a thick slice of rustic bread! The sauce is amazing when soaked up.",
+                lastOpened: Date.now(),
+                checkedIngredients: [],
+                checkedSteps: [],
+                personalNotes: "",
+                notebookStickyNotes: [],
+                versionHistory: []
+            };
+        }
+
+        let userSettings = createDefaultUserSettings();
 
         let recipes = [];
         let userFamilies = [];
         let currentScale = 1;
         let isCookingMode = false;
+        let authViewMode = 'login';
         let searchQuery = "";
         let showListSearch = false;
         let showListFilters = false;
@@ -2143,6 +2173,9 @@
             errors: []
         };
         const landingSessionKey = 'uculiLandingEntered';
+        const developerBypassStorageKey = 'uculiDeveloperBypass';
+        const developerBypassQueryParam = 'dev-bypass';
+        const developerBypassUserId = '__uculi_local_dev__';
         const billingIntegrationConfig = {
             provider: 'Stripe',
             checkoutReady: false,
@@ -2418,17 +2451,15 @@
             return resultText;
         }
 
-        function changeGlobalLanguage(langCode) {
-            const checkExist = setInterval(function() {
-                let combo = document.querySelector('.goog-te-combo');
-                if (combo) {
-                    if (combo.value !== langCode) {
-                        combo.value = langCode;
-                        combo.dispatchEvent(new Event('change'));
-                    }
-                    clearInterval(checkExist);
-                }
-            }, 200);
+        function changeGlobalLanguage(langCode, options = {}) {
+            const { silent = false } = options;
+            const nextLanguage = String(langCode || 'en').toLowerCase();
+
+            userSettings.language = 'en';
+
+            if (!silent && nextLanguage !== 'en') {
+                showToast('App translation is temporarily offline. Uculi stays in English for now.', 'languages');
+            }
         }
 
         function escapeHTML(value = '') {
@@ -2439,6 +2470,20 @@
                 '"': '&quot;',
                 "'": '&#39;'
             }[char]));
+        }
+
+        function showTemporaryFeatureOffline(featureName, detail = '') {
+            createModal(`${escapeHTML(featureName)} is temporarily offline`, `
+                <div class="space-y-4 text-inkDark">
+                    <div class="rounded-2xl border border-parchmentDark bg-parchment p-4 shadow-sm">
+                        <p class="text-[11px] font-bold uppercase tracking-[0.24em] text-sage">Temporarily disabled</p>
+                        <p class="mt-2 text-sm font-semibold leading-relaxed text-forest">This feature is turned off for now because it is not meeting the quality bar for public use.</p>
+                    </div>
+                    ${detail ? `<div class="rounded-2xl border border-parchmentDark bg-white p-4 shadow-sm text-sm font-semibold leading-relaxed text-sage">${escapeHTML(detail)}</div>` : ''}
+                </div>
+            `, [
+                { text: 'Close', primary: true, onClick: () => closeModal() }
+            ]);
         }
 
         function getDefaultNotebookCoverSticker(seed = 0) {
@@ -3228,7 +3273,15 @@
         }
 
         function loadData() {
-            const savedSettings = localStorage.getItem('recipeArchiveSettings');
+            resetAuthenticatedUserState();
+
+            if (!currentUser?.uid) {
+                applyUserModeClasses();
+                document.documentElement.style.colorScheme = 'light';
+                return;
+            }
+
+            const savedSettings = localStorage.getItem(getScopedStorageKey(legacyRecipeSettingsStorageKey));
             let shouldResaveSettings = false;
 
             if (savedSettings) {
@@ -3280,48 +3333,26 @@
                 shouldResaveSettings = true;
             }
 
-            if(userSettings.language && userSettings.language !== 'en') {
-                changeGlobalLanguage(userSettings.language);
+            if (userSettings.language && userSettings.language !== 'en') {
+                userSettings.language = 'en';
+                shouldResaveSettings = true;
             }
 
-            const savedRecipes = localStorage.getItem('recipeArchiveData');
+            const savedRecipes = localStorage.getItem(getScopedStorageKey(legacyRecipeDataStorageKey));
             if (savedRecipes) {
                 recipes = JSON.parse(savedRecipes).map(recipe => ({
                     ...recipe,
+                    versionHistory: Array.isArray(recipe.versionHistory) ? recipe.versionHistory.slice(0, 5) : [],
                     notebookStickyNotes: normalizeNotebookStickyNotes(recipe.notebookStickyNotes)
                 }));
             } else {
-                recipes = [{
-                    id: 1,
-                    title: "Forester's Mushroom Stew",
-                    author: "House Recipe",
-                    source: "local",
-                    category: "Cooking",
-                    country: "🇳🇱 Netherlands",
-                    profile: defaultPlaceholderProfile,
-                    prepTime: 15,
-                    cookTime: 40,
-                    servings: 4,
-                    difficulty: "Easy",
-                    diet: [],
-                    cuisine: "European",
-                    ingredients: ["500g Mushrooms", "4 Potatoes", "2 cloves of Garlic", "100ml Red Wine", "2 Carrots", "1 Onion"],
-                    instructions: [
-                        "Chop all vegetables and mushrooms into rough chunks.",
-                        "Fry the onions until translucent, then add the mushrooms and garlic.",
-                        "Deglaze the pan with red wine.",
-                        "Bake at 180°C or let simmer for 40 minutes."
-                    ],
-                    tips: "Serve with a thick slice of rustic bread! The sauce is amazing when soaked up.",
-                    lastOpened: Date.now(),
-                    checkedIngredients: [],
-                    checkedSteps: [],
-                    personalNotes: "",
-                    notebookStickyNotes: []
-                }];
+                recipes = [createDefaultStarterRecipe()];
                 saveData();
                 shouldResaveSettings = false;
             }
+
+            const savedFamilies = localStorage.getItem(getScopedStorageKey(legacyRecipeFamiliesStorageKey));
+            userFamilies = savedFamilies ? JSON.parse(savedFamilies).map(normalizeFamilyRecord) : [];
 
             if (shouldResaveSettings) {
                 saveData();
@@ -3329,9 +3360,11 @@
         }
 
         function saveData() {
+            if (!currentUser?.uid) return;
             applyUserModeClasses();
-            localStorage.setItem('recipeArchiveSettings', JSON.stringify(userSettings));
-            localStorage.setItem('recipeArchiveData', JSON.stringify(recipes));
+            localStorage.setItem(getScopedStorageKey(legacyRecipeSettingsStorageKey), JSON.stringify(userSettings));
+            localStorage.setItem(getScopedStorageKey(legacyRecipeDataStorageKey), JSON.stringify(recipes));
+            localStorage.setItem(getScopedStorageKey(legacyRecipeFamiliesStorageKey), JSON.stringify((userFamilies || []).map(normalizeFamilyRecord)));
         }
 
         function normalizeShoppingListLabel(value = '') {
@@ -3783,14 +3816,245 @@
         let firebaseInitialized = false;
         let publishedRecipesCache = [];
 
+        function getCurrentAccountStorageId() {
+            if (!currentUser) return '';
+            return String(currentUser.uid || currentUser.email || '').trim();
+        }
+
+        function getScopedStorageKey(baseKey) {
+            const accountId = getCurrentAccountStorageId();
+            return accountId ? `${baseKey}:${accountId}` : baseKey;
+        }
+
+        function migrateLegacyStorageToCurrentAccount() {
+            const accountId = getCurrentAccountStorageId();
+            if (!accountId) return;
+
+            const migrationKey = `${accountStorageMigrationPrefix}:${accountId}`;
+            if (localStorage.getItem(migrationKey)) return;
+
+            [legacyRecipeSettingsStorageKey, legacyRecipeDataStorageKey, legacyRecipeFamiliesStorageKey].forEach(baseKey => {
+                const scopedKey = getScopedStorageKey(baseKey);
+                if (localStorage.getItem(scopedKey) !== null) return;
+
+                const legacyValue = localStorage.getItem(baseKey);
+                if (legacyValue !== null) {
+                    localStorage.setItem(scopedKey, legacyValue);
+                }
+            });
+
+            localStorage.setItem(migrationKey, '1');
+        }
+
+        function resetAuthenticatedUserState() {
+            userSettings = createDefaultUserSettings();
+            recipes = [];
+            userFamilies = [];
+            indexViewMode = 'cards';
+            notebookPageIndex = 0;
+            notebookSpreadPageIndex = 0;
+            notebookMobileSide = 'left';
+            notebookCoverOpen = false;
+            activeNotebookStickyNoteMenu = null;
+            currentIndexRecipeIds = [];
+        }
+
+        function syncAuthenticatedAppChrome() {
+            const header = document.getElementById('main-header');
+            const nav = document.getElementById('main-nav');
+            const shouldHideChrome = !isAuthenticated;
+
+            if (header) {
+                header.style.display = shouldHideChrome ? 'none' : '';
+                header.setAttribute('aria-hidden', shouldHideChrome ? 'true' : 'false');
+            }
+
+            if (nav) {
+                nav.style.display = shouldHideChrome ? 'none' : '';
+                nav.setAttribute('aria-hidden', shouldHideChrome ? 'true' : 'false');
+            }
+        }
+
+        function getReadableAuthErrorMessage(error) {
+            const code = String(error?.code || '');
+            if (code.includes('invalid-email')) return 'Use a valid email address.';
+            if (code.includes('missing-password') || code.includes('wrong-password') || code.includes('invalid-credential')) return 'Your email or password is incorrect.';
+            if (code.includes('email-already-in-use')) return 'This email address already has an account.';
+            if (code.includes('weak-password')) return 'Choose a stronger password with at least 6 characters.';
+            if (code.includes('user-not-found')) return 'No account exists for this email address yet.';
+            if (code.includes('too-many-requests')) return 'Too many attempts. Please wait a moment and try again.';
+            if (code.includes('operation-not-allowed')) return 'This sign-in method is not enabled. Enable Email/Password in Firebase Console → Authentication → Sign-in method.';
+            if (code.includes('unauthorized-domain')) return 'This domain is not authorized for Firebase Auth. Add www.uculi.com and uculi.com in Firebase Authentication → Settings → Authorized domains.';
+            if (code.includes('redirect-uri-mismatch')) return 'Google OAuth redirect URI mismatch. Add the required Firebase auth handler URL in Google Cloud OAuth client settings.';
+            if (code.includes('popup-blocked') || code.includes('popup-closed-by-user')) return 'Google sign-in popup was blocked or closed. Try again or use redirect sign-in.';
+            if (code.includes('network-request-failed')) return 'Network error. Check your internet connection and try again.';
+            if (code.includes('internal-error')) return `Server error from authentication provider. [${code}]`;
+            const displayCode = code || 'unknown';
+            return `Authentication failed [${displayCode}]: ${error?.message || 'Please try again.'}`;
+        }
+
+        function isLocalDeveloperPreviewContext() {
+            if (typeof window === 'undefined') return false;
+            const hostname = String(window.location.hostname || '').toLowerCase();
+            return window.location.protocol === 'file:' || hostname === 'localhost' || hostname === '127.0.0.1';
+        }
+
+        function isDeveloperBypassRequested() {
+            if (!isLocalDeveloperPreviewContext()) return false;
+            const params = new URLSearchParams(window.location.search || '');
+            if (params.get(developerBypassQueryParam) === '0') {
+                localStorage.removeItem(developerBypassStorageKey);
+                return false;
+            }
+            return params.get(developerBypassQueryParam) === '1' || localStorage.getItem(developerBypassStorageKey) === '1';
+        }
+
+        function isDeveloperBypassSession() {
+            return currentUser?.uid === developerBypassUserId;
+        }
+
+        function activateDeveloperBypassSession() {
+            if (!isLocalDeveloperPreviewContext() || !isDeveloperBypassRequested()) return false;
+
+            localStorage.setItem(developerBypassStorageKey, '1');
+            currentUser = {
+                uid: developerBypassUserId,
+                email: '',
+                displayName: 'Developer Preview'
+            };
+            isAuthenticated = true;
+            migrateLegacyStorageToCurrentAccount();
+            loadData();
+            userSettings.name = userSettings.name || 'Developer Preview';
+            userSettings.email = '';
+            saveData();
+            syncAuthenticatedAppChrome();
+            return true;
+        }
+
+        function clearDeveloperBypassPreference() {
+            if (!isLocalDeveloperPreviewContext()) return;
+            localStorage.removeItem(developerBypassStorageKey);
+        }
+
+        function setAuthViewMode(mode = 'login') {
+            authViewMode = mode === 'register' ? 'register' : 'login';
+            renderAuthGate();
+        }
+
+        function renderAuthGate() {
+            syncAuthenticatedAppChrome();
+            currentView = 'auth';
+
+            if (!contentDiv) return;
+
+            const showRegister = authViewMode === 'register';
+            contentDiv.innerHTML = `
+                <div class="mx-auto flex min-h-full w-full max-w-5xl items-center justify-center py-8 md:py-12">
+                    <div class="grid w-full overflow-hidden rounded-[32px] border border-parchmentDark bg-white shadow-[0_30px_80px_rgba(44,61,46,0.12)] lg:grid-cols-[minmax(0,1.05fr)_28rem]">
+                        <section class="relative overflow-hidden bg-[linear-gradient(135deg,rgba(244,239,230,0.98),rgba(255,255,255,0.94))] px-6 py-8 md:px-10 md:py-12">
+                            <div class="absolute inset-0 pointer-events-none opacity-50" style="background-image: radial-gradient(circle at 10% 0%, rgba(212,167,98,0.18) 0%, transparent 40%), radial-gradient(circle at 90% 100%, rgba(90,118,95,0.16) 0%, transparent 38%);"></div>
+                            <div class="relative">
+                                <div class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-forest text-white shadow-lg shadow-forest/20">
+                                    <i data-lucide="book-open" class="h-6 w-6"></i>
+                                </div>
+                                <p class="mt-6 text-[11px] font-bold uppercase tracking-[0.28em] text-sage">Private recipe archive</p>
+                                <h1 class="mt-4 font-fantasy text-4xl font-bold leading-[1.02] text-forest md:text-5xl">Log in to open your Uculi kitchen.</h1>
+                                <p class="mt-4 max-w-xl text-sm font-semibold leading-relaxed text-sage md:text-base">Access is now account-only. Your recipes, uploaded photos, notebook notes, shopping list, and family data stay scoped to your own account on this device.</p>
+                                <div class="mt-8 grid gap-3 text-sm font-semibold text-forest md:max-w-xl">
+                                    <div class="rounded-2xl border border-parchmentDark bg-white/90 p-4 shadow-sm">
+                                        <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-sage">Why this changed</p>
+                                        <p class="mt-2 leading-relaxed">No more shared browser archive between users. Every sign-in now gets its own saved recipes and uploaded images.</p>
+                                    </div>
+                                    <div class="rounded-2xl border border-parchmentDark bg-white/90 p-4 shadow-sm">
+                                        <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-sage">What you need</p>
+                                        <p class="mt-2 leading-relaxed">Only the essentials: first name, last name, email + password, or one tap with Google.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="px-6 py-8 md:px-8 md:py-10">
+                            <div class="mx-auto flex h-full max-w-md flex-col">
+                                <div class="inline-flex rounded-2xl border border-parchmentDark bg-parchment p-1 shadow-sm">
+                                    <button type="button" onclick="setAuthViewMode('login')" class="flex-1 rounded-xl px-4 py-3 text-sm font-bold transition-all ${showRegister ? 'text-sage hover:text-forest' : 'bg-white text-forest shadow-sm'}">Log in</button>
+                                    <button type="button" onclick="setAuthViewMode('register')" class="flex-1 rounded-xl px-4 py-3 text-sm font-bold transition-all ${showRegister ? 'bg-white text-forest shadow-sm' : 'text-sage hover:text-forest'}">Create account</button>
+                                </div>
+
+                                <div class="mt-8 rounded-[28px] border border-parchmentDark bg-[#fffdf8] p-5 shadow-sm md:p-6">
+                                    <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-sage">${showRegister ? 'New Uculi account' : 'Welcome back'}</p>
+                                    <h2 class="mt-3 font-fantasy text-3xl font-bold text-forest">${showRegister ? 'Create your account' : 'Sign in to continue'}</h2>
+                                    <p class="mt-2 text-sm font-semibold leading-relaxed text-sage">${showRegister ? 'Use your first name, last name, email address, and a password. Your profile will be set up immediately.' : 'Use your email and password, or continue with Google.'}</p>
+
+                                    <div class="mt-6 space-y-4">
+                                        ${showRegister ? `
+                                            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                                <div>
+                                                    <label class="mb-2 block text-xs font-bold uppercase tracking-[0.22em] text-sage">First Name</label>
+                                                    <input id="auth-first-name" type="text" autocomplete="given-name" class="${inputClass}" placeholder="Jane">
+                                                </div>
+                                                <div>
+                                                    <label class="mb-2 block text-xs font-bold uppercase tracking-[0.22em] text-sage">Last Name</label>
+                                                    <input id="auth-last-name" type="text" autocomplete="family-name" class="${inputClass}" placeholder="Doe">
+                                                </div>
+                                            </div>
+                                        ` : ''}
+                                        <div>
+                                            <label class="mb-2 block text-xs font-bold uppercase tracking-[0.22em] text-sage">Email</label>
+                                            <input id="auth-email" type="email" autocomplete="email" class="${inputClass}" placeholder="you@example.com">
+                                        </div>
+                                        <div>
+                                            <label class="mb-2 block text-xs font-bold uppercase tracking-[0.22em] text-sage">Password</label>
+                                            <input id="auth-password" type="password" autocomplete="${showRegister ? 'new-password' : 'current-password'}" class="${inputClass}" placeholder="${showRegister ? 'At least 6 characters' : 'Your password'}">
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-6 space-y-3">
+                                        <button type="button" onclick="${showRegister ? 'registerWithEmailPassword()' : 'signInWithEmailPassword()'}" class="${getAppButtonClasses('primary', { fullWidth: true, size: 'lg' })}">
+                                            <i data-lucide="${showRegister ? 'user-plus' : 'log-in'}" class="h-4 w-4"></i>${showRegister ? 'Create account' : 'Log in'}
+                                        </button>
+                                        <button type="button" onclick="signInWithGoogle('auth-gate')" class="${getAppButtonClasses(firebaseInitialized ? 'secondary' : 'muted', { fullWidth: true, size: 'lg' })}" ${firebaseInitialized ? '' : 'disabled'}>
+                                            <i data-lucide="globe-2" class="h-4 w-4"></i>Continue with Google
+                                        </button>
+                                    </div>
+
+                                    <p class="mt-4 text-xs font-semibold leading-relaxed text-sage">${firebaseInitialized ? 'Google sign-in and account storage are ready.' : 'Authentication is still loading. If Google stays unavailable, refresh once and try again.'}</p>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            `;
+
+            lucide.createIcons();
+        }
+
+        function ensureAuthenticatedAccess() {
+            if (isAuthenticated && currentUser) {
+                syncAuthenticatedAppChrome();
+                return true;
+            }
+
+            renderAuthGate();
+            return false;
+        }
+
+        function resolveFirebaseAuthDomain() {
+            const host = String(window.location.hostname || '').toLowerCase();
+            if (host === 'www.uculi.com' || host === 'uculi.com') {
+                return host;
+            }
+            return 'uculi-24ecd.firebaseapp.com';
+        }
+
         function initializeFirebase() {
             const firebaseConfig = {
-                apiKey: "YOUR_API_KEY",
-                authDomain: "YOUR_AUTH_DOMAIN",
-                projectId: "YOUR_PROJECT_ID",
-                storageBucket: "YOUR_STORAGE_BUCKET",
-                messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-                appId: "YOUR_APP_ID"
+                apiKey: "AIzaSyD7JnQgnVrzsueRRKVc1GKZ9jRhb1iS51Q",
+                authDomain: resolveFirebaseAuthDomain(),
+                projectId: "uculi-24ecd",
+                storageBucket: "uculi-24ecd.firebasestorage.app",
+                messagingSenderId: "522301414957",
+                appId: "1:522301414957:web:db58cc94c72e8322eee2a4"
             };
 
             if (!firebaseConfig.apiKey || firebaseConfig.apiKey === 'YOUR_API_KEY') {
@@ -3801,20 +4065,111 @@
                 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
                 firebaseInitialized = true;
 
+                // Handle redirect result from mobile Google sign-in
+                firebase.auth().getRedirectResult().then(result => {
+                    if (result && result.user) {
+                        const u = result.user;
+                        userSettings.email = u.email || userSettings.email || '';
+                        userSettings.name = u.displayName || userSettings.name;
+                        userSettings.profilePic = u.photoURL || userSettings.profilePic;
+                        saveData();
+                        syncToFirestore();
+                        showToast(`Welcome, ${u.displayName || 'Chef'}!`, 'check-circle');
+                    }
+                }).catch(error => {
+                    if (error.code !== 'auth/no-current-user') {
+                        const code = String(error?.code || 'unknown');
+                        showToast(`${getReadableAuthErrorMessage(error)} [${code}]`, 'alert-circle');
+                    }
+                });
+
                 firebase.auth().onAuthStateChanged(user => {
                     currentUser = user;
                     isAuthenticated = !!user;
                     if (user) {
+                        migrateLegacyStorageToCurrentAccount();
+                        loadData();
                         userSettings.email = user.email || userSettings.email || '';
-                        userSettings.name = user.displayName || userSettings.name;
+                        userSettings.name = user.displayName || userSettings.name || user.email?.split('@')[0] || '';
                         userSettings.profilePic = user.photoURL || userSettings.profilePic;
                         saveData();
+                        syncAuthenticatedAppChrome();
+                        renderList();
                         setTimeout(() => checkFamilyRemovals(), 1000);
+                    } else if (activateDeveloperBypassSession()) {
+                        renderList();
+                    } else {
+                        resetAuthenticatedUserState();
+                        syncAuthenticatedAppChrome();
+                        renderAuthGate();
                     }
                 });
             } catch (error) {
                 console.error('Firebase initialization error:', error);
             }
+        }
+
+        async function signInWithEmailPassword() {
+            if (!firebaseInitialized) {
+                showToast('Authentication is still loading. Please try again in a moment.', 'alert-circle');
+                return;
+            }
+
+            const email = document.getElementById('auth-email')?.value?.trim();
+            const password = document.getElementById('auth-password')?.value || '';
+
+            if (!email || !password) {
+                showToast('Enter your email address and password.', 'alert-circle');
+                return;
+            }
+
+            try {
+                await firebase.auth().signInWithEmailAndPassword(email, password);
+                showToast('Signed in successfully.', 'check-circle');
+            } catch (error) {
+                showToast(getReadableAuthErrorMessage(error), 'alert-circle');
+            }
+        }
+
+        async function registerWithEmailPassword() {
+            if (!firebaseInitialized) {
+                showToast('Authentication is still loading. Please try again in a moment.', 'alert-circle');
+                return;
+            }
+
+            const firstName = document.getElementById('auth-first-name')?.value?.trim() || '';
+            const lastName = document.getElementById('auth-last-name')?.value?.trim() || '';
+            const email = document.getElementById('auth-email')?.value?.trim();
+            const password = document.getElementById('auth-password')?.value || '';
+
+            if (!firstName || !lastName || !email || !password) {
+                showToast('Enter your first name, last name, email address, and password.', 'alert-circle');
+                return;
+            }
+
+            try {
+                const result = await firebase.auth().createUserWithEmailAndPassword(email, password);
+                const displayName = `${firstName} ${lastName}`.trim();
+
+                if (result.user) {
+                    await result.user.updateProfile({ displayName });
+                    currentUser = result.user;
+                    userSettings.name = displayName;
+                    userSettings.email = result.user.email || email;
+                    saveData();
+                    await syncToFirestore();
+                }
+
+                showToast('Account created successfully.', 'check-circle');
+            } catch (error) {
+                showToast(getReadableAuthErrorMessage(error), 'alert-circle');
+            }
+        }
+
+        function shouldUseRedirectForGoogleSignIn() {
+            const host = String(window.location.hostname || '').toLowerCase();
+            if (host === 'localhost' || host === '127.0.0.1') return false;
+            return true;
         }
 
         async function signInWithGoogle(origin = 'app') {
@@ -3825,17 +4180,23 @@
 
             try {
                 const provider = new firebase.auth.GoogleAuthProvider();
-                const result = await firebase.auth().signInWithPopup(provider);
-                currentUser = result.user;
-                isAuthenticated = true;
-                userSettings.email = currentUser.email || userSettings.email || '';
-                userSettings.name = currentUser.displayName || userSettings.name;
-                userSettings.profilePic = currentUser.photoURL || userSettings.profilePic;
-                saveData();
-                await syncToFirestore();
-                showToast(`Welcome, ${currentUser.displayName || 'Chef'}!`, 'check-circle');
+                if (shouldUseRedirectForGoogleSignIn()) {
+                    await firebase.auth().signInWithRedirect(provider);
+                    // page will reload; result handled in initFirebase via getRedirectResult
+                } else {
+                    const result = await firebase.auth().signInWithPopup(provider);
+                    currentUser = result.user;
+                    isAuthenticated = true;
+                    userSettings.email = currentUser.email || userSettings.email || '';
+                    userSettings.name = currentUser.displayName || userSettings.name;
+                    userSettings.profilePic = currentUser.photoURL || userSettings.profilePic;
+                    saveData();
+                    await syncToFirestore();
+                    showToast(`Welcome, ${currentUser.displayName || 'Chef'}!`, 'check-circle');
+                }
             } catch (error) {
-                showToast(`Auth error: ${error.message}`, 'alert-circle');
+                const code = String(error?.code || 'unknown');
+                showToast(`${getReadableAuthErrorMessage(error)} [${code}]`, 'alert-circle');
             }
         }
 
@@ -3845,28 +4206,40 @@
                 return;
             }
 
-            await signInWithGoogle('landing');
-
-            if (isAuthenticated) {
-                enterAppFromLanding('google-auth');
-            }
+            authViewMode = 'login';
+            enterAppFromLanding('landing-login');
         }
 
         async function signOut() {
+            if (isDeveloperBypassSession()) {
+                clearDeveloperBypassPreference();
+                currentUser = null;
+                isAuthenticated = false;
+                resetAuthenticatedUserState();
+                syncAuthenticatedAppChrome();
+                showToast('Developer bypass disabled.', 'shield-off');
+                showAppLanding();
+                renderAuthGate();
+                return;
+            }
+
             if (!firebaseInitialized) return;
 
             try {
                 await firebase.auth().signOut();
                 currentUser = null;
                 isAuthenticated = false;
+                resetAuthenticatedUserState();
+                syncAuthenticatedAppChrome();
                 showToast('Signed out successfully', 'check-circle');
-                renderList();
+                renderAuthGate();
             } catch (error) {
                 showToast(`Sign out error: ${error.message}`, 'alert-circle');
             }
         }
 
         async function syncToFirestore() {
+            if (isDeveloperBypassSession()) return;
             if (!hasPremiumAccess() || !isAuthenticated || !firebaseInitialized || !currentUser) return;
 
             try {
@@ -3909,6 +4282,9 @@
         }
 
         function runUculiAI() {
+            showTemporaryFeatureOffline('Uculi AI Auto-Fill', 'It will stay offline until the recipe AI output is rebuilt and re-tested next week.');
+            return;
+
             if (draftIngredients.length === 0 && draftSteps.length === 0) {
                 showToast('Add ingredients or instructions first for the AI to analyze.', 'alert-circle');
                 return;
@@ -5118,6 +5494,10 @@
         }
 
         function showAppLanding() {
+            if (isDeveloperBypassRequested()) {
+                return;
+            }
+
             if (sessionStorage.getItem(landingSessionKey) === '1' || document.getElementById('app-landing')) {
                 return;
             }
@@ -5234,7 +5614,7 @@
                             <div class="flex flex-col md:flex-row items-center justify-between gap-4">
                                 <div class="flex items-center gap-2 opacity-60">
                                     <i data-lucide="book-open" class="h-4 w-4 text-forest"></i>
-                                    <span class="text-xs font-bold uppercase tracking-[0.2em] text-forest">© 2026 Uculi</span>
+                                    <span class="text-xs font-bold uppercase tracking-[0.2em] text-forest">© 2026 Uculi, by SneezingDonkey.org</span>
                                 </div>
                                 <div class="flex gap-6 text-[10px] font-bold uppercase tracking-[0.2em] text-sage">
                                     <a href="#" class="hover:text-gold transition-colors">Privacy</a>
@@ -5255,6 +5635,236 @@
             document.getElementById('app-landing')?.remove();
             trackLaunchEvent('appEntered');
             renderList();
+        }
+
+        const familyColorOptions = [
+            { key: 'sage', name: 'Sage', hex: '#6d8a69', soft: 'rgba(109, 138, 105, 0.14)' },
+            { key: 'gold', name: 'Gold', hex: '#c39a4d', soft: 'rgba(195, 154, 77, 0.16)' },
+            { key: 'coral', name: 'Coral', hex: '#d97b63', soft: 'rgba(217, 123, 99, 0.15)' },
+            { key: 'berry', name: 'Berry', hex: '#b45d7a', soft: 'rgba(180, 93, 122, 0.15)' },
+            { key: 'ocean', name: 'Ocean', hex: '#4d84a8', soft: 'rgba(77, 132, 168, 0.14)' },
+            { key: 'teal', name: 'Teal', hex: '#4f9b8f', soft: 'rgba(79, 155, 143, 0.14)' },
+            { key: 'plum', name: 'Plum', hex: '#7a5ea8', soft: 'rgba(122, 94, 168, 0.15)' },
+            { key: 'slate', name: 'Slate', hex: '#6c7a89', soft: 'rgba(108, 122, 137, 0.14)' }
+        ];
+
+        function getFamilyColorOption(colorKey = 'sage') {
+            return familyColorOptions.find(option => option.key === colorKey) || familyColorOptions[0];
+        }
+
+        function normalizeFamilyRecord(family = {}) {
+            const color = getFamilyColorOption(family.colorKey);
+            return {
+                ...family,
+                name: String(family.name || 'Family book').trim(),
+                colorKey: color.key,
+                memberIds: Array.isArray(family.memberIds) ? family.memberIds.filter(Boolean) : [],
+                removedMembers: Array.isArray(family.removedMembers) ? family.removedMembers : []
+            };
+        }
+
+        function getActiveFamiliesForCurrentUser() {
+            return (userFamilies || [])
+                .map(normalizeFamilyRecord)
+                .filter(family => !family.removedMembers.some(member => member.userId === currentUser?.uid));
+        }
+
+        function getFamilyById(familyId) {
+            if (!familyId) return null;
+            const family = (userFamilies || []).find(entry => entry.id === familyId);
+            return family ? normalizeFamilyRecord(family) : null;
+        }
+
+        function getRecipeFamily(recipe) {
+            if (!recipe?.familyId && !recipe?.familyName) return null;
+
+            const linkedFamily = getFamilyById(recipe.familyId);
+            const familyName = linkedFamily?.name || recipe.familyName || '';
+            if (!familyName) return null;
+
+            const color = getFamilyColorOption(linkedFamily?.colorKey || recipe.familyColorKey);
+            return {
+                id: linkedFamily?.id || recipe.familyId || '',
+                name: familyName,
+                label: `Family "${familyName}"`,
+                colorKey: color.key,
+                colorHex: color.hex,
+                colorSoft: color.soft
+            };
+        }
+
+        function getRecipeCardSourceLabel(recipe) {
+            if (recipe?.source === 'published') return 'Saved from Browse';
+
+            const family = getRecipeFamily(recipe);
+            if (family) return family.label;
+
+            if (isRecipePublishedLive(recipe)) return 'Published live';
+            if (recipe?.publishedId) return 'Private draft with publish history';
+            return 'Private recipe';
+        }
+
+        function getRecipeDetailLocationLabel(recipe) {
+            if (recipe?.source === 'published') return 'Saved from Browse';
+
+            const family = getRecipeFamily(recipe);
+            if (family) return family.label;
+
+            return 'Created by you';
+        }
+
+        function getNotebookRecipeMoodLabel(recipe) {
+            if (recipe?.source === 'published') return 'Saved from another cook';
+
+            const family = getRecipeFamily(recipe);
+            if (family) return `${family.label} shared book`;
+
+            return 'Written in your own archive';
+        }
+
+        function getRecipeFamilyChipMarkup(recipe, className = 'text-[10px] font-bold uppercase tracking-[0.16em] px-2.5 py-1.5 rounded-sm border') {
+            const family = getRecipeFamily(recipe);
+            if (!family) return '';
+
+            return `<span class="${className}" style="border-color:${family.colorHex}; color:${family.colorHex}; background:${family.colorSoft};">${escapeHTML(family.label)}</span>`;
+        }
+
+        function hexToRgba(hex, alpha = 1) {
+            const normalized = String(hex || '').replace('#', '').trim();
+            if (normalized.length !== 6) return `rgba(109, 138, 105, ${alpha})`;
+
+            const red = Number.parseInt(normalized.slice(0, 2), 16);
+            const green = Number.parseInt(normalized.slice(2, 4), 16);
+            const blue = Number.parseInt(normalized.slice(4, 6), 16);
+            return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+        }
+
+        function getNotebookPhotoFrameStyle(recipe) {
+            const family = getRecipeFamily(recipe);
+            if (!family) return '';
+
+            return `border-color:${family.colorHex}; background:linear-gradient(180deg, ${hexToRgba(family.colorHex, 0.18)}, rgba(255,255,255,0.96)); box-shadow:0 20px 32px ${hexToRgba(family.colorHex, 0.22)};`;
+        }
+
+        function buildRecipeVersionSnapshot(recipe = {}) {
+            return {
+                snapshotId: `recipe-version-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                capturedAt: new Date().toISOString(),
+                title: recipe.title || '',
+                author: recipe.author || 'Unknown',
+                category: recipe.category || '',
+                country: recipe.country || '',
+                familyId: recipe.familyId || '',
+                familyName: recipe.familyName || '',
+                familyColorKey: recipe.familyColorKey || '',
+                prepTime: Number(recipe.prepTime) || 0,
+                cookTime: Number(recipe.cookTime) || 0,
+                servings: Number(recipe.servings) || 0,
+                difficulty: recipe.difficulty || '',
+                diet: Array.isArray(recipe.diet) ? [...recipe.diet] : [],
+                cuisine: recipe.cuisine || '',
+                ingredients: Array.isArray(recipe.ingredients) ? [...recipe.ingredients] : [],
+                instructions: normalizeRecipeInstructions(recipe.instructions),
+                tips: recipe.tips || ''
+            };
+        }
+
+        function buildRecipeVersionSignature(recipe = {}) {
+            return JSON.stringify(buildRecipeVersionSnapshot(recipe));
+        }
+
+        function getUpdatedRecipeVersionHistory(existingRecipe, nextRecipePayload) {
+            const priorHistory = Array.isArray(existingRecipe?.versionHistory) ? existingRecipe.versionHistory : [];
+            if (!existingRecipe) return priorHistory.slice(0, 5);
+
+            const previousSignature = buildRecipeVersionSignature(existingRecipe);
+            const nextSignature = buildRecipeVersionSignature(nextRecipePayload);
+            if (previousSignature === nextSignature) return priorHistory.slice(0, 5);
+
+            const previousSnapshot = {
+                ...buildRecipeVersionSnapshot(existingRecipe),
+                signature: previousSignature
+            };
+
+            const filteredHistory = priorHistory.filter(entry => entry.signature !== previousSignature);
+            return [previousSnapshot, ...filteredHistory].slice(0, 5);
+        }
+
+        function formatRecipeVersionTimestamp(value) {
+            const date = value ? new Date(value) : null;
+            if (!date || Number.isNaN(date.getTime())) return 'Unknown save moment';
+            return date.toLocaleString('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function showRecipeVersionHistory(recipeId) {
+            const recipe = recipes.find(entry => entry.id === recipeId);
+            const history = Array.isArray(recipe?.versionHistory) ? recipe.versionHistory.slice(0, 5) : [];
+
+            if (!recipe || history.length === 0) {
+                showToast('No previous versions saved yet.', 'history');
+                return;
+            }
+
+            createModal(`Recent versions of ${escapeHTML(recipe.title)}`, `
+                <div class="space-y-4 text-inkDark">
+                    <div class="rounded-2xl border border-parchmentDark bg-parchment p-4 shadow-sm">
+                        <p class="text-[11px] font-bold uppercase tracking-[0.24em] text-sage">Version history</p>
+                        <p class="mt-2 text-sm font-semibold leading-relaxed text-forest">Uculi keeps the last ${history.length} saved version${history.length === 1 ? '' : 's'} of this recipe on this account so you can review what changed.</p>
+                    </div>
+                    ${history.map((entry, index) => {
+                        const familyChip = getRecipeFamilyChipMarkup(entry, 'inline-flex items-center text-[10px] font-bold uppercase tracking-[0.16em] px-2.5 py-1.5 rounded-full border');
+                        const visibleIngredients = (entry.ingredients || []).slice(0, 6);
+                        const visibleInstructions = (entry.instructions || []).slice(0, 4);
+                        return `
+                            <details class="rounded-2xl border border-parchmentDark bg-white p-4 shadow-sm" ${index === 0 ? 'open' : ''}>
+                                <summary class="cursor-pointer list-none">
+                                    <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                        <div>
+                                            <p class="text-[11px] font-bold uppercase tracking-[0.24em] text-sage">Saved ${formatRecipeVersionTimestamp(entry.capturedAt)}</p>
+                                            <h3 class="mt-2 font-fantasy text-2xl font-bold text-forest">${escapeHTML(entry.title || recipe.title)}</h3>
+                                            <div class="mt-3 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-sage">
+                                                <span class="rounded-full border border-parchmentDark bg-parchment px-2.5 py-1.5">${escapeHTML(entry.category || 'Recipe')}</span>
+                                                ${entry.difficulty ? `<span class="rounded-full border border-parchmentDark bg-white px-2.5 py-1.5">${escapeHTML(entry.difficulty)}</span>` : ''}
+                                                ${familyChip}
+                                            </div>
+                                        </div>
+                                        <div class="rounded-2xl border border-parchmentDark bg-parchment px-4 py-3 text-right text-sm font-semibold text-forest">
+                                            <p>${entry.prepTime || 0}m prep</p>
+                                            <p>${entry.cookTime || 0}m cook</p>
+                                            <p>Serves ${entry.servings || 0}</p>
+                                        </div>
+                                    </div>
+                                </summary>
+                                <div class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+                                    <div class="rounded-2xl border border-parchmentDark bg-parchment p-4">
+                                        <p class="text-[11px] font-bold uppercase tracking-[0.24em] text-sage">Ingredients</p>
+                                        <ul class="mt-3 space-y-2 text-sm font-semibold text-forest">
+                                            ${visibleIngredients.map(item => `<li>${escapeHTML(item)}</li>`).join('')}
+                                        </ul>
+                                        ${(entry.ingredients || []).length > visibleIngredients.length ? `<p class="mt-3 text-xs font-semibold text-sage">+ ${(entry.ingredients || []).length - visibleIngredients.length} more ingredient${(entry.ingredients || []).length - visibleIngredients.length === 1 ? '' : 's'}</p>` : ''}
+                                    </div>
+                                    <div class="rounded-2xl border border-parchmentDark bg-white p-4">
+                                        <p class="text-[11px] font-bold uppercase tracking-[0.24em] text-sage">Instructions</p>
+                                        <ol class="mt-3 space-y-3 text-sm font-semibold text-forest">
+                                            ${visibleInstructions.map((step, stepIndex) => `<li>${stepIndex + 1}. ${escapeHTML(getRecipeInstructionText(step))}</li>`).join('')}
+                                        </ol>
+                                        ${(entry.instructions || []).length > visibleInstructions.length ? `<p class="mt-3 text-xs font-semibold text-sage">+ ${(entry.instructions || []).length - visibleInstructions.length} more step${(entry.instructions || []).length - visibleInstructions.length === 1 ? '' : 's'}</p>` : ''}
+                                        ${entry.tips ? `<div class="mt-4 rounded-2xl border border-parchmentDark bg-parchment p-4"><p class="text-[11px] font-bold uppercase tracking-[0.24em] text-sage">Chef's notes</p><p class="mt-2 text-sm font-semibold leading-relaxed text-forest">${escapeHTML(entry.tips)}</p></div>` : ''}
+                                    </div>
+                                </div>
+                            </details>
+                        `;
+                    }).join('')}
+                </div>
+            `, [
+                { text: 'Close', primary: true, onClick: () => closeModal() }
+            ]);
         }
 
         function generateId() { return recipes.length > 0 ? Math.max(...recipes.map(r => r.id)) + 1 : 1; }
@@ -5488,6 +6098,7 @@
                                     const isRemoved = family.removedMembers && family.removedMembers.some(m => m.userId === currentUser?.uid);
                                     const isCreator = family.creatorId === currentUser?.uid;
                                     const memberCount = family.memberIds ? family.memberIds.length : 0;
+                                    const familyColor = getFamilyColorOption(family.colorKey);
                                     const familyStatus = isRemoved
                                         ? 'Read-only archive access'
                                         : isCreator
@@ -5501,7 +6112,10 @@
                                                     <h4 class="mt-2 font-fantasy text-2xl font-bold text-forest leading-tight">${family.name}</h4>
                                                     <p class="mt-2 text-sm font-semibold text-sage">${familyStatus}</p>
                                                 </div>
-                                                <span class="inline-flex items-center rounded-full border border-parchmentDark bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-sage shadow-sm">#${family.tag}</span>
+                                                <div class="flex flex-col items-end gap-2">
+                                                    <span class="inline-flex items-center gap-2 rounded-full border border-parchmentDark bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-sage shadow-sm"><span class="h-2.5 w-2.5 rounded-full" style="background:${familyColor.hex};"></span>#${family.tag}</span>
+                                                    <span class="inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em]" style="border:1px solid ${familyColor.hex}; color:${familyColor.hex}; background:${familyColor.soft};">${familyColor.name}</span>
+                                                </div>
                                             </div>
                                             <div class="mt-5 flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-sage">
                                                 <span class="inline-flex items-center gap-2 rounded-full border border-parchmentDark bg-white px-3 py-2 shadow-sm"><i data-lucide="users" class="w-4 h-4 text-gold"></i>${memberCount} ${memberCount === 1 ? 'member' : 'members'}</span>
@@ -5954,15 +6568,15 @@
                         </div>
                         <div>
                             <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Display Language</label>
-                            <select id="settings-language" class="${inputClass}">
-                                <option value="en" ${userSettings.language === 'en' ? 'selected' : ''}>English (Original)</option>
-                                <option value="nl" ${userSettings.language === 'nl' ? 'selected' : ''}>Nederlands (Dutch)</option>
-                                <option value="es" ${userSettings.language === 'es' ? 'selected' : ''}>Español (Spanish)</option>
-                                <option value="fr" ${userSettings.language === 'fr' ? 'selected' : ''}>Français (French)</option>
-                                <option value="de" ${userSettings.language === 'de' ? 'selected' : ''}>Deutsch (German)</option>
-                                <option value="it" ${userSettings.language === 'it' ? 'selected' : ''}>Italiano (Italian)</option>
-                            </select>
-                            <p class="text-[10px] text-sage mt-1 italic">Automatically translates the entire app.</p>
+                            <div class="rounded-xl border border-sage border-opacity-20 bg-accent bg-opacity-60 p-4">
+                                <div class="flex items-start justify-between gap-4">
+                                    <div>
+                                        <p class="text-sm font-bold text-forest">English only for now</p>
+                                        <p class="mt-1 text-xs font-semibold text-sage">App-wide translation is temporarily offline while the language experience is rebuilt and re-tested.</p>
+                                    </div>
+                                    <i data-lucide="languages" class="w-5 h-5 text-gold"></i>
+                                </div>
+                            </div>
                         </div>
                         <div class="md:col-span-2">
                             <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Visual Mode</label>
@@ -6026,6 +6640,12 @@
                             <div>
                                 <h2 class="font-fantasy text-3xl font-bold text-forest">App Settings</h2>
                                 <p class="mt-1 text-sm font-semibold text-sage opacity-80">Manage your profile, preferences, and account setup.</p>
+                            </div>
+                            <div class="flex flex-wrap gap-3">
+                                <button onclick="renderList()" class="${getAppButtonClasses('secondary', { size: 'lg' })}">
+                                    <i data-lucide="arrow-left" class="w-4 h-4"></i> Back to Archive
+                                </button>
+                                ${isAuthenticated ? `<button onclick="signOut()" class="${getAppButtonClasses('danger', { size: 'lg' })}"><i data-lucide="log-out" class="w-4 h-4"></i> Sign Out</button>` : ''}
                             </div>
                         </div>
                     </div>
@@ -6176,12 +6796,9 @@
         function saveSettings(e) {
             e.preventDefault();
             userSettings.measurementSystem = document.getElementById('settings-measurement').value;
-
-            const newLang = document.getElementById('settings-language').value;
-            userSettings.language = newLang;
+            userSettings.language = 'en';
             userSettings.autoPublish = document.getElementById('settings-auto-publish').checked;
             delete userSettings.themeMode;
-            changeGlobalLanguage(newLang);
 
             saveData();
             showToast('Settings saved successfully!', 'settings-2');
@@ -6893,7 +7510,10 @@
 
             const coverConfig = normalizeNotebookCover(userSettings.notebookCover);
             const totalPages = filteredRecipes.length;
-            const recipeMood = recipe.source === 'published' ? 'Saved from another cook' : 'Written in your own archive';
+            const recipeMood = getNotebookRecipeMoodLabel(recipe);
+            const notebookFamily = getRecipeFamily(recipe);
+            const notebookFamilyBadge = notebookFamily ? `<span class="inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em]" style="border-color:${notebookFamily.colorHex}; color:${notebookFamily.colorHex}; background:${notebookFamily.colorSoft};">${escapeHTML(notebookFamily.label)}</span>` : '';
+            const notebookPhotoFrameStyle = getNotebookPhotoFrameStyle(recipe);
             const totalIngredients = Array.isArray(recipe.ingredients) ? recipe.ingredients.length : 0;
             const totalInstructions = normalizeRecipeInstructions(recipe.instructions || []).length;
             const isShortNotebook = isNotebookShortViewport();
@@ -7007,6 +7627,7 @@
                     <div class="notebook-paper__body">
                         ${isShortNotebook ? `
                             <p class="text-[11px] font-bold uppercase tracking-[0.3em] text-sage opacity-80">Recipe page</p>
+                            ${notebookFamilyBadge ? `<div class="mt-3">${notebookFamilyBadge}</div>` : ''}
                             <h3 class="mt-2 font-fantasy text-2xl md:text-3xl font-bold text-forest leading-[1.02]">${safeRecipeTitle}</h3>
                             <div class="notebook-paper__section notebook-ruled-block mt-3 text-xs font-semibold text-sage">
                                 <div class="notebook-line-row">${recipeMood}</div>
@@ -7022,12 +7643,13 @@
                         ` : `
                             <div class="notebook-page-hero">
                                 <div class="notebook-page-photo-cluster">
-                                    <div class="notebook-page-photo-frame">
+                                    <div class="notebook-page-photo-frame" style="${notebookPhotoFrameStyle}">
                                         <span class="notebook-page-photo-clothespin" aria-hidden="true"></span>
                                         <div class="notebook-page-photo-card" style="background-image:url('${recipe.profile || defaultPlaceholderProfile}')"></div>
                                     </div>
                                 </div>
                                 <p class="text-[11px] font-bold uppercase tracking-[0.3em] text-sage opacity-80">Recipe page</p>
+                                ${notebookFamilyBadge ? `<div class="mt-3">${notebookFamilyBadge}</div>` : ''}
                                 <h3 class="mt-2 font-fantasy text-3xl md:text-5xl font-bold text-forest leading-[1.02]">${safeRecipeTitle}</h3>
                                 <div class="notebook-ruled-block mt-3 text-sm font-semibold text-sage">
                                     <div class="notebook-line-row">${recipeMood}</div>
@@ -7283,6 +7905,9 @@
         }
 
         function renderList() {
+            if (!ensureAuthenticatedAccess()) {
+                return;
+            }
             isCookingMode = false;
             document.getElementById('body').classList.remove('cooking-mode-active');
             setActiveNav('index');
@@ -7550,6 +8175,7 @@
                 filteredRecipes.forEach(recipe => {
                     const savedRecipeOutdated = isSavedPublishedRecipeOutdated(recipe);
                     const recipeVersionLabel = getPublishedVersionLabel(recipe);
+                    const familyChipMarkup = getRecipeFamilyChipMarkup(recipe, 'inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em]');
                     html += `
                         <div onclick="renderDetail(${recipe.id})" class="relative h-[120px] bg-white rounded-md shadow-sm hover:shadow-xl transition-all cursor-pointer border border-parchmentDark group overflow-hidden flex items-stretch">
                             ${savedRecipeOutdated ? `<button onclick="event.stopPropagation(); renderDetail(${recipe.id})" title="Author update available" class="absolute right-4 top-1/2 -translate-y-1/2 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-gold bg-white text-gold shadow-md transition-all hover:scale-105 hover:text-forest"><i data-lucide="alert-circle" class="h-5 w-5"></i></button>` : ''}
@@ -7561,10 +8187,12 @@
                                     ${recipeVersionLabel ? `<span>· ${recipeVersionLabel}</span>` : ''}
                                     ${(recipe.prepTime || recipe.cookTime) ? `<span>· ${Number(recipe.prepTime || 0) + Number(recipe.cookTime || 0)}m</span>` : ''}
                                 </div>
+                                ${familyChipMarkup ? `<div class="mt-2 sm:hidden">${familyChipMarkup}</div>` : ''}
                             </div>
                             <div class="hidden sm:flex flex-col justify-center items-end px-4 gap-2 border-l border-parchmentDark">
                                 <span class="text-[10px] bg-accent text-sage font-bold px-2 py-1 rounded-sm uppercase tracking-wider">${recipe.category || 'Misc'}</span>
                                 ${recipe.difficulty ? `<span class="text-[10px] bg-gold bg-opacity-20 text-sage font-bold px-2 py-1 rounded-sm">${recipe.difficulty}</span>` : ''}
+                                ${familyChipMarkup}
                             </div>
                         </div>
                     `;
@@ -7575,9 +8203,8 @@
                 filteredRecipes.forEach(recipe => {
                     const savedRecipeOutdated = isSavedPublishedRecipeOutdated(recipe);
                     const recipeVersionLabel = getPublishedVersionLabel(recipe);
-                    const recipeSourceLabel = recipe.source === 'published'
-                        ? 'Saved from Browse'
-                        : (isRecipePublishedLive(recipe) ? 'Published live' : (recipe.publishedId ? 'Private draft with publish history' : 'Private recipe'));
+                    const recipeSourceLabel = getRecipeCardSourceLabel(recipe);
+                    const familyChipMarkup = getRecipeFamilyChipMarkup(recipe, 'inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em]');
                     html += `
                         <div onclick="renderDetail(${recipe.id})" class="relative h-[24rem] bg-white rounded-md shadow-sm hover:shadow-xl transition-all cursor-pointer border border-parchmentDark group overflow-hidden flex flex-col">
                             ${savedRecipeOutdated ? `<button onclick="event.stopPropagation(); renderDetail(${recipe.id})" title="Author update available" class="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-gold bg-white text-gold shadow-md transition-all hover:scale-105 hover:text-forest"><i data-lucide="alert-circle" class="h-5 w-5"></i></button>` : ''}
@@ -7609,7 +8236,7 @@
                                 </div>
 
                                 <div class="mt-auto border-t border-accent pt-4">
-                                    <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-sage opacity-80">${recipeSourceLabel}</p>
+                                    ${familyChipMarkup || `<p class="text-[10px] font-bold uppercase tracking-[0.2em] text-sage opacity-80">${recipeSourceLabel}</p>`}
                                 </div>
                             </div>
                         </div>
@@ -7760,7 +8387,8 @@
         }
 
         window.addEventListener('storage', event => {
-            if (event.key !== 'recipeArchiveSettings' || !event.newValue) return;
+            const scopedSettingsKey = currentUser?.uid ? getScopedStorageKey(legacyRecipeSettingsStorageKey) : legacyRecipeSettingsStorageKey;
+            if (event.key !== scopedSettingsKey || !event.newValue) return;
 
             try {
                 const parsedSettings = JSON.parse(event.newValue);
@@ -8055,31 +8683,24 @@
 
         function showPremiumModal(featureName) {
             trackLaunchEvent('premiumModalOpened');
-            const billingReady = isBillingCheckoutReady();
-            createModal("Unlock Uculi Premium", `
+            createModal("Premium Coming Soon", `
                 <div class="p-6 text-center bg-white">
                     <div class="w-16 h-16 bg-gold bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-4 border border-gold">
-                        <i data-lucide="crown" class="w-8 h-8 text-gold"></i>
+                        <i data-lucide="sparkles" class="w-8 h-8 text-gold"></i>
                     </div>
-                    <h3 class="text-2xl font-fantasy font-bold text-forest mb-2">Premium Feature</h3>
-                    <p class="text-sage mb-6 text-sm font-semibold">You need Premium to ${featureName}. Free stays local-only with up to 8 recipes on this device (1 image upload per 15 minutes), while Premium unlocks notebook mode, 15 image uploads per day, sharing, downloads, cloud sync, and families.</p>
+                    <h3 class="text-2xl font-fantasy font-bold text-forest mb-2">Premium functions are coming soon</h3>
+                    <p class="text-sage mb-6 text-sm font-semibold">${escapeHTML(`Premium is required to ${featureName}`)}. Billing, backend entitlements, and the final Premium package are still in development, so this feature stays temporarily unavailable in the public app.</p>
                     
                     <div class="space-y-3 text-left bg-parchment p-4 rounded-md border border-parchmentDark mb-6">
-                        <p class="flex items-center gap-2 text-sm text-forest font-bold"><i data-lucide="check" class="w-4 h-4 text-gold"></i> Unlimited Local Recipes</p>
-                        <p class="flex items-center gap-2 text-sm text-forest font-bold"><i data-lucide="check" class="w-4 h-4 text-gold"></i> Notebook Mode</p>
-                        <p class="flex items-center gap-2 text-sm text-forest font-bold"><i data-lucide="check" class="w-4 h-4 text-gold"></i> Recipe Sharing & Downloads</p>
-                        <p class="flex items-center gap-2 text-sm text-forest font-bold"><i data-lucide="check" class="w-4 h-4 text-gold"></i> Connect with Families</p>
-                        <p class="flex items-center gap-2 text-sm text-forest font-bold"><i data-lucide="check" class="w-4 h-4 text-gold"></i> Cloud Sync & Publishing</p>
-                        <p class="flex items-center gap-2 text-sm text-forest font-bold"><i data-lucide="check" class="w-4 h-4 text-gold"></i> Sticky Notes & Custom Covers</p>
+                        <p class="flex items-center gap-2 text-sm text-forest font-bold"><i data-lucide="clock-3" class="w-4 h-4 text-gold"></i> Temporary public message while Premium is being finalized</p>
+                        <p class="flex items-center gap-2 text-sm text-forest font-bold"><i data-lucide="shield-check" class="w-4 h-4 text-gold"></i> Prevents unfinished billing or entitlement flows from leaking into production</p>
+                        <p class="flex items-center gap-2 text-sm text-forest font-bold"><i data-lucide="crown" class="w-4 h-4 text-gold"></i> Local Premium preview remains reserved for explicit testing only</p>
                     </div>
 
-                    <p class="mb-4 text-xs font-semibold leading-relaxed text-sage">${billingReady ? 'Checkout prerequisites are marked ready. The next step can hand off to the live billing provider.' : 'Billing is not wired in this build yet. The button below keeps using the local Premium preview so you can test locked screens until the final billing stage.'}</p>
+                    <p class="mb-4 text-xs font-semibold leading-relaxed text-sage">Premium features will return once billing, restore, backend validation, and access control are all live end-to-end.</p>
 
-                    <button onclick="startPremiumUpgradeFlow('premium-modal')" class="${billingReady ? getAppButtonClasses('accent', { fullWidth: true, size: 'lg' }) : getAppButtonClasses('primary', { fullWidth: true, size: 'lg' })} mb-3">
-                        ${billingReady ? 'Start Secure Checkout' : 'Preview Premium Locally'}
-                    </button>
-                    <button onclick="closeModal()" class="${getAppButtonClasses('secondary', { fullWidth: true, size: 'md' })}">
-                        Maybe Later
+                    <button onclick="closeModal()" class="${getAppButtonClasses('primary', { fullWidth: true, size: 'lg' })} mb-3">
+                        Understood
                     </button>
                 </div>
             `);
@@ -8210,10 +8831,23 @@
         // --- FAMILY RECIPE BOOKS ---
         function showCreateFamilyModal() { if(!hasPremiumAccess()) { showPremiumModal("create families"); return; }
             if (!isAuthenticated) return showToast('Please sign in to create a family.', 'alert-circle', true);
-            const activeFamilies = userFamilies.filter(f => !f.removedMembers || !f.removedMembers.some(m => m.userId === currentUser.uid));
+            const activeFamilies = getActiveFamiliesForCurrentUser();
             if (activeFamilies.length >= 3) {
                 return showToast('You can only be an active member of 3 families at once.', 'alert-circle', true);
             }
+
+            const colorChoicesMarkup = familyColorOptions.map((option, index) => `
+                <label class="cursor-pointer rounded-2xl border border-parchmentDark bg-white p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+                    <input type="radio" name="new-family-color" value="${option.key}" class="sr-only" ${index === 0 ? 'checked' : ''}>
+                    <div class="flex items-center gap-3">
+                        <span class="h-8 w-8 rounded-full border border-white shadow-sm" style="background:${option.hex}; box-shadow: inset 0 1px 0 rgba(255,255,255,0.35);"></span>
+                        <div>
+                            <p class="text-sm font-bold text-forest">${option.name}</p>
+                            <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-sage">Family color</p>
+                        </div>
+                    </div>
+                </label>
+            `).join('');
 
             createModal('Create Family Book', `
                 <div class="space-y-5 text-inkDark">
@@ -8230,15 +8864,20 @@
                         <input type="text" id="new-family-pin" placeholder="Enter a 4-8 digit pin" class="${mutedInputClass}" maxlength="8">
                         <p class="mt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-sage">People will need this pin to join the book.</p>
                     </div>
+                    <div>
+                        <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-3">Family Color</label>
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">${colorChoicesMarkup}</div>
+                    </div>
                 </div>
             `, [
                 { text: 'Cancel', onClick: () => closeModal() },
                 { text: 'Create Family', primary: true, onClick: () => {
                     const name = document.getElementById('new-family-name').value.trim();
                     const pin = document.getElementById('new-family-pin').value.trim();
+                    const colorKey = document.querySelector('input[name="new-family-color"]:checked')?.value || familyColorOptions[0].key;
                     if (!name || !pin) return showToast('Please fill out all fields.', 'alert-circle', true);
                     if (pin.length < 4) return showToast('Pincode must be at least 4 characters.', 'alert-circle', true);
-                    submitCreateFamily(name, pin);
+                    submitCreateFamily(name, pin, colorKey);
                     closeModal();
                 }}
             ]);
@@ -8269,22 +8908,25 @@
             ]);
         }
 
-        async function submitCreateFamily(name, pin) {
+        async function submitCreateFamily(name, pin, colorKey = familyColorOptions[0].key) {
             showToast('Creating family...', 'loader');
             const tag = Math.floor(1000 + Math.random() * 9000).toString();
+            const color = getFamilyColorOption(colorKey);
             
             const newFamily = {
                 id: 'fam_' + Date.now(),
                 name: name,
                 tag: tag,
                 pinCode: pin,
+                colorKey: color.key,
                 creatorId: currentUser.uid,
                 memberIds: [currentUser.uid],
                 removedMembers: []
             };
             
-            userFamilies.push(newFamily);
-            showToast('Family created! Invite others with tag #' + tag, 'check');
+            userFamilies.push(normalizeFamilyRecord(newFamily));
+            saveData();
+            showToast(`Family created! Invite others with tag #${tag}.`, 'check');
             renderProfile(); 
         }
 
@@ -8389,6 +9031,7 @@
                     removedAt: Date.now(),
                     acknowledged: false
                 });
+                saveData();
                 
                 showToast('Member removed successfully.', 'user-minus');
                 closeModal();
@@ -8403,6 +9046,7 @@
             const fam = userFamilies.find(f => f.id === familyId);
             if (fam) {
                 fam.memberIds = fam.memberIds.filter(id => id !== currentUser.uid);
+                saveData();
                 showToast('Left family successfully.', 'log-out');
                 closeModal();
                 renderProfile();
@@ -8438,6 +9082,7 @@
                     </div>
                 `, [{ text: 'I Understand', primary: true, onClick: () => {
                     unacknowledged.forEach(u => u.entry.acknowledged = true);
+                    saveData();
                     closeModal();
                 }}]);
             }
@@ -8548,7 +9193,9 @@
             const isSavedCommunityRecipe = recipe.source === 'published';
             const isOwnedRecipe = isRecipeOwnedByCurrentUser(recipe);
             const canEditExistingRecipe = isRecipeEditable(recipe);
-            const recipeLocationLabel = isSavedCommunityRecipe ? 'Saved from Browse' : 'Created by you';
+            const recipeLocationLabel = getRecipeDetailLocationLabel(recipe);
+            const recipeFamilyChip = getRecipeFamilyChipMarkup(recipe, 'text-[10px] font-bold px-2.5 py-1.5 rounded-sm uppercase tracking-[0.16em] border');
+            const versionHistoryCount = Array.isArray(recipe.versionHistory) ? recipe.versionHistory.length : 0;
             const recipeVersionLabel = getPublishedVersionLabel(recipe);
             const recipeIsLive = isRecipePublishedLive(recipe);
             const recipeHasUnpublishedChanges = hasRecipeChangesSincePublish(recipe);
@@ -8586,6 +9233,7 @@
                         <span id="focus-btn-text">${isCookingMode ? 'Exit Cooking' : 'Cook Mode'}</span>
                     </button>
                     ${primarySupportAction}
+                    ${!isSavedCommunityRecipe && versionHistoryCount > 0 ? renderDetailIconAction(`History (${versionHistoryCount})`, 'history', `showRecipeVersionHistory(${recipe.id})`, 'secondary', '', true) : ''}
                     ${hasPremiumAccess()
                         ? renderDetailIconAction('Share', 'share-2', `shareRecipe(${recipe.id})`, 'secondary', '', true)
                         : renderDetailIconAction('Share', 'lock', "showPremiumModal('share recipes')", 'muted', '', true)}
@@ -8605,6 +9253,11 @@
                 <button onclick="toggleCookingMode(${recipe.id})" id="cooking-mode-exit-btn" class="cooking-mode-exit-btn h-12 items-center gap-2 rounded-full bg-forest px-6 text-sm font-bold text-white shadow-xl transition-all hover:bg-gold hover:text-forest border-2 border-white">
                     <i data-lucide="x-circle" class="w-5 h-5"></i> Exit Cooking Mode
                 </button>
+                <div class="mb-4 flex flex-wrap items-center gap-3">
+                    <button onclick="renderList()" class="${getAppButtonClasses('secondary', { size: 'lg' })}">
+                        <i data-lucide="arrow-left" class="w-4 h-4"></i> Back to Archive
+                    </button>
+                </div>
                 <div class="detail-shell bg-white rounded-sm shadow-sm mb-6 border border-parchmentDark relative w-full">
                     <div class="detail-hero-shell w-full h-48 md:h-64 relative bg-forest rounded-t-sm">
                         <div class="absolute inset-0 overflow-hidden rounded-t-sm">
@@ -8642,6 +9295,7 @@
                             <div class="detail-status-chips flex flex-wrap items-center gap-2">
                                 <span class="text-[10px] bg-white text-sage font-bold px-2.5 py-1.5 rounded-sm uppercase tracking-[0.24em] border border-parchmentDark">${recipe.category || 'Recipe'}</span>
                                 ${recipe.diet && recipe.diet.length > 0 ? recipe.diet.map(d => `<span class="text-[10px] bg-gold bg-opacity-20 text-sage font-bold px-2.5 py-1.5 rounded-sm uppercase tracking-[0.16em]">${d}</span>`).join('') : ''}
+                                ${recipeFamilyChip}
                                 ${isSavedCommunityRecipe ? `<span class="text-[10px] bg-forest bg-opacity-10 text-forest font-bold px-2.5 py-1.5 rounded-sm uppercase tracking-[0.16em] border border-forest border-opacity-10">Saved community recipe${recipeVersionLabel ? ` ${recipeVersionLabel}` : ''}</span>` : ''}
                                 ${!isSavedCommunityRecipe && recipe.publishedId ? `<span class="text-[10px] ${recipeIsLive ? 'bg-forest bg-opacity-10 text-forest border-forest border-opacity-10' : 'bg-white text-sage border-parchmentDark'} font-bold px-2.5 py-1.5 rounded-sm uppercase tracking-[0.16em] border">${recipeIsLive ? 'Live in Browse' : 'Removed from Browse'}${recipeVersionLabel ? ` ${recipeVersionLabel}` : ''}</span>` : ''}
                                 ${!isSavedCommunityRecipe && recipeHasUnpublishedChanges ? `<span class="text-[10px] bg-gold bg-opacity-15 text-forest font-bold px-2.5 py-1.5 rounded-sm uppercase tracking-[0.16em] border border-gold border-opacity-30">Local changes not published</span>` : ''}
@@ -8835,6 +9489,12 @@
             const editorGuidance = recipeToEdit
                 ? 'Update the recipe basics here. Optional details stay in one section below when you need them.'
                 : 'Start with the essentials: title, category, ingredients, and steps. Optional details stay available below.';
+            const activeFamilies = getActiveFamiliesForCurrentUser();
+            const familyOptionsMarkup = ['<option value="">Personal archive</option>', ...activeFamilies.map(family => `<option value="${family.id}">${escapeHTML(family.name)}</option>`)].join('');
+            const recipeFamily = recipeToEdit ? getRecipeFamily(recipeToEdit) : null;
+            const familyHelperText = activeFamilies.length > 0
+                ? 'Choose a family book if this recipe belongs in a shared archive. Personal recipes stay private to your account.'
+                : 'This recipe stays in your personal archive until you create or join a family book.';
             const dietOptionsMarkup = dietOptions.map(option => {
                 const desc = dietDescriptions[option] || '';
                 return `<label class="relative flex items-center gap-2 cursor-pointer rounded-sm border border-parchmentDark bg-white px-3 py-2 font-semibold text-forest shadow-sm transition-all hover:border-gold hover:text-sage group">
@@ -8854,6 +9514,9 @@
                             <h2 class="font-fantasy font-bold text-3xl text-forest flex items-center gap-2"><i data-lucide="file-plus-2" class="w-8 h-8 text-gold"></i> ${formTitle}</h2>
                             <p class="mt-2 text-sm font-semibold text-sage">${editorGuidance}</p>
                         </div>
+                        <button type="button" onclick="cancelRecipeEditor()" class="${getAppButtonClasses('secondary', { size: 'lg' })}">
+                            <i data-lucide="arrow-left" class="w-4 h-4"></i> Back
+                        </button>
                     </div>
                     
                     <form id="add-recipe-form" class="space-y-8" onsubmit="saveRecipe(event)">
@@ -8880,6 +9543,15 @@
                             <div class="md:col-span-2">
                                 <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Country / Origin</label>
                                 <input type="text" id="r-country" list="countries-list" placeholder="Typ of selecteer een land..." value="${userSettings.country}" class="${inputClass}">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-2">Assign to Family Book</label>
+                                <select id="r-family-book" class="${inputClass}">
+                                    ${familyOptionsMarkup}
+                                </select>
+                                <p class="mt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-sage">${familyHelperText}</p>
+                                <p class="mt-2 text-xs font-semibold text-forest opacity-80">This assignment is saved with the recipe and drives the family label, color, and shared-book placement.</p>
+                                ${recipeFamily && !activeFamilies.some(family => family.id === recipeFamily.id) ? `<p class="mt-2 text-xs font-semibold text-coral">This recipe currently references ${escapeHTML(recipeFamily.label)}. Save it again after choosing a new family if you want to move it.</p>` : ''}
                             </div>
                         </div>
 
@@ -8927,8 +9599,8 @@
 
                                 <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
                                     <div class="md:col-span-4 flex justify-end">
-                                        <button type="button" onclick="runUculiAI()" class="inline-flex h-9 items-center justify-center gap-2 rounded-lg transition-all bg-gold text-white font-bold text-[10px] uppercase tracking-wider px-4 shadow-sm hover:bg-opacity-90">
-                                            <i data-lucide="wand-2" class="h-3 w-3"></i> Uculi AI Auto-Fill
+                                        <button type="button" onclick="showTemporaryFeatureOffline('Uculi AI Auto-Fill', 'It is temporarily disabled because the current recipe suggestions are too unreliable.')" class="${getAppButtonClasses('muted', { size: 'md' })}">
+                                            <i data-lucide="sparkles" class="h-4 w-4"></i> Uculi AI Temporarily Offline
                                         </button>
                                     </div>
                                     <div>
@@ -8989,6 +9661,7 @@
                 document.getElementById('r-author').value = recipeToEdit.author || '';
                 document.getElementById('r-category').value = recipeToEdit.category || '';
                 document.getElementById('r-country').value = recipeToEdit.country || '';
+                document.getElementById('r-family-book').value = activeFamilies.some(family => family.id === recipeToEdit.familyId) ? recipeToEdit.familyId || '' : '';
                 document.getElementById('r-tips').value = recipeToEdit.tips || '';
                 applyRecipeDetailFields(recipeToEdit);
 
@@ -9797,6 +10470,8 @@
             const manualServings = parseInt(document.getElementById('r-servings').value) || 4;
             const manualDifficulty = document.getElementById('r-difficulty').value || '';
             const manualCuisine = document.getElementById('r-cuisine').value || '';
+            const selectedFamilyId = document.getElementById('r-family-book')?.value || '';
+            const selectedFamily = getFamilyById(selectedFamilyId);
             const recipePayload = {
                 ...existingRecipe,
                 id: existingRecipe?.id || generateId(),
@@ -9805,6 +10480,9 @@
                 source: existingRecipe?.source || 'local',
                 category: manualCategory,
                 country: document.getElementById('r-country').value,
+                familyId: selectedFamily?.id || '',
+                familyName: selectedFamily?.name || '',
+                familyColorKey: selectedFamily?.colorKey || '',
                 profile: draftProfile || existingRecipe?.profile || defaultPlaceholderProfile,
                 prepTime: manualPrepTime,
                 cookTime: manualCookTime,
@@ -9819,7 +10497,26 @@
                 checkedIngredients: existingRecipe?.checkedIngredients || [],
                 checkedSteps: existingRecipe?.checkedSteps || [],
                 personalNotes: existingRecipe?.personalNotes || "",
-                notebookStickyNotes: normalizeNotebookStickyNotes(existingRecipe?.notebookStickyNotes)
+                notebookStickyNotes: normalizeNotebookStickyNotes(existingRecipe?.notebookStickyNotes),
+                versionHistory: existingRecipe ? getUpdatedRecipeVersionHistory(existingRecipe, {
+                    ...existingRecipe,
+                    title: titleValue,
+                    author: document.getElementById('r-author').value || 'Unknown',
+                    category: manualCategory,
+                    country: document.getElementById('r-country').value,
+                    familyId: selectedFamily?.id || '',
+                    familyName: selectedFamily?.name || '',
+                    familyColorKey: selectedFamily?.colorKey || '',
+                    prepTime: manualPrepTime,
+                    cookTime: manualCookTime,
+                    servings: manualServings,
+                    difficulty: manualDifficulty,
+                    diet: selectedDiet,
+                    cuisine: manualCuisine,
+                    ingredients: [...draftIngredients],
+                    instructions: normalizeRecipeInstructions(draftSteps),
+                    tips: notesValue
+                }) : []
             };
 
             if (existingRecipe) {

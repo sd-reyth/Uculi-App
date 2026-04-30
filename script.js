@@ -1925,12 +1925,12 @@
 
         function initializeFirebase() {
             const firebaseConfig = {
-                apiKey: "YOUR_API_KEY",
-                authDomain: "YOUR_AUTH_DOMAIN",
-                projectId: "YOUR_PROJECT_ID",
-                storageBucket: "YOUR_STORAGE_BUCKET",
-                messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-                appId: "YOUR_APP_ID"
+                    apiKey: "AIzaSyD7JnQgnVrzsueRRKVc1GKZ9jRhb1iS51Q",
+                    authDomain: "uculi-24ecd.firebaseapp.com",
+                    projectId: "uculi-24ecd",
+                    storageBucket: "uculi-24ecd.firebasestorage.app",
+                    messagingSenderId: "522301414957",
+                    appId: "1:522301414957:web:db58cc94c72e8322eee2a4"
             };
 
             if (!firebaseConfig.apiKey || firebaseConfig.apiKey === 'YOUR_API_KEY') {

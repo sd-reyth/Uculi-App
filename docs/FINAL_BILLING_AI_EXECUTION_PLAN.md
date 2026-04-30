@@ -108,6 +108,82 @@ billing-events/{providerEventId}
 5. Merge the server billing block into `userSettings.billing` instead of relying on preview state.
 6. Hide or dev-gate preview-only upgrade and reset controls before production release.
 
+## Tomorrow Execution Order
+
+Follow this order exactly so entitlement truth is never ambiguous:
+
+1. Finalize the Premium feature list and the exact plan IDs before touching checkout code.
+2. Create the backend endpoints first.
+3. Add webhook handling and event deduplication second.
+4. Mirror entitlement state into Firestore third.
+5. Wire the client checkout and restore buttons only after the backend mirror is working.
+6. Replace the temporary public “Premium coming soon” modal only after live entitlement reads are verified.
+7. Remove or hard-disable the public local Premium preview path before release.
+
+Do not start with client buttons or Stripe.js alone. The backend entitlement mirror must exist before the UI can safely unlock features.
+
+## Family And Collaboration Impact
+
+Premium billing work affects more than the billing card.
+
+- Family collaboration must read entitlements from the authenticated account, not from local preview flags.
+- Shared family data should move to Firestore collections only after entitlement checks are enforced server-side or by rules.
+- Published recipes, cloud sync, and family invites must all fail closed for free users.
+- Shopping partners can stay local-account scoped until real family collaboration storage is added.
+
+Recommended family data shape for the next backend pass:
+
+```text
+families/{familyId}
+  name
+  tag
+  colorKey
+  creatorId
+  memberIds[]
+  createdAt
+  updatedAt
+
+family-recipes/{familyRecipeId}
+  familyId
+  recipeId
+  ownerId
+  updatedAt
+  version
+```
+
+## Temporary Premium Freeze Rules
+
+Keep the current temporary public lock behavior until all items below are true:
+
+1. Checkout creates a real billing session.
+2. Webhooks update Firestore entitlement state.
+3. Restore purchase returns the same entitlement state as checkout.
+4. The client refreshes entitlement state correctly after sign-in and app reload.
+5. Free users cannot reach Premium flows through local preview buttons in production.
+
+Until then, every Premium entry point should keep showing the temporary unavailable message in the public app.
+
+## Go/No-Go Checks For Tomorrow
+
+Go live only if all checks pass:
+
+1. A free user stays blocked from notebook mode, sticky notes, custom covers, sharing, PDF export, publishing, families, and cloud sync.
+2. A paid user unlocks Premium immediately after checkout without manual local toggles.
+3. A paid user can sign in on a second device and restore access without support help.
+4. Firestore entitlement state matches Stripe state after checkout, renewal, cancel, and payment failure.
+5. The local Premium preview path is unavailable to normal production users.
+6. The temporary public Premium modal is removed only after the live entitlement path is verified.
+
+## Cleanup Before Release
+
+Before the final production deploy:
+
+1. Remove public references to “Local Premium Preview” from customer-facing UI.
+2. Keep preview-only tooling behind an explicit dev flag or remove it entirely.
+3. Re-run the Premium lock validation checklist on a fresh free account.
+4. Re-run the same checklist on an active paid account.
+5. Deploy Hosting only after both account paths are confirmed.
+
 ## Minimum Stripe Events To Handle
 
 - `checkout.session.completed`
