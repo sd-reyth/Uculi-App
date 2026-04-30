@@ -2145,6 +2145,8 @@
         let isLoadingPublishedRecipesCache = false;
         let activeSavedRecipeUpdateNoticeId = null;
         let viewedPublicProfileAuthorId = null;
+        let profileBannerToneCache = {};
+        let profileBannerTonePending = {};
         let publishedRecipeStatusChecks = {};
         let activeNotificationsModalId = null;
         let activeDetailRecipeId = null;
@@ -6891,6 +6893,237 @@
             else icon.classList.add('opacity-0');
         }
 
+        function getProfileI18n() {
+            const lang = supportedAppLanguages.includes(userSettings.language) ? userSettings.language : 'en';
+            const dictionary = {
+                en: {
+                    yourProfile: 'Your Profile',
+                    setCountry: 'Set your country',
+                    addBio: 'Add a short bio.',
+                    publicProfile: 'Public profile',
+                    privateProfile: 'Private profile',
+                    likes: 'likes',
+                    editProfile: 'Edit profile',
+                    created: 'Created',
+                    yourRecipes: 'Your recipes',
+                    saved: 'Saved',
+                    savedFromBrowse: 'Saved from Browse',
+                    published: 'Published',
+                    sharedLive: 'Shared live',
+                    sharedBooks: 'Shared books',
+                    myFamilies: 'My Families',
+                    join: 'Join',
+                    create: 'Create',
+                    noFamiliesYet: 'No families yet',
+                    noFamiliesDesc: 'Create one shared book or join an existing family archive when you are ready to collaborate.',
+                    open: 'Open',
+                    familySummary: (active, archived) => active > 0
+                        ? `${active} active shared ${active === 1 ? 'book' : 'books'}${archived ? `, ${archived} archived` : ''}.`
+                        : 'Create one shared book or join an existing family archive.'
+                },
+                nl: {
+                    yourProfile: 'Jouw profiel',
+                    setCountry: 'Stel je land in',
+                    addBio: 'Voeg een korte bio toe.',
+                    publicProfile: 'Publiek profiel',
+                    privateProfile: 'Priv\u00e9profiel',
+                    likes: 'likes',
+                    editProfile: 'Profiel bewerken',
+                    created: 'Aangemaakt',
+                    yourRecipes: 'Jouw recepten',
+                    saved: 'Opgeslagen',
+                    savedFromBrowse: 'Opgeslagen uit Browse',
+                    published: 'Gepubliceerd',
+                    sharedLive: 'Live gedeeld',
+                    sharedBooks: 'Gedeelde boeken',
+                    myFamilies: 'Mijn families',
+                    join: 'Deelnemen',
+                    create: 'Aanmaken',
+                    noFamiliesYet: 'Nog geen families',
+                    noFamiliesDesc: 'Maak een gedeeld boek of neem deel aan een bestaand familie-archief wanneer je wilt samenwerken.',
+                    open: 'Openen',
+                    familySummary: (active, archived) => active > 0
+                        ? `${active} actieve gedeelde ${active === 1 ? 'map' : 'mappen'}${archived ? `, ${archived} gearchiveerd` : ''}.`
+                        : 'Maak een gedeeld boek of neem deel aan een bestaand familie-archief.'
+                },
+                fr: {
+                    yourProfile: 'Votre profil',
+                    setCountry: 'D\u00e9finissez votre pays',
+                    addBio: 'Ajoutez une courte bio.',
+                    publicProfile: 'Profil public',
+                    privateProfile: 'Profil priv\u00e9',
+                    likes: 'likes',
+                    editProfile: 'Modifier le profil',
+                    created: 'Cr\u00e9\u00e9s',
+                    yourRecipes: 'Vos recettes',
+                    saved: 'Enregistr\u00e9s',
+                    savedFromBrowse: 'Enregistr\u00e9 depuis Browse',
+                    published: 'Publi\u00e9s',
+                    sharedLive: 'Partag\u00e9s en direct',
+                    sharedBooks: 'Livres partag\u00e9s',
+                    myFamilies: 'Mes familles',
+                    join: 'Rejoindre',
+                    create: 'Cr\u00e9er',
+                    noFamiliesYet: 'Aucune famille pour le moment',
+                    noFamiliesDesc: 'Cr\u00e9ez un livre partag\u00e9 ou rejoignez une archive familiale existante lorsque vous \u00eates pr\u00eat \u00e0 collaborer.',
+                    open: 'Ouvrir',
+                    familySummary: (active, archived) => active > 0
+                        ? `${active} livre${active === 1 ? '' : 's'} partag\u00e9${active === 1 ? '' : 's'} actif${active === 1 ? '' : 's'}${archived ? `, ${archived} archiv\u00e9${archived === 1 ? '' : 's'}` : ''}.`
+                        : 'Cr\u00e9ez un livre partag\u00e9 ou rejoignez une archive familiale existante.'
+                },
+                de: {
+                    yourProfile: 'Dein Profil',
+                    setCountry: 'Land festlegen',
+                    addBio: 'F\u00fcge eine kurze Bio hinzu.',
+                    publicProfile: '\u00d6ffentliches Profil',
+                    privateProfile: 'Privates Profil',
+                    likes: 'Likes',
+                    editProfile: 'Profil bearbeiten',
+                    created: 'Erstellt',
+                    yourRecipes: 'Deine Rezepte',
+                    saved: 'Gespeichert',
+                    savedFromBrowse: 'Aus Browse gespeichert',
+                    published: 'Ver\u00f6ffentlicht',
+                    sharedLive: 'Live geteilt',
+                    sharedBooks: 'Geteilte B\u00fccher',
+                    myFamilies: 'Meine Familien',
+                    join: 'Beitreten',
+                    create: 'Erstellen',
+                    noFamiliesYet: 'Noch keine Familien',
+                    noFamiliesDesc: 'Erstelle ein gemeinsames Buch oder tritt einem bestehenden Familienarchiv bei, wenn du bereit bist zu kooperieren.',
+                    open: '\u00d6ffnen',
+                    familySummary: (active, archived) => active > 0
+                        ? `${active} aktive geteilte ${active === 1 ? 'Sammlung' : 'Sammlungen'}${archived ? `, ${archived} archiviert` : ''}.`
+                        : 'Erstelle ein gemeinsames Buch oder tritt einem bestehenden Familienarchiv bei.'
+                },
+                es: {
+                    yourProfile: 'Tu perfil',
+                    setCountry: 'Define tu pa\u00eds',
+                    addBio: 'Agrega una bio corta.',
+                    publicProfile: 'Perfil p\u00fablico',
+                    privateProfile: 'Perfil privado',
+                    likes: 'likes',
+                    editProfile: 'Editar perfil',
+                    created: 'Creadas',
+                    yourRecipes: 'Tus recetas',
+                    saved: 'Guardadas',
+                    savedFromBrowse: 'Guardadas desde Browse',
+                    published: 'Publicadas',
+                    sharedLive: 'Compartidas en vivo',
+                    sharedBooks: 'Libros compartidos',
+                    myFamilies: 'Mis familias',
+                    join: 'Unirse',
+                    create: 'Crear',
+                    noFamiliesYet: 'A\u00fan no hay familias',
+                    noFamiliesDesc: 'Crea un libro compartido o \u00fanete a un archivo familiar existente cuando quieras colaborar.',
+                    open: 'Abrir',
+                    familySummary: (active, archived) => active > 0
+                        ? `${active} libro${active === 1 ? '' : 's'} compartido${active === 1 ? '' : 's'} activo${active === 1 ? '' : 's'}${archived ? `, ${archived} archivado${archived === 1 ? '' : 's'}` : ''}.`
+                        : 'Crea un libro compartido o \u00fanete a un archivo familiar existente.'
+                }
+            };
+
+            return dictionary[lang] || dictionary.en;
+        }
+
+        function getWarmAvatarPlaceholder(displayName = 'U') {
+            const initial = String(displayName || 'U').trim().charAt(0).toUpperCase() || 'U';
+            const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 320'>
+                <defs>
+                    <linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>
+                        <stop offset='0%' stop-color='#c5a059'/>
+                        <stop offset='55%' stop-color='#a47a41'/>
+                        <stop offset='100%' stop-color='#7f5a33'/>
+                    </linearGradient>
+                </defs>
+                <rect width='320' height='320' fill='url(#g)'/>
+                <circle cx='72' cy='82' r='58' fill='rgba(255,255,255,0.14)'/>
+                <circle cx='268' cy='262' r='86' fill='rgba(44,61,46,0.18)'/>
+                <circle cx='166' cy='166' r='114' fill='rgba(255,255,255,0.1)'/>
+                <text x='160' y='190' text-anchor='middle' fill='rgba(255,255,255,0.95)' font-family='Cormorant Garamond, serif' font-size='132' font-weight='700'>${initial}</text>
+            </svg>`;
+            return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+        }
+
+        function getCulinaryTextureBanner() {
+            const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 420'>
+                <defs>
+                    <linearGradient id='bg' x1='0' y1='0' x2='1' y2='1'>
+                        <stop offset='0%' stop-color='#f2ebde'/>
+                        <stop offset='45%' stop-color='#eadfcd'/>
+                        <stop offset='100%' stop-color='#ddccb1'/>
+                    </linearGradient>
+                    <pattern id='grain' width='40' height='40' patternUnits='userSpaceOnUse'>
+                        <circle cx='8' cy='9' r='1.1' fill='rgba(88,70,40,0.08)'/>
+                        <circle cx='31' cy='16' r='0.9' fill='rgba(88,70,40,0.07)'/>
+                        <circle cx='17' cy='32' r='0.8' fill='rgba(88,70,40,0.08)'/>
+                    </pattern>
+                </defs>
+                <rect width='1200' height='420' fill='url(#bg)'/>
+                <rect width='1200' height='420' fill='url(#grain)'/>
+                <path d='M120 280C240 240 290 310 410 270C520 234 590 312 700 278C820 240 910 300 1060 250' stroke='rgba(124,98,60,0.18)' stroke-width='8' fill='none' stroke-linecap='round'/>
+                <path d='M100 170C200 126 260 186 360 154C470 120 560 194 680 146C780 106 900 176 1080 124' stroke='rgba(124,98,60,0.12)' stroke-width='5' fill='none' stroke-linecap='round'/>
+            </svg>`;
+            return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+        }
+
+        function getProfileBannerTone(imageUrl) {
+            return profileBannerToneCache[imageUrl] || 'light';
+        }
+
+        function analyzeProfileBannerTone(imageUrl) {
+            if (!imageUrl || profileBannerToneCache[imageUrl] || profileBannerTonePending[imageUrl]) return;
+            profileBannerTonePending[imageUrl] = true;
+
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+
+            img.onload = () => {
+                let tone = 'light';
+                try {
+                    const canvas = document.createElement('canvas');
+                    const sampleWidth = 32;
+                    const sampleHeight = 18;
+                    canvas.width = sampleWidth;
+                    canvas.height = sampleHeight;
+                    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                    if (!ctx) throw new Error('Canvas context unavailable');
+
+                    ctx.drawImage(img, 0, 0, sampleWidth, sampleHeight);
+                    const data = ctx.getImageData(0, 0, sampleWidth, sampleHeight).data;
+
+                    let brightnessSum = 0;
+                    let pixelCount = 0;
+                    for (let i = 0; i < data.length; i += 4) {
+                        const r = data[i];
+                        const g = data[i + 1];
+                        const b = data[i + 2];
+                        brightnessSum += (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                        pixelCount += 1;
+                    }
+
+                    const avgBrightness = pixelCount ? (brightnessSum / pixelCount) : 1;
+                    tone = avgBrightness < 0.5 ? 'dark' : 'light';
+                } catch (error) {
+                    tone = 'light';
+                }
+
+                profileBannerToneCache[imageUrl] = tone;
+                delete profileBannerTonePending[imageUrl];
+
+                if (currentView === 'profile') {
+                    renderProfile();
+                }
+            };
+
+            img.onerror = () => {
+                profileBannerToneCache[imageUrl] = 'light';
+                delete profileBannerTonePending[imageUrl];
+            };
+
+            img.src = imageUrl;
+        }
+
         // --- VIEWS ---
         function renderProfile() {
             activeDetailRecipeId = null;
@@ -6908,55 +7141,61 @@
                 });
             }
 
-            const bannerBg = userSettings.bannerPic || defaultPlaceholderBanner;
-            const profileBg = userSettings.profilePic || defaultPlaceholderProfile;
+            const t = getProfileI18n();
+            const hasCustomBanner = Boolean(userSettings.bannerPic && userSettings.bannerPic !== defaultPlaceholderBanner);
+            const hasCustomProfile = Boolean(userSettings.profilePic && userSettings.profilePic !== defaultPlaceholderProfile);
+            const bannerBg = hasCustomBanner ? userSettings.bannerPic : getCulinaryTextureBanner();
+            const profileBg = hasCustomProfile ? userSettings.profilePic : getWarmAvatarPlaceholder(userSettings.name || 'U');
+            const bannerTone = getProfileBannerTone(bannerBg);
+            const nameTextClass = bannerTone === 'dark'
+                ? 'text-gold drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]'
+                : 'text-forest';
+            const countryTextClass = bannerTone === 'dark'
+                ? 'text-parchment drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]'
+                : 'text-sage';
             const createdRecipes = recipes.filter(recipe => recipe.source !== 'published').length;
             const savedRecipes = recipes.filter(recipe => recipe.source === 'published').length;
             const publishedRecipes = recipes.filter(recipe => recipe.source !== 'published' && isRecipePublishedLive(recipe)).length;
             const totalPublicLikes = getTotalPublishedLikesForAuthor(currentUser?.uid || '');
             const activeFamilyCount = (userFamilies || []).filter(family => !family.removedMembers || !family.removedMembers.some(member => member.userId === currentUser?.uid)).length;
             const archivedFamilyCount = Math.max((userFamilies || []).length - activeFamilyCount, 0);
-            const familySummaryText = activeFamilyCount > 0
-                ? `${activeFamilyCount} active shared ${activeFamilyCount === 1 ? 'book' : 'books'}${archivedFamilyCount ? `, ${archivedFamilyCount} archived` : ''}.`
-                : 'Create one shared book or join an existing family archive.';
+            const familySummaryText = t.familySummary(activeFamilyCount, archivedFamilyCount);
 
             contentDiv.innerHTML = `
                 <div class="max-w-4xl mx-auto space-y-6">
                     <div class="bg-white rounded-sm shadow-sm border border-parchmentDark overflow-hidden">
                         <div class="h-52 md:h-60 bg-cover bg-center relative" style="background-image: url('${bannerBg}')">
-                            <div class="absolute inset-0 bg-gradient-to-t from-forest/70 via-forest/20 to-transparent"></div>
-                            <div class="absolute inset-0 bg-gradient-to-r from-black/25 via-transparent to-black/20"></div>
-                            <div class="absolute -right-12 -top-10 h-40 w-40 rounded-full bg-gold/20 blur-3xl"></div>
-                            <div class="absolute left-10 bottom-6 h-20 w-20 rounded-full bg-white/15 blur-2xl"></div>
+                            <div class="absolute inset-0 bg-gradient-to-t from-forest/22 via-transparent to-white/15"></div>
+                            <div class="absolute inset-0 bg-gradient-to-r from-white/8 via-transparent to-forest/10"></div>
                             <div class="absolute left-6 md:left-8 bottom-0 translate-y-1/2 w-28 h-28 md:w-32 md:h-32 rounded-full border-4 border-white shadow-2xl bg-cover bg-center bg-white z-20 ring-4 ring-forest/10" style="background-image: url('${profileBg}')"></div>
                         </div>
                         <div class="px-6 md:px-8 pb-8 pt-0">
                             <div class="flex flex-col gap-4 relative z-10 -mt-14 md:-mt-20 md:flex-row md:items-end md:justify-between">
                                 <div class="flex flex-col gap-4 md:min-w-0 md:pl-36">
-                                    <div class="rounded-[28px] border border-white/70 bg-gradient-to-br from-white/95 via-parchment/85 to-white/90 px-5 py-4 shadow-2xl backdrop-blur-md md:max-w-2xl md:min-w-[420px]">
-                                        <h2 class="font-fantasy font-bold text-4xl text-forest leading-tight break-words">${userSettings.name || 'Your Profile'}</h2>
-                                        <p class="text-sm font-bold uppercase tracking-[0.24em] text-sage mt-1">${userSettings.country || 'Set your country'}</p>
-                                        <p class="mt-3 text-sm font-semibold text-forest opacity-85 truncate" title="${escapeHTML(userSettings.bio || 'Add a short bio.')}">${escapeHTML(userSettings.bio || 'Add a short bio.')}</p>
+                                    <div class="rounded-[28px] border border-white/60 bg-gradient-to-br from-white/96 via-parchment/88 to-white/92 px-5 py-4 shadow-xl backdrop-blur-sm md:max-w-2xl md:min-w-[420px]">
+                                        <h2 class="font-fantasy font-bold text-4xl leading-tight break-words ${nameTextClass}">${escapeHTML(userSettings.name || t.yourProfile)}</h2>
+                                        <p class="text-sm font-bold uppercase tracking-[0.24em] mt-1 ${countryTextClass}">${escapeHTML(userSettings.country || t.setCountry)}</p>
+                                        <p class="mt-3 text-sm font-semibold text-forest opacity-85 truncate" title="${escapeHTML(userSettings.bio || t.addBio)}">${escapeHTML(userSettings.bio || t.addBio)}</p>
                                         <div class="mt-4 flex flex-wrap items-center gap-2">
-                                            <span class="inline-flex items-center gap-1.5 rounded-full bg-white/85 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-sage shadow-sm ring-1 ring-parchmentDark/60">
+                                            <span class="inline-flex items-center gap-1.5 rounded-full bg-accent/75 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-sage shadow-sm">
                                                 <i data-lucide="${userSettings.isPublic ? 'globe' : 'lock'}" class="h-3.5 w-3.5"></i>
-                                                ${userSettings.isPublic ? 'Public profile' : 'Private profile'}
+                                                ${userSettings.isPublic ? t.publicProfile : t.privateProfile}
                                             </span>
-                                            <span class="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1.5 text-[11px] font-bold text-sage shadow-sm ring-1 ring-parchmentDark/50">
-                                                <i data-lucide="heart" class="h-3.5 w-3.5"></i>${totalPublicLikes} likes
+                                            <span class="inline-flex items-center gap-1.5 rounded-full bg-accent/75 px-3 py-1.5 text-[11px] font-bold text-sage shadow-sm">
+                                                <i data-lucide="heart" class="h-3.5 w-3.5"></i>${totalPublicLikes} ${t.likes}
                                             </span>
                                             ${(() => {
                                                 const primaryFamily = (userFamilies || []).find(f => !f.removedMembers?.some(m => m.userId === currentUser?.uid));
                                                 if (!primaryFamily) return '';
                                                 const fc = getFamilyColorOption(primaryFamily.colorKey);
-                                                return `<span class="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1.5 text-[11px] font-bold shadow-sm ring-1 ring-parchmentDark/50" style="color:${fc.hex};"><i data-lucide="users" class="h-3.5 w-3.5"></i>#1 ${escapeHTML(primaryFamily.name)}</span>`;
+                                                return `<span class="inline-flex items-center gap-1.5 rounded-full bg-accent/75 px-3 py-1.5 text-[11px] font-bold shadow-sm" style="color:${fc.hex};"><i data-lucide="users" class="h-3.5 w-3.5"></i>#1 ${escapeHTML(primaryFamily.name)}</span>`;
                                             })()}
                                         </div>
                                     </div>
                                 </div>
                                 <div class="self-start md:self-end rounded-2xl border border-white/70 bg-white/75 p-1.5 shadow-lg backdrop-blur-sm">
                                     <button onclick="renderProfileEditor()" class="${getAppButtonClasses('secondary')}">
-                                        <i data-lucide="pencil-line" class="h-4 w-4 text-gold"></i>Edit profile
+                                        <i data-lucide="pencil-line" class="h-4 w-4 text-gold"></i>${t.editProfile}
                                     </button>
                                 </div>
                             </div>
@@ -6965,19 +7204,19 @@
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div class="bg-white rounded-sm border border-parchmentDark p-5 shadow-sm">
-                            <p class="text-xs font-bold uppercase tracking-[0.24em] text-sage">Created</p>
-                            <p class="mt-2 text-3xl font-fantasy font-bold text-forest">${createdRecipes}</p>
-                            <p class="text-sm font-semibold text-sage">Your recipes</p>
+                            <p class="text-xs font-bold uppercase tracking-[0.24em] text-sage">${t.created}</p>
+                            <p class="mt-2 text-5xl md:text-6xl font-fantasy font-black text-forest leading-none">${createdRecipes}</p>
+                            <p class="text-sm font-semibold text-sage">${t.yourRecipes}</p>
                         </div>
                         <div class="bg-white rounded-sm border border-parchmentDark p-5 shadow-sm">
-                            <p class="text-xs font-bold uppercase tracking-[0.24em] text-sage">Saved</p>
-                            <p class="mt-2 text-3xl font-fantasy font-bold text-forest">${savedRecipes}</p>
-                            <p class="text-sm font-semibold text-sage">Saved from Browse</p>
+                            <p class="text-xs font-bold uppercase tracking-[0.24em] text-sage">${t.saved}</p>
+                            <p class="mt-2 text-5xl md:text-6xl font-fantasy font-black text-forest leading-none">${savedRecipes}</p>
+                            <p class="text-sm font-semibold text-sage">${t.savedFromBrowse}</p>
                         </div>
                         <div class="bg-white rounded-sm border border-parchmentDark p-5 shadow-sm">
-                            <p class="text-xs font-bold uppercase tracking-[0.24em] text-sage">Published</p>
-                            <p class="mt-2 text-3xl font-fantasy font-bold text-forest">${publishedRecipes}</p>
-                            <p class="text-sm font-semibold text-sage">Shared live</p>
+                            <p class="text-xs font-bold uppercase tracking-[0.24em] text-sage">${t.published}</p>
+                            <p class="mt-2 text-5xl md:text-6xl font-fantasy font-black text-forest leading-none">${publishedRecipes}</p>
+                            <p class="text-sm font-semibold text-sage">${t.sharedLive}</p>
                         </div>
                     </div>
 
@@ -6985,22 +7224,22 @@
                     <div class="bg-white rounded-sm shadow-sm border border-parchmentDark p-6 md:p-8">
                         <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                             <div>
-                                <p class="text-[11px] font-bold uppercase tracking-[0.28em] text-sage">Shared books</p>
-                                <h3 class="mt-2 font-fantasy text-3xl font-bold text-forest">My Families</h3>
+                                <p class="text-[11px] font-bold uppercase tracking-[0.28em] text-sage">${t.sharedBooks}</p>
+                                <h3 class="mt-2 font-fantasy text-3xl font-bold text-forest">${t.myFamilies}</h3>
                                 <p class="mt-2 text-sm font-semibold text-sage">${familySummaryText}</p>
                             </div>
                             <div class="flex flex-wrap gap-3">
                                 <button onclick="showJoinFamilyModal()" class="${getAppButtonClasses('secondary')}">
-                                    <i data-lucide="log-in" class="w-4 h-4"></i> Join
+                                    <i data-lucide="log-in" class="w-4 h-4"></i> ${t.join}
                                 </button>
                                 <button onclick="showCreateFamilyModal()" class="${getAppButtonClasses('primary')}">
-                                    <i data-lucide="plus" class="w-4 h-4"></i> Create
+                                    <i data-lucide="plus" class="w-4 h-4"></i> ${t.create}
                                 </button>
                             </div>
                         </div>
                         
                         ${userFamilies && userFamilies.length > 0 ? `
-                            <div id="family-list-sortable" class="flex flex-col gap-2">
+                            <div id="family-list-sortable" class="flex flex-col gap-3">
                                 ${userFamilies.slice(0, 3).map((family, idx) => {
                                     const isRemoved = family.removedMembers && family.removedMembers.some(m => m.userId === currentUser?.uid);
                                     const isCreator = family.creatorId === currentUser?.uid;
@@ -7008,28 +7247,27 @@
                                     const familyColor = getFamilyColorOption(family.colorKey);
                                     const rankLabel = ['#1', '#2', '#3'][idx] || '';
                                     return `
-                                        <div class="family-sortable-row group flex items-center gap-3 rounded-2xl border bg-white px-4 py-3 shadow-sm transition-all cursor-grab active:cursor-grabbing select-none ${isRemoved ? 'opacity-70' : ''}" data-family-id="${family.id}" draggable="true" style="border-left: 4px solid ${familyColor.hex};">
+                                        <div class="family-sortable-row group flex items-center gap-4 rounded-2xl border bg-white px-5 py-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg cursor-grab active:cursor-grabbing select-none ${isRemoved ? 'opacity-70' : ''}" data-family-id="${family.id}" draggable="true" style="border-left: 4px solid ${familyColor.hex};">
                                             <div class="flex-shrink-0 text-sage/50 hover:text-sage transition-colors">
-                                                <i data-lucide="grip-vertical" class="w-4 h-4 pointer-events-none"></i>
+                                                <i data-lucide="grip-vertical" class="w-5 h-5 pointer-events-none"></i>
                                             </div>
-                                            <span class="text-[10px] font-bold uppercase tracking-[0.2em] w-16 flex-shrink-0" style="color:${familyColor.hex};">${rankLabel}</span>
-                                            <span class="font-fantasy font-bold text-forest text-base flex-1 truncate">${family.name}</span>
-                                            <span class="inline-flex items-center gap-1.5 rounded-full border border-parchmentDark bg-parchment px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-sage flex-shrink-0 hidden sm:inline-flex">
-                                                <i data-lucide="users" class="w-3 h-3"></i>${memberCount}
+                                            <span class="text-[11px] font-bold uppercase tracking-[0.2em] w-20 flex-shrink-0" style="color:${familyColor.hex};">${rankLabel}</span>
+                                            <span class="font-fantasy font-bold text-forest text-xl leading-none flex-1 truncate">${family.name}</span>
+                                            <span class="inline-flex items-center gap-1.5 rounded-full bg-accent/75 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-sage flex-shrink-0 hidden sm:inline-flex">
+                                                <i data-lucide="users" class="w-3.5 h-3.5"></i>${memberCount}
                                             </span>
-                                            <button type="button" onclick="showFamilyDetails('${family.id}')" class="flex-shrink-0 rounded-xl border border-parchmentDark bg-parchment px-3 py-1.5 text-[11px] font-bold text-forest shadow-sm transition-all hover:border-gold hover:bg-white">Open</button>
+                                            <button type="button" onclick="showFamilyDetails('${family.id}')" class="flex-shrink-0 rounded-xl bg-parchment px-3.5 py-2 text-xs font-bold text-forest shadow-sm transition-all hover:bg-white hover:shadow-md">${t.open}</button>
                                         </div>
                                     `;
                                 }).join('')}
                             </div>
-                            <p class="mt-3 text-[11px] font-semibold text-sage">Versleep om de volgorde te wijzigen. #1 verschijnt op je profielkaart.</p>
                         ` : `
                             <div class="rounded-[24px] border-2 border-dashed border-parchmentDark bg-parchment px-6 py-10 text-center">
                                 <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-parchmentDark bg-white shadow-sm">
                                     <i data-lucide="users" class="text-sage w-6 h-6"></i>
                                 </div>
-                                <p class="text-forest font-bold mb-1">No families yet</p>
-                                <p class="text-sage text-sm font-semibold">Create one shared book or join an existing family archive when you are ready to collaborate.</p>
+                                <p class="text-forest font-bold mb-1">${t.noFamiliesYet}</p>
+                                <p class="text-sage text-sm font-semibold">${t.noFamiliesDesc}</p>
                             </div>
                         `}
                     </div>
@@ -7037,6 +7275,7 @@
                 </div>
             `;
             lucide.createIcons();
+            analyzeProfileBannerTone(bannerBg);
             initFamilySortable();
         }
 
@@ -7278,7 +7517,7 @@
                             <p class="mt-1 text-sm font-semibold text-sage">${billingMeta.summary}</p>
                         </div>
                         <div class="grid w-full gap-3 md:w-auto md:grid-cols-2">
-                            <button onclick="showPremiumModal('unlock premium')" class="${getAppButtonClasses('accent', { fullWidth: true, size: 'lg' })}">
+                            <button onclick="showPlansModal()" class="${getAppButtonClasses('accent', { fullWidth: true, size: 'lg' })}">
                                 <i data-lucide="crown" class="w-4 h-4"></i> View Plans
                             </button>
                             ${billingMeta.state === 'preview'
@@ -7315,7 +7554,7 @@
                         <p class="mt-1 text-sm font-semibold text-sage">${billingMeta.summary}</p>
                     </div>
                     <div class="${settingsActionGridClass}">
-                        <button onclick="${billingReady ? "startPremiumUpgradeFlow('settings-billing')" : "showPremiumModal('upgrade')"}" class="${getAppButtonClasses('primary', { fullWidth: true, size: 'lg' })}">
+                        <button onclick="${billingReady ? "startPremiumUpgradeFlow('settings-billing')" : "showPlansModal()"}" class="${getAppButtonClasses('primary', { fullWidth: true, size: 'lg' })}">
                             <i data-lucide="${billingReady ? 'credit-card' : 'crown'}" class="w-4 h-4"></i> ${billingReady ? 'Change Plan' : 'View Plans'}
                         </button>
                         <button onclick="${restoreReady ? 'restorePremiumEntitlement()' : "showBillingRestoreSetupStatusModal('settings-billing')"}" class="${getAppButtonClasses('secondary', { fullWidth: true, size: 'lg' })}">
@@ -9854,6 +10093,73 @@
                 modal.classList.add('hidden', 'opacity-0');
                 modal.firstElementChild?.classList.add('scale-95');
             }
+        }
+
+        function showPlansModal() {
+            trackLaunchEvent('plansModalOpened');
+            const planCardBase = 'rounded-2xl border p-5 flex flex-col gap-3';
+            const checkIcon = `<i data-lucide="check" class="w-4 h-4 text-gold flex-shrink-0"></i>`;
+            const lockIcon = `<i data-lucide="lock" class="w-4 h-4 text-sage flex-shrink-0"></i>`;
+            function featureRow(icon, label) {
+                return `<li class="flex items-center gap-2 text-sm font-semibold text-forest">${icon}<span>${label}</span></li>`;
+            }
+            createModal("Plans & Pricing", `
+                <div class="space-y-4 p-2">
+                    <!-- Free -->
+                    <div class="${planCardBase} border-parchmentDark bg-parchment">
+                        <div>
+                            <p class="text-[11px] font-bold uppercase tracking-[0.22em] text-sage">Free</p>
+                            <p class="font-fantasy text-2xl font-bold text-forest mt-1">€0 <span class="text-base font-normal text-sage">/ forever</span></p>
+                        </div>
+                        <ul class="space-y-2">
+                            ${featureRow(checkIcon, 'Up to 8 recipes')}
+                            ${featureRow(checkIcon, 'Notebook mode')}
+                            ${featureRow(checkIcon, 'Cloud sync (read)')}
+                            ${featureRow(lockIcon, 'Unlimited recipes')}
+                            ${featureRow(lockIcon, 'Publish & share recipes')}
+                            ${featureRow(lockIcon, 'Family sharing')}
+                            ${featureRow(lockIcon, 'PDF export')}
+                            ${featureRow(lockIcon, 'Backup & restore')}
+                        </ul>
+                    </div>
+                    <!-- Premium Monthly -->
+                    <div class="${planCardBase} border-gold bg-white shadow-md">
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <p class="text-[11px] font-bold uppercase tracking-[0.22em] text-gold">Premium Monthly</p>
+                                <p class="font-fantasy text-2xl font-bold text-forest mt-1">Coming soon</p>
+                            </div>
+                            <span class="text-xs font-bold uppercase tracking-wide bg-gold bg-opacity-15 text-gold px-2 py-1 rounded-full">Monthly</span>
+                        </div>
+                        <ul class="space-y-2">
+                            ${featureRow(checkIcon, 'Everything in Free')}
+                            ${featureRow(checkIcon, 'Unlimited recipes')}
+                            ${featureRow(checkIcon, 'Publish & share recipes')}
+                            ${featureRow(checkIcon, 'Family sharing')}
+                            ${featureRow(checkIcon, 'PDF export')}
+                            ${featureRow(checkIcon, 'Backup & restore')}
+                        </ul>
+                        <p class="text-xs text-sage font-semibold">Billing available once checkout is live.</p>
+                    </div>
+                    <!-- Premium Lifetime -->
+                    <div class="${planCardBase} border-forest bg-white shadow-md">
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <p class="text-[11px] font-bold uppercase tracking-[0.22em] text-forest">Premium Lifetime</p>
+                                <p class="font-fantasy text-2xl font-bold text-forest mt-1">Coming soon</p>
+                            </div>
+                            <span class="text-xs font-bold uppercase tracking-wide bg-forest bg-opacity-10 text-forest px-2 py-1 rounded-full">One-time</span>
+                        </div>
+                        <ul class="space-y-2">
+                            ${featureRow(checkIcon, 'Everything in Premium')}
+                            ${featureRow(checkIcon, 'Pay once, use forever')}
+                            ${featureRow(checkIcon, 'All future updates included')}
+                        </ul>
+                        <p class="text-xs text-sage font-semibold">Billing available once checkout is live.</p>
+                    </div>
+                    <p class="text-center text-xs text-sage font-semibold pt-1">Pricing will be confirmed when billing goes live.</p>
+                </div>
+            `);
         }
 
         function showPremiumModal(featureName) {
