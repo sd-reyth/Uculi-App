@@ -1,4 +1,4 @@
-# Uculi Next Week Coding Plan
+﻿# Uculi Next Week Coding Plan
 
 Date: 30 April 2026
 
@@ -56,3 +56,10 @@ Stabilize the public auth-first experience, remove remaining launch-risk technic
 1. Publicly exposing unfinished billing controls.
 2. Reworking the notebook design again unless QA finds a concrete regression.
 3. Expanding Shopping List scope before auth, family storage, and billing are stable.
+
+## Added From User Testing (30 April 2026)
+
+1. Run a top-of-screen back-button audit for all major views (desktop + mobile), including a consistent floating back option where needed.
+2. Fix notebook mode scaling edge cases for custom cover styles and sticker interaction controls (positioning/z-index).
+3. Add a first-run interactive tutorial and a "Show tutorial again" action in Settings.
+4. Add a concise in-app usage guide / Q&A page in Settings covering shopping list behavior, key buttons, color meanings, and main workflows.

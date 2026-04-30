@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Uculi — Smart Ingredient Parser & Unit Converter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        forest: '#2D4A3E',
+                        sage:   '#7A9E7E',
+                        gold:   '#C9A84C',
+                        parchment: '#F5F0E8',
+                        parchmentDark: '#E8DFD0',
+                        coral:  '#E07A5F',
+                    },
+                    fontFamily: {
+                        serif: ['Georgia', 'Cambria', 'serif'],
+                        sans:  ['system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        };
+    </script>
+    <style>
+        .json-pre { font-size: 11px; line-height: 1.5; white-space: pre-wrap; word-break: break-all; }
+        details summary { cursor: pointer; list-style: none; }
+        details summary::-webkit-details-marker { display: none; }
+        .toggle-btn[data-active="true"]  { background: #2D4A3E; color: #fff; }
+        .toggle-btn[data-active="false"] { background: #fff; color: #2D4A3E; border: 1.5px solid #7A9E7E; }
+    </style>
+</head>
+<body class="min-h-screen bg-parchment font-sans text-forest">
+
+<!-- ── Header ─────────────────────────────────────────────── -->
+<header class="border-b border-parchmentDark bg-white px-6 py-4 shadow-sm">
+    <div class="mx-auto flex max-w-4xl items-center justify-between">
+        <div>
+            <h1 class="font-serif text-xl font-bold text-forest">Uculi · Smart Ingredient Parser</h1>
+            <p class="mt-0.5 text-xs font-semibold text-sage">NLP parsing · unit conversion · Metric / Imperial · NL / EN / ES</p>
+        </div>
+        <span class="rounded-full bg-sage bg-opacity-20 px-3 py-1 text-xs font-bold text-sage uppercase tracking-wider">v1.0</span>
+    </div>
+</header>
+
+<!-- ── Main ───────────────────────────────────────────────── -->
+<main class="mx-auto max-w-4xl px-4 py-8 space-y-6">
+
+    <!-- Input card -->
+    <section class="rounded-2xl border border-parchmentDark bg-white p-6 shadow-sm">
+        <h2 class="mb-4 text-[11px] font-bold uppercase tracking-[0.28em] text-sage">Input</h2>
+
+        <textarea id="input-area"
+            rows="6"
+            placeholder="Eén ingrediënt per regel, bijv.&#10;3 theelepels vanilleextract&#10;anderhalf eetlepel olijfolie&#10;een snufje zout&#10;500g gehakt rundvlees&#10;2 cups bloem"
+            class="w-full rounded-xl border border-parchmentDark bg-parchment px-4 py-3 text-sm font-medium text-forest placeholder-sage placeholder-opacity-60 outline-none focus:border-gold focus:ring-2 focus:ring-gold focus:ring-opacity-20 resize-y"
+        ></textarea>
+
+        <!-- Controls row -->
+        <div class="mt-4 flex flex-wrap items-center gap-3">
+
+            <!-- Language selector -->
+            <div class="flex items-center gap-2">
+                <label class="text-xs font-bold uppercase tracking-wider text-sage">Invoertaal</label>
+                <select id="lang-select"
+                    class="rounded-lg border border-parchmentDark bg-parchment px-3 py-2 text-sm font-semibold text-forest outline-none focus:border-gold">
+                    <option value="nl">🇳🇱 Nederlands</option>
+                    <option value="en">🇬🇧 English</option>
+                    <option value="es">🇪🇸 Español</option>
+                </select>
+            </div>
+
+            <!-- Display system toggle -->
+            <div class="flex items-center gap-2">
+                <label class="text-xs font-bold uppercase tracking-wider text-sage">Weergave</label>
+                <div class="flex rounded-xl overflow-hidden border border-parchmentDark">
+                    <button id="btn-metric"   onclick="setSystem('metric')"   data-active="true"
+                        class="toggle-btn px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all">Metric</button>
+                    <button id="btn-imperial" onclick="setSystem('imperial')" data-active="false"
+                        class="toggle-btn px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all">Imperial</button>
+                </div>
+            </div>
+
+            <!-- Parse button -->
+            <button onclick="runParser()"
+                class="ml-auto flex items-center gap-2 rounded-xl bg-forest px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-gold hover:text-forest">
+                ▶ Parseer
+            </button>
+        </div>
+    </section>
+
+    <!-- Results card -->
+    <section id="results-section" class="hidden rounded-2xl border border-parchmentDark bg-white p-6 shadow-sm">
+        <div class="mb-4 flex items-center justify-between">
+            <h2 class="text-[11px] font-bold uppercase tracking-[0.28em] text-sage">Resultaten</h2>
+            <span id="results-count" class="text-xs font-semibold text-sage"></span>
+        </div>
+        <div id="results-list" class="space-y-3"></div>
+    </section>
+
+    <!-- Reference card -->
+    <details class="rounded-2xl border border-parchmentDark bg-white shadow-sm">
+        <summary class="flex cursor-pointer items-center justify-between p-6">
+            <h2 class="text-[11px] font-bold uppercase tracking-[0.28em] text-sage">Referentie: ondersteunde eenheden</h2>
+            <span class="text-xs font-semibold text-gold">▼ toon</span>
+        </summary>
+        <div id="unit-reference" class="px-6 pb-6"></div>
+    </details>
+</main>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// 1. UNIT MAP  — Universal Base Truth
+//    All keys lowercase. Value: { type, baseValue (ml or g), baseUnit }
+// ═══════════════════════════════════════════════════════════════════════════
+const UNIT_MAP = {
+    // ── VOLUME ─────────────────────────────────────────────
+    // Teaspoon
+    'theelepel':         { type: 'volume', baseValue: 5,       baseUnit: 'ml', displayNL: 'theelepel',   displayEN: 'tsp'   },
+    'theelepels':        { type: 'volume', baseValue: 5,       baseUnit: 'ml', displayNL: 'theelepel',   displayEN: 'tsp'   },
+    'tl':                { type: 'volume', baseValue: 5,       baseUnit: 'ml', displayNL: 'theelepel',   displayEN: 'tsp'   },
+    'tsp':               { type: 'volume', baseValue: 5,       baseUnit: 'ml', displayNL: 'theelepel',   displayEN: 'tsp'   },
+    'teaspoon':          { type: 'volume', baseValue: 5,       baseUnit: 'ml', displayNL: 'theelepel',   displayEN: 'tsp'   },
+    'teaspoons':         { type: 'volume', baseValue: 5,       baseUnit: 'ml', displayNL: 'theelepel',   displayEN: 'tsp'   },
+
+    // Tablespoon
+    'eetlepel':          { type: 'volume', baseValue: 15,      baseUnit: 'ml', displayNL: 'eetlepel',    displayEN: 'tbsp'  },
+    'eetlepels':         { type: 'volume', baseValue: 15,      baseUnit: 'ml', displayNL: 'eetlepel',    displayEN: 'tbsp'  },
+    'el':                { type: 'volume', baseValue: 15,      baseUnit: 'ml', displayNL: 'eetlepel',    displayEN: 'tbsp'  },
+    'tbsp':              { type: 'volume', baseValue: 15,      baseUnit: 'ml', displayNL: 'eetlepel',    displayEN: 'tbsp'  },
+    'tablespoon':        { type: 'volume', baseValue: 15,      baseUnit: 'ml', displayNL: 'eetlepel',    displayEN: 'tbsp'  },
+    'tablespoons':       { type: 'volume', baseValue: 15,      baseUnit: 'ml', displayNL: 'eetlepel',    displayEN: 'tbsp'  },
+
+    // Cup / Kopje
+    'kopje':             { type: 'volume', baseValue: 240,     baseUnit: 'ml', displayNL: 'kopje',       displayEN: 'cup'   },
+    'kopjes':            { type: 'volume', baseValue: 240,     baseUnit: 'ml', displayNL: 'kopje',       displayEN: 'cup'   },
+    'cup':               { type: 'volume', baseValue: 240,     baseUnit: 'ml', displayNL: 'kopje',       displayEN: 'cup'   },
+    'cups':              { type: 'volume', baseValue: 240,     baseUnit: 'ml', displayNL: 'kopje',       displayEN: 'cup'   },
+
+    // Fluid ounce
+    'fl.oz':             { type: 'volume', baseValue: 29.5735, baseUnit: 'ml', displayNL: 'fl.oz',       displayEN: 'fl.oz' },
+    'floz':              { type: 'volume', baseValue: 29.5735, baseUnit: 'ml', displayNL: 'fl.oz',       displayEN: 'fl.oz' },
+    'fluid ounce':       { type: 'volume', baseValue: 29.5735, baseUnit: 'ml', displayNL: 'fl.oz',       displayEN: 'fl.oz' },
+    'fluid ounces':      { type: 'volume', baseValue: 29.5735, baseUnit: 'ml', displayNL: 'fl.oz',       displayEN: 'fl.oz' },
+
+    // Pint
+    'pint':              { type: 'volume', baseValue: 473.176, baseUnit: 'ml', displayNL: 'pint',        displayEN: 'pint'  },
+    'pints':             { type: 'volume', baseValue: 473.176, baseUnit: 'ml', displayNL: 'pint',        displayEN: 'pint'  },
+
+    // Milliliter
+    'milliliter':        { type: 'volume', baseValue: 1,       baseUnit: 'ml', displayNL: 'ml',          displayEN: 'ml'    },
+    'milliliters':       { type: 'volume', baseValue: 1,       baseUnit: 'ml', displayNL: 'ml',          displayEN: 'ml'    },
+    'millilitre':        { type: 'volume', baseValue: 1,       baseUnit: 'ml', displayNL: 'ml',          displayEN: 'ml'    },
+    'millilitres':       { type: 'volume', baseValue: 1,       baseUnit: 'ml', displayNL: 'ml',          displayEN: 'ml'    },
+    'ml':                { type: 'volume', baseValue: 1,       baseUnit: 'ml', displayNL: 'ml',          displayEN: 'ml'    },
+
+    // Deciliter
+    'deciliter':         { type: 'volume', baseValue: 100,     baseUnit: 'ml', displayNL: 'dl',          displayEN: 'dl'    },
+    'deciliters':        { type: 'volume', baseValue: 100,     baseUnit: 'ml', displayNL: 'dl',          displayEN: 'dl'    },
+    'dl':                { type: 'volume', baseValue: 100,     baseUnit: 'ml', displayNL: 'dl',          displayEN: 'dl'    },
+
+    // Liter
+    'liter':             { type: 'volume', baseValue: 1000,    baseUnit: 'ml', displayNL: 'liter',       displayEN: 'liter' },
+    'liters':            { type: 'volume', baseValue: 1000,    baseUnit: 'ml', displayNL: 'liter',       displayEN: 'liter' },
+    'litre':             { type: 'volume', baseValue: 1000,    baseUnit: 'ml', displayNL: 'liter',       displayEN: 'liter' },
+    'litres':            { type: 'volume', baseValue: 1000,    baseUnit: 'ml', displayNL: 'liter',       displayEN: 'liter' },
+    'l':                 { type: 'volume', baseValue: 1000,    baseUnit: 'ml', displayNL: 'liter',       displayEN: 'liter' },
+
+    // ── WEIGHT ─────────────────────────────────────────────
+    // Gram
+    'gram':              { type: 'weight', baseValue: 1,       baseUnit: 'g',  displayNL: 'gram',        displayEN: 'gram'  },
+    'grams':             { type: 'weight', baseValue: 1,       baseUnit: 'g',  displayNL: 'gram',        displayEN: 'gram'  },
+    'grammen':           { type: 'weight', baseValue: 1,       baseUnit: 'g',  displayNL: 'gram',        displayEN: 'gram'  },
+    'g':                 { type: 'weight', baseValue: 1,       baseUnit: 'g',  displayNL: 'gram',        displayEN: 'gram'  },
+
+    // Kilogram
+    'kilogram':          { type: 'weight', baseValue: 1000,    baseUnit: 'g',  displayNL: 'kg',          displayEN: 'kg'    },
+    'kilograms':         { type: 'weight', baseValue: 1000,    baseUnit: 'g',  displayNL: 'kg',          displayEN: 'kg'    },
+    'kg':                { type: 'weight', baseValue: 1000,    baseUnit: 'g',  displayNL: 'kg',          displayEN: 'kg'    },
+
+    // Ounce (weight)
+    'ounce':             { type: 'weight', baseValue: 28.3495, baseUnit: 'g',  displayNL: 'oz',          displayEN: 'oz'    },
+    'ounces':            { type: 'weight', baseValue: 28.3495, baseUnit: 'g',  displayNL: 'oz',          displayEN: 'oz'    },
+    'oz':                { type: 'weight', baseValue: 28.3495, baseUnit: 'g',  displayNL: 'oz',          displayEN: 'oz'    },
+
+    // Pound
+    'pound':             { type: 'weight', baseValue: 453.592, baseUnit: 'g',  displayNL: 'pond',        displayEN: 'lb'    },
+    'pounds':            { type: 'weight', baseValue: 453.592, baseUnit: 'g',  displayNL: 'pond',        displayEN: 'lb'    },
+    'lb':                { type: 'weight', baseValue: 453.592, baseUnit: 'g',  displayNL: 'pond',        displayEN: 'lb'    },
+    'lbs':               { type: 'weight', baseValue: 453.592, baseUnit: 'g',  displayNL: 'pond',        displayEN: 'lb'    },
+    'pond':              { type: 'weight', baseValue: 453.592, baseUnit: 'g',  displayNL: 'pond',        displayEN: 'lb'    },
+    'ponden':            { type: 'weight', baseValue: 453.592, baseUnit: 'g',  displayNL: 'pond',        displayEN: 'lb'    },
+
+    // ── SPANISH ALIASES ──────────────────────────────────
+    // Cucharadita (teaspoon)
+    'cucharadita':       { type: 'volume', baseValue: 5,       baseUnit: 'ml', displayNL: 'theelepel',   displayEN: 'tsp'   },
+    'cucharaditas':      { type: 'volume', baseValue: 5,       baseUnit: 'ml', displayNL: 'theelepel',   displayEN: 'tsp'   },
+    'cdita':             { type: 'volume', baseValue: 5,       baseUnit: 'ml', displayNL: 'theelepel',   displayEN: 'tsp'   },
+    'cditas':            { type: 'volume', baseValue: 5,       baseUnit: 'ml', displayNL: 'theelepel',   displayEN: 'tsp'   },
+
+    // Cucharada (tablespoon)
+    'cucharada':         { type: 'volume', baseValue: 15,      baseUnit: 'ml', displayNL: 'eetlepel',    displayEN: 'tbsp'  },
+    'cucharadas':        { type: 'volume', baseValue: 15,      baseUnit: 'ml', displayNL: 'eetlepel',    displayEN: 'tbsp'  },
+    'cda':               { type: 'volume', baseValue: 15,      baseUnit: 'ml', displayNL: 'eetlepel',    displayEN: 'tbsp'  },
+    'cdas':              { type: 'volume', baseValue: 15,      baseUnit: 'ml', displayNL: 'eetlepel',    displayEN: 'tbsp'  },
+
+    // Taza (cup)
+    'taza':              { type: 'volume', baseValue: 240,     baseUnit: 'ml', displayNL: 'kopje',       displayEN: 'cup'   },
+    'tazas':             { type: 'volume', baseValue: 240,     baseUnit: 'ml', displayNL: 'kopje',       displayEN: 'cup'   },
+
+    // Mililitro
+    'mililitro':         { type: 'volume', baseValue: 1,       baseUnit: 'ml', displayNL: 'ml',          displayEN: 'ml'    },
+    'mililitros':        { type: 'volume', baseValue: 1,       baseUnit: 'ml', displayNL: 'ml',          displayEN: 'ml'    },
+
+    // Decilitro
+    'decilitro':         { type: 'volume', baseValue: 100,     baseUnit: 'ml', displayNL: 'dl',          displayEN: 'dl'    },
+    'decilitros':        { type: 'volume', baseValue: 100,     baseUnit: 'ml', displayNL: 'dl',          displayEN: 'dl'    },
+
+    // Litro
+    'litro':             { type: 'volume', baseValue: 1000,    baseUnit: 'ml', displayNL: 'liter',       displayEN: 'liter' },
+    'litros':            { type: 'volume', baseValue: 1000,    baseUnit: 'ml', displayNL: 'liter',       displayEN: 'liter' },
+
+    // Gramo
+    'gramo':             { type: 'weight', baseValue: 1,       baseUnit: 'g',  displayNL: 'gram',        displayEN: 'gram'  },
+    'gramos':            { type: 'weight', baseValue: 1,       baseUnit: 'g',  displayNL: 'gram',        displayEN: 'gram'  },
+
+    // Kilogramo / kilo
+    'kilogramo':         { type: 'weight', baseValue: 1000,    baseUnit: 'g',  displayNL: 'kg',          displayEN: 'kg'    },
+    'kilogramos':        { type: 'weight', baseValue: 1000,    baseUnit: 'g',  displayNL: 'kg',          displayEN: 'kg'    },
+    'kilo':              { type: 'weight', baseValue: 1000,    baseUnit: 'g',  displayNL: 'kg',          displayEN: 'kg'    },
+    'kilos':             { type: 'weight', baseValue: 1000,    baseUnit: 'g',  displayNL: 'kg',          displayEN: 'kg'    },
+
+    // Onza (weight ounce)
+    'onza':              { type: 'weight', baseValue: 28.3495, baseUnit: 'g',  displayNL: 'oz',          displayEN: 'oz'    },
+    'onzas':             { type: 'weight', baseValue: 28.3495, baseUnit: 'g',  displayNL: 'oz',          displayEN: 'oz'    },
+
+    // Libra
+    'libra':             { type: 'weight', baseValue: 453.592, baseUnit: 'g',  displayNL: 'pond',        displayEN: 'lb'    },
+    'libras':            { type: 'weight', baseValue: 453.592, baseUnit: 'g',  displayNL: 'pond',        displayEN: 'lb'    },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 2. NO-CONVERT TERMS (absolute, never convert)
+// ═══════════════════════════════════════════════════════════════════════════
+const NO_CONVERT_TERMS = new Set([
+    // NL
+    'snufje', 'snuf', 'scheutje', 'scheut', 'teentje', 'teentjes', 'stuks', 'stuk', 'takje', 'takjes',
+    'blaadje', 'blaadjes', 'plak', 'plakje', 'plakjes', 'handvol', 'bosje',
+    // EN
+    'pinch', 'dash', 'clove', 'cloves', 'piece', 'pieces', 'sprig', 'sprigs',
+    'leaf', 'leaves', 'slice', 'slices', 'handful', 'bunch', 'head', 'heads',
+    'drop', 'drops', 'can', 'cans', 'jar', 'jars', 'pack', 'packs', 'package', 'packages',
+    // ES
+    'pizca', 'pizcas', 'chorrito', 'chorritos', 'diente', 'dientes', 'pieza', 'piezas',
+    'ramita', 'ramitas', 'hoja', 'hojas', 'rebanada', 'rebanadas', 'puñado', 'manojo',
+    'lata', 'latas', 'bote', 'botes', 'paquete', 'paquetes', 'cabeza', 'cabezas',
+    'gota', 'gotas',
+]);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 3. TEXT → NUMBER  (NL + EN mixed, word boundaries will be applied in code)
+// ═══════════════════════════════════════════════════════════════════════════
+const TEXT_TO_NUMBER = [
+    // Must be sorted longest-first to avoid "anderhalf" being split into "ander" + "half"
+    { pattern: /\banderhalf\b/gi,         value: 1.5   },
+    { pattern: /\bdrieënhalf\b/gi,        value: 3.5   },
+    { pattern: /\btweeënhalf\b/gi,        value: 2.5   },
+    { pattern: /\bone\s+and\s+a\s+half\b/gi, value: 1.5 },
+    { pattern: /\btwo\s+and\s+a\s+half\b/gi, value: 2.5 },
+    { pattern: /\bthree\s+and\s+a\s+half\b/gi, value: 3.5 },
+    { pattern: /\bdrie\b/gi,              value: 3     },
+    { pattern: /\bvier\b/gi,              value: 4     },
+    { pattern: /\bvijf\b/gi,              value: 5     },
+    { pattern: /\bzes\b/gi,               value: 6     },
+    { pattern: /\bzeven\b/gi,             value: 7     },
+    { pattern: /\bacht\b/gi,              value: 8     },
+    { pattern: /\bnegen\b/gi,             value: 9     },
+    { pattern: /\btien\b/gi,              value: 10    },
+    { pattern: /\btwaalf\b/gi,            value: 12    },
+    { pattern: /\btwee\b/gi,              value: 2     },
+    { pattern: /\been\b/gi,               value: 1     },  // NL "een" = 1
+    { pattern: /\bhalf\b/gi,              value: 0.5   },
+    { pattern: /\bone\b/gi,               value: 1     },
+    { pattern: /\btwo\b/gi,               value: 2     },
+    { pattern: /\bthree\b/gi,             value: 3     },
+    { pattern: /\bfour\b/gi,              value: 4     },
+    { pattern: /\bfive\b/gi,              value: 5     },
+    { pattern: /\bsix\b/gi,               value: 6     },
+    { pattern: /\bseven\b/gi,             value: 7     },
+    { pattern: /\beight\b/gi,             value: 8     },
+    { pattern: /\bnine\b/gi,              value: 9     },
+    { pattern: /\bten\b/gi,               value: 10    },
+    { pattern: /\btwelve\b/gi,            value: 12    },
+    { pattern: /\ba\b/gi,                 value: 1     },  // "a pinch of" → 1
+    // Spanish
+    { pattern: /\banderhalf\b/gi,         value: 1.5   },  // already defined above but duplicate-safe
+    { pattern: /\bmedio\b/gi,             value: 0.5   },  // ES: medio = half
+    { pattern: /\bmedia\b/gi,             value: 0.5   },  // ES: media = half (feminine)
+    { pattern: /\bun\b/gi,                value: 1     },  // ES: un/una = 1
+    { pattern: /\buna\b/gi,               value: 1     },
+    { pattern: /\buno\b/gi,               value: 1     },
+    { pattern: /\bdos\b/gi,               value: 2     },
+    { pattern: /\btres\b/gi,              value: 3     },
+    { pattern: /\bcuatro\b/gi,            value: 4     },
+    { pattern: /\bcinco\b/gi,             value: 5     },
+    { pattern: /\bseis\b/gi,              value: 6     },
+    { pattern: /\bsiete\b/gi,             value: 7     },
+    { pattern: /\bocho\b/gi,              value: 8     },
+    { pattern: /\bnueve\b/gi,             value: 9     },
+    { pattern: /\bdiez\b/gi,              value: 10    },
+    { pattern: /\bdoce\b/gi,              value: 12    },
+];
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 4. PREPARATION WORDS  (stripped after unit, before ingredient name)
+// ═══════════════════════════════════════════════════════════════════════════
+const PREP_WORDS_NL = ['gehakt', 'fijngehakt', 'gesneden', 'geraspt', 'gepeld', 'geroosterd',
+    'gekneusd', 'fijngesneden', 'fijngemalen', 'gemalen', 'geplet', 'gebakken', 'gekookt', 'geweekt'];
+const PREP_WORDS_EN = ['chopped', 'finely chopped', 'minced', 'grated', 'peeled', 'roasted',
+    'crushed', 'sliced', 'ground', 'diced', 'toasted', 'cooked', 'soaked', 'trimmed', 'shredded'];
+const PREP_WORDS_ES = ['finamente picado', 'finamente picada', 'picado', 'picada', 'cortado', 'cortada',
+    'rallado', 'rallada', 'pelado', 'pelada', 'tostado', 'tostada', 'molido', 'molida',
+    'triturado', 'triturada', 'en rodajas', 'en cubos', 'en trozos', 'cocido', 'cocida',
+    'frito', 'frita', 'asado', 'asada', 'hervido', 'hervida'];
+const ALL_PREP_WORDS = [...PREP_WORDS_NL, ...PREP_WORDS_EN, ...PREP_WORDS_ES]
+    .sort((a, b) => b.length - a.length); // longest first
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 5. PARSER PIPELINE
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Sort unit keys longest-first so "eetlepel" matches before "el", etc.
+ */
+const UNIT_KEYS_SORTED = Object.keys(UNIT_MAP).sort((a, b) => b.length - a.length);
+
+/**
+ * Step 1: text-to-number substitution
+ */
+function applyTextToNumber(text) {
+    let result = text;
+    for (const { pattern, value } of TEXT_TO_NUMBER) {
+        result = result.replace(pattern, String(value));
+    }
+    return result;
+}
+
+/**
+ * Step 2: extract leading numeric amount (supports decimals, fractions 1/2, unicode ½¼¾)
+ * Returns { amount: number, rest: string }
+ */
+function extractAmount(text) {
+    // Unicode fractions → decimal first
+    let t = text
+        .replace(/½/g, '0.5').replace(/¼/g, '0.25').replace(/¾/g, '0.75')
+        .replace(/⅓/g, '0.333').replace(/⅔/g, '0.667').replace(/⅛/g, '0.125')
+        .replace(/,/g, '.') // handle "1,5"
+        .trim();
+
+    // Pattern: optional integer + fraction  e.g. "1 1/2" or just "1/2" or "1.5"
+    const fracMatch = t.match(/^(\d+)\s+(\d+)\/(\d+)\b/);
+    if (fracMatch) {
+        const whole = parseFloat(fracMatch[1]);
+        const num   = parseFloat(fracMatch[2]);
+        const den   = parseFloat(fracMatch[3]);
+        return { amount: whole + num / den, rest: t.slice(fracMatch[0].length).trim() };
+    }
+    const simpleFrac = t.match(/^(\d+)\/(\d+)\b/);
+    if (simpleFrac) {
+        return { amount: parseFloat(simpleFrac[1]) / parseFloat(simpleFrac[2]), rest: t.slice(simpleFrac[0].length).trim() };
+    }
+    const numMatch = t.match(/^(\d+\.?\d*)/);
+    if (numMatch) {
+        return { amount: parseFloat(numMatch[1]), rest: t.slice(numMatch[0].length).trim() };
+    }
+    return { amount: null, rest: t };
+}
+
+/**
+ * Step 3: match unit key at start of string (longest-first)
+ * Returns { unitKey: string|null, rest: string }
+ */
+function extractUnit(text) {
+    const lower = text.toLowerCase();
+    for (const key of UNIT_KEYS_SORTED) {
+        // Word boundary: key must be followed by space, comma, or end-of-string
+        const re = new RegExp('^' + escapeRegex(key) + '(?=[\\s,.]|$)', 'i');
+        if (re.test(lower)) {
+            return { unitKey: key, rest: text.slice(key.length).trim() };
+        }
+    }
+    return { unitKey: null, rest: text };
+}
+
+/**
+ * Step 3b: check if the start of text is a no-convert term
+ * Returns { noConvert: string|null, rest: string }
+ */
+function extractNoConvert(text) {
+    const lower = text.toLowerCase();
+    // Sort by length descending to try longer terms first
+    const sorted = [...NO_CONVERT_TERMS].sort((a, b) => b.length - a.length);
+    for (const term of sorted) {
+        const re = new RegExp('^' + escapeRegex(term) + '(?=[\\s,.]|$)', 'i');
+        if (re.test(lower)) {
+            return { noConvert: term, rest: text.slice(term.length).trim() };
+        }
+    }
+    return { noConvert: null, rest: text };
+}
+
+/**
+ * Step 4: extract preparation word(s) from start of string
+ * Returns { preparation: string, rest: string }
+ */
+function extractPreparation(text) {
+    const lower = text.toLowerCase();
+    for (const prep of ALL_PREP_WORDS) {
+        const re = new RegExp('^' + escapeRegex(prep) + '(?=[\\s,]|$)', 'i');
+        if (re.test(lower)) {
+            return { preparation: prep, rest: text.slice(prep.length).trim() };
+        }
+    }
+    return { preparation: '', rest: text };
+}
+
+/**
+ * Strip leading "of" / "van" connector words
+ */
+function stripConnector(text) {
+    return text.replace(/^(of|van)\s+/i, '').trim();
+}
+
+function escapeRegex(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Main parse function — runs the full pipeline for a single line
+ */
+function parseIngredientLine(rawLine) {
+    const originalText = rawLine.trim();
+    if (!originalText) return null;
+
+    // Step 1: text-to-number
+    let text = applyTextToNumber(originalText);
+
+    // Step 2: amount
+    const { amount, rest: afterAmount } = extractAmount(text);
+
+    // Check for no-convert terms BEFORE trying unit
+    const { noConvert, rest: afterNC } = extractNoConvert(afterAmount);
+    if (noConvert) {
+        const { rest: afterConn } = { rest: stripConnector(afterNC) };
+        const { preparation, rest: ingredient } = extractPreparation(afterConn.length ? afterConn : afterNC);
+        return {
+            original:    originalText,
+            amount:      amount,
+            unit:        noConvert,
+            unitKey:     null,
+            type:        'absolute',
+            baseValue:   null,
+            baseUnit:    null,
+            preparation: preparation,
+            ingredient:  stripConnector(ingredient) || afterConn || '(onbekend)',
+            converted:   null,
+            displayUnit: noConvert,
+            warning:     false,
+        };
+    }
+
+    // Step 3: unit
+    const { unitKey, rest: afterUnit } = extractUnit(afterAmount);
+    const rest1 = stripConnector(afterUnit);
+
+    // Step 4: preparation
+    const { preparation, rest: afterPrep } = extractPreparation(rest1);
+    const ingredient = stripConnector(afterPrep).trim() || rest1 || '(onbekend)';
+
+    const unitMeta = unitKey ? UNIT_MAP[unitKey] : null;
+
+    if (!unitMeta) {
+        // Unknown or missing unit — return as-is with warning
+        return {
+            original:    originalText,
+            amount:      amount,
+            unit:        null,
+            unitKey:     null,
+            type:        'unknown',
+            baseValue:   null,
+            baseUnit:    null,
+            preparation: preparation,
+            ingredient:  ingredient,
+            converted:   null,
+            displayUnit: null,
+            warning:     true,
+        };
+    }
+
+    const baseValue = (amount ?? 1) * unitMeta.baseValue;
+
+    return {
+        original:    originalText,
+        amount:      amount,
+        unit:        unitKey,
+        unitKey:     unitKey,
+        type:        unitMeta.type,
+        baseValue:   baseValue,
+        baseUnit:    unitMeta.baseUnit,
+        preparation: preparation,
+        ingredient:  ingredient,
+        converted:   null,  // filled in by formatter
+        displayUnit: null,  // filled in by formatter
+        warning:     false,
+    };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 6. FORMAT OUTPUT  — Base Truth → display system
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Round to max `decimals` decimal places, stripping trailing zeros
+ */
+function smartRound(num, decimals = 2) {
+    const factor = Math.pow(10, decimals);
+    return Math.round(num * factor) / factor;
+}
+
+function formatVolume(baseML, system) {
+    if (system === 'metric') {
+        if (baseML >= 1000) return { value: smartRound(baseML / 1000, 2), unit: 'liter' };
+        if (baseML >= 100)  return { value: smartRound(baseML, 0),         unit: 'ml' };
+        return                     { value: smartRound(baseML, 1),          unit: 'ml' };
+    } else {
+        // Imperial: prefer cups if ≥ 60ml (≈ ¼ cup), else fl.oz
+        const cups  = baseML / 240;
+        const floz  = baseML / 29.5735;
+        if (baseML >= 60) return { value: smartRound(cups, 2),   unit: 'cups' };
+        return               { value: smartRound(floz, 2),    unit: 'fl.oz' };
+    }
+}
+
+function formatWeight(baseG, system) {
+    if (system === 'metric') {
+        if (baseG >= 1000) return { value: smartRound(baseG / 1000, 2), unit: 'kg' };
+        return                    { value: smartRound(baseG, 0),          unit: 'gram' };
+    } else {
+        // Imperial: lb if ≥ 226g (≈ ½ lb), else oz
+        const lb = baseG / 453.592;
+        const oz = baseG / 28.3495;
+        if (baseG >= 226) return { value: smartRound(lb, 2), unit: 'lb' };
+        return                   { value: smartRound(oz, 1), unit: 'oz' };
+    }
+}
+
+/**
+ * Apply formatting to a parsed ingredient object.
+ * Returns a new object with `converted` and `displayUnit` filled in.
+ */
+function formatParsed(parsed, system) {
+    if (parsed.type === 'absolute' || parsed.type === 'unknown' || !parsed.baseValue) {
+        return { ...parsed };
+    }
+    let fmt;
+    if (parsed.type === 'volume') {
+        fmt = formatVolume(parsed.baseValue, system);
+    } else if (parsed.type === 'weight') {
+        fmt = formatWeight(parsed.baseValue, system);
+    } else {
+        return { ...parsed };
+    }
+    return { ...parsed, converted: fmt.value, displayUnit: fmt.unit };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 7. BUILD OUTPUT STRING
+//    Format: [conv. qty] [unit] [prep] [ingredient] ([original qty] [original unit])
+// ═══════════════════════════════════════════════════════════════════════════
+function buildOutputString(formatted) {
+    const { type, amount, unit, converted, displayUnit, preparation, ingredient, original, warning } = formatted;
+
+    if (type === 'unknown' || warning) {
+        return original; // pass through unchanged
+    }
+
+    if (type === 'absolute') {
+        // e.g. "1 snufje zout" → "1 snufje zout"
+        const qtyPart  = amount !== null ? `${amount} ` : '';
+        const prepPart = preparation ? ` ${preparation}` : '';
+        return `${qtyPart}${unit}${prepPart} ${ingredient}`.trim();
+    }
+
+    // Convert types
+    const convQty      = converted !== null ? converted : amount;
+    const convUnit     = displayUnit || unit;
+    const prepPart     = preparation ? ` ${preparation}` : '';
+    const origAmount   = amount !== null ? amount : '';
+    const origUnit     = unit || '';
+    const originalPart = origAmount !== '' ? ` (${origAmount} ${origUnit})`.replace(/\s+/g, ' ') : '';
+
+    return `${convQty} ${convUnit}${prepPart} ${ingredient}${originalPart}`.trim();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STATE & UI
+// ═══════════════════════════════════════════════════════════════════════════
+let displaySystem = 'metric';
+
+function setSystem(sys) {
+    displaySystem = sys;
+    document.getElementById('btn-metric').dataset.active   = sys === 'metric'   ? 'true' : 'false';
+    document.getElementById('btn-imperial').dataset.active = sys === 'imperial' ? 'true' : 'false';
+}
+
+function runParser() {
+    const raw  = document.getElementById('input-area').value;
+    const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+
+    if (lines.length === 0) return;
+
+    const section = document.getElementById('results-section');
+    const list    = document.getElementById('results-list');
+    const countEl = document.getElementById('results-count');
+
+    section.classList.remove('hidden');
+    list.innerHTML = '';
+
+    let okCount = 0;
+    let warnCount = 0;
+
+    for (const line of lines) {
+        const parsed    = parseIngredientLine(line);
+        if (!parsed) continue;
+        const formatted = formatParsed(parsed, displaySystem);
+        const outputStr = buildOutputString(formatted);
+
+        const isWarn = formatted.warning;
+        const isAbsolute = formatted.type === 'absolute';
+        isWarn ? warnCount++ : okCount++;
+
+        const badgeClass = isWarn
+            ? 'bg-amber-100 text-amber-700 border border-amber-300'
+            : isAbsolute
+                ? 'bg-sage bg-opacity-20 text-sage border border-sage border-opacity-30'
+                : 'bg-green-50 text-green-700 border border-green-200';
+        const badgeLabel = isWarn ? '⚠ Onbekend' : isAbsolute ? '✦ Absoluut' : '✓ Geconverteerd';
+
+        const jsonData = JSON.stringify({
+            original:    formatted.original,
+            amount:      formatted.amount,
+            unitKey:     formatted.unitKey,
+            type:        formatted.type,
+            baseValue:   formatted.baseValue ? `${formatted.baseValue} ${formatted.baseUnit}` : null,
+            converted:   formatted.converted !== null ? `${formatted.converted} ${formatted.displayUnit}` : null,
+            preparation: formatted.preparation || null,
+            ingredient:  formatted.ingredient,
+            warning:     formatted.warning,
+        }, null, 2);
+
+        const card = document.createElement('div');
+        card.className = 'rounded-xl border border-parchmentDark bg-parchment p-4';
+        card.innerHTML = `
+            <div class="flex items-start justify-between gap-3 flex-wrap">
+                <p class="text-base font-bold text-forest flex-1">${escapeHTML(outputStr)}</p>
+                <span class="shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${badgeClass}">${badgeLabel}</span>
+            </div>
+            <p class="mt-1 text-xs text-sage font-medium">Invoer: <span class="italic">${escapeHTML(line)}</span></p>
+            <details class="mt-3">
+                <summary class="inline-flex items-center gap-1.5 text-xs font-bold text-gold hover:text-forest transition-colors">
+                    <span>▶ JSON datastructuur</span>
+                </summary>
+                <pre class="json-pre mt-2 rounded-lg border border-parchmentDark bg-white p-3 text-forest">${escapeHTML(jsonData)}</pre>
+            </details>
+        `;
+        list.appendChild(card);
+    }
+
+    countEl.textContent = `${lines.length} ingrediënt${lines.length !== 1 ? 'en' : ''} · ${okCount} verwerkt${warnCount > 0 ? ` · ${warnCount} waarschuwing${warnCount !== 1 ? 'en' : ''}` : ''}`;
+}
+
+function escapeHTML(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// REFERENCE TABLE — render unit reference on page load
+// ═══════════════════════════════════════════════════════════════════════════
+(function buildReference() {
+    const el = document.getElementById('unit-reference');
+    const groups = { volume: [], weight: [] };
+    const seen = new Set();
+    for (const [key, meta] of Object.entries(UNIT_MAP)) {
+        const label = `${meta.displayNL} / ${meta.displayEN}`;
+        if (seen.has(label)) continue;
+        seen.add(label);
+        const base = meta.type === 'volume' ? `${meta.baseValue} ml` : `${meta.baseValue} g`;
+        groups[meta.type].push({ key, label, base });
+    }
+
+    let html = '<div class="grid gap-6 md:grid-cols-2">';
+
+    for (const [type, rows] of Object.entries(groups)) {
+        html += `
+            <div>
+                <h3 class="mb-3 text-[10px] font-bold uppercase tracking-[0.28em] text-sage">${type === 'volume' ? 'Volume' : 'Gewicht'}</h3>
+                <table class="w-full text-xs">
+                    <thead>
+                        <tr class="text-left text-sage font-bold uppercase tracking-wider border-b border-parchmentDark">
+                            <th class="pb-2 pr-4">Alias</th>
+                            <th class="pb-2">Base waarde</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-parchmentDark">
+                        ${rows.map(r => `<tr class="hover:bg-parchment"><td class="py-1.5 pr-4 font-medium">${escapeHTML(r.label)}</td><td class="py-1.5 text-sage">${escapeHTML(r.base)}</td></tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>`;
+    }
+
+    html += `
+        <div class="md:col-span-2 mt-2">
+            <h3 class="mb-3 text-[10px] font-bold uppercase tracking-[0.28em] text-sage">Absoluut (nooit converteren)</h3>
+            <div class="flex flex-wrap gap-2">
+                ${[...NO_CONVERT_TERMS].sort().map(t => `<span class="rounded-full bg-sage bg-opacity-10 px-3 py-1 text-xs font-medium text-forest">${escapeHTML(t)}</span>`).join('')}
+            </div>
+        </div>`;
+
+    html += '</div>';
+    el.innerHTML = html;
+})();
+</script>
+</body>
+</html>
