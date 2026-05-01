@@ -115,20 +115,18 @@ const firebaseConfig = {
 3. Add `www.uculi.com` before launch.
 4. Add `uculi.com` as well if you want the apex domain to redirect to `www.uculi.com`.
 
-## Step 7: Stage A Safe Hosting Build
+## Step 7: Prepare Single-Source Hosting
 
-Do not deploy the repo root directly.
+1. Use `index.html` as the only app shell source.
+2. Keep deployment filtering in `firebase.json` (`hosting.ignore`) so only intended files are published.
+3. Keep internal planning docs, notes, and future server-side code in ignored paths.
 
-1. Run `scripts/prepare-hosting.ps1` from the repo root.
-2. Confirm the generated `public/` folder contains only the assets that should be public.
-3. Keep internal planning docs, notes, and future server-side code outside `public/`.
-
-The repo now includes `firebase.json`, which is configured to serve only `public/` and attach security headers before launch.
+The repo now uses root-based hosting in `firebase.json` with security headers enabled before launch.
 
 ## Step 8: Configure Firebase Hosting For `www.uculi.com`
 
 1. In Firebase Console, open `Hosting` and finish initial setup for your project.
-2. Use the included `firebase.json` so the hosting root stays `public/`, not the repo root.
+2. Use the included `firebase.json` root hosting config with the explicit ignore list.
 3. Add `www.uculi.com` as the primary custom domain in Firebase Hosting.
 4. Add `uculi.com` as a secondary custom domain and configure it to redirect to `www.uculi.com`.
 5. At your domain provider, add the exact DNS records Firebase shows for verification and routing.
@@ -142,7 +140,7 @@ Notes:
 
 ## Step 9: Launch Security Checklist
 
-- Deploy only the generated `public/` folder.
+- Deploy with the root-based `firebase.json` configuration and verify ignore rules are intact.
 - Keep `.firebaserc` local and outside version control.
 - Keep billing secrets and webhook secrets on the server side only.
 - Verify Firebase Auth authorized domains include the final live domains.

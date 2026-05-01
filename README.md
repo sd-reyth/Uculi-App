@@ -65,9 +65,9 @@ If a note overlaps with one of these files, merge it into the relevant canonical
 
 ## Safe Hosting Flow
 
-- Never publish the repo root directly.
-- Use `scripts/prepare-hosting.ps1` to stage a deployment-safe `public/` folder.
-- Firebase Hosting is configured through `firebase.json` to serve only `public/`.
+- Use `index.html` as the single source of truth for the app shell.
+- Firebase Hosting now deploys from repo root with an explicit ignore list in `firebase.json`.
+- The legacy `public/index.html` staging copy flow has been removed to avoid drift.
 - Security headers and a restrictive Content Security Policy are set at the hosting layer before launch.
 - Keep `.firebaserc` local so the repo does not need to carry your live project binding.
 - Treat `.noop/` as disposable local runtime scratch, not as product source.
@@ -78,7 +78,6 @@ For `www.uculi.com`, use `www` as the primary production host and redirect the a
 
 - `index.html` - application UI, state, and logic.
 - `firebase.json` - Hosting configuration, rewrites, and security headers.
-- `scripts/prepare-hosting.ps1` - stages the app into the safe `public/` deploy folder.
 - `README.md` - high-level repo guide.
 - `docs/STRICT_LAUNCH_BACKLOG.md` - active launch backlog.
 - `docs/FINAL_BILLING_AI_EXECUTION_PLAN.md` - billing implementation plan.
