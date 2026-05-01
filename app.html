@@ -2067,6 +2067,7 @@
         const legacyRecipeDataStorageKey = 'recipeArchiveData';
         const legacyRecipeFamiliesStorageKey = 'recipeArchiveFamilies';
         const adminConfigStorageKey = 'recipeArchiveAdminConfig';
+        const moderationLogStorageKey = 'recipeArchiveModerationLog';
         const accountStorageMigrationPrefix = 'recipeArchiveMigrated';
 
         const harmfulContentPatterns = [
@@ -2076,8 +2077,398 @@
             { label: 'Drugs', pattern: /\b(cocaine|heroin|meth|amphetamine|mdma|ecstasy)\b/i }
         ];
 
+        const familyNameProfanityPatterns = [
+            /\bfuck\b/i,
+            /\bfucking\b/i,
+            /\bshit\b/i,
+            /\bbitch\b/i,
+            /\basshole\b/i,
+            /\bcunt\b/i,
+            /\bnigger\b/i,
+            /\bneger\b/i,
+            /\bkanker\b/i,
+            /\btyfus\b/i,
+            /\btering\b/i,
+            /\bhoer\b/i
+        ];
+
+        const moderationReportReasonOptions = [
+            'Harassment or abuse',
+            'Hate speech',
+            'Sexual or explicit content',
+            'Violence or threats',
+            'Spam or scam',
+            'Impersonation',
+            'Privacy violation',
+            'Other'
+        ];
+
         function normalizeAdminEmail(value = '') {
             return String(value || '').trim().toLowerCase();
+        }
+
+        function getDefaultModerationStatus() {
+            return {
+                uid: '',
+                state: 'clear',
+                sanctionType: '',
+                reason: '',
+                startedAt: '',
+                expiresAt: '',
+                actorId: '',
+                actorEmail: '',
+                targetEmail: '',
+                strikeCount: 0,
+                banCount: 0,
+                publishBlocked: false,
+                profileOffline: false,
+                socialIsolation: false,
+                familyReadOnly: false,
+                permabanReviewAt: '',
+                latestNotification: null,
+                updatedAt: ''
+            };
+        }
+
+        function normalizeModerationStatus(status = {}) {
+            const normalized = {
+                ...getDefaultModerationStatus(),
+                ...(status || {})
+            };
+
+            normalized.uid = String(normalized.uid || '').trim();
+            normalized.state = String(normalized.state || 'clear').trim().toLowerCase();
+            normalized.sanctionType = String(normalized.sanctionType || '').trim().toLowerCase();
+            normalized.reason = String(normalized.reason || '').trim();
+            normalized.startedAt = String(normalized.startedAt || '');
+            normalized.expiresAt = String(normalized.expiresAt || '');
+            normalized.actorId = String(normalized.actorId || '');
+            normalized.actorEmail = String(normalized.actorEmail || '');
+            normalized.targetEmail = String(normalized.targetEmail || '');
+            normalized.strikeCount = Math.max(0, Number(normalized.strikeCount) || 0);
+            normalized.banCount = Math.max(0, Number(normalized.banCount) || 0);
+            normalized.publishBlocked = normalized.publishBlocked === true;
+            normalized.profileOffline = normalized.profileOffline === true;
+            normalized.socialIsolation = normalized.socialIsolation === true;
+            normalized.familyReadOnly = normalized.familyReadOnly === true;
+            normalized.permabanReviewAt = String(normalized.permabanReviewAt || '');
+            normalized.latestNotification = normalized.latestNotification && typeof normalized.latestNotification === 'object'
+                ? {
+                    id: String(normalized.latestNotification.id || ''),
+                    title: String(normalized.latestNotification.title || ''),
+                    message: String(normalized.latestNotification.message || ''),
+                    createdAt: String(normalized.latestNotification.createdAt || '')
+                }
+                : null;
+            normalized.updatedAt = String(normalized.updatedAt || '');
+            return normalized;
+        }
+
+        function isModerationActive(status = null) {
+            const normalized = normalizeModerationStatus(status || currentUserModerationStatus || {});
+            if (!normalized.state || normalized.state === 'clear') return false;
+            if (normalized.state === 'permaban') return true;
+            if (!normalized.expiresAt) return false;
+            const expiresAtMs = new Date(normalized.expiresAt).getTime();
+            return Number.isFinite(expiresAtMs) && expiresAtMs > Date.now();
+        }
+
+        function getResolvedCurrentUserModerationStatus() {
+            if (!currentUserModerationStatus) return getDefaultModerationStatus();
+            const normalized = normalizeModerationStatus(currentUserModerationStatus);
+            if (!isModerationActive(normalized)) {
+                return normalizeModerationStatus({
+                    ...normalized,
+                    state: 'clear',
+                    sanctionType: '',
+                    reason: '',
+                    startedAt: '',
+                    expiresAt: '',
+                    publishBlocked: false,
+                    profileOffline: false,
+                    socialIsolation: false,
+                    familyReadOnly: false
+                });
+            }
+            return normalized;
+        }
+
+        function isCurrentUserPublishBlocked() {
+            const status = getResolvedCurrentUserModerationStatus();
+            return status.publishBlocked === true;
+        }
+
+        function isCurrentUserSociallyIsolated() {
+            const status = getResolvedCurrentUserModerationStatus();
+            return status.socialIsolation === true;
+        }
+
+        function isCurrentUserFamilyReadOnly() {
+            const status = getResolvedCurrentUserModerationStatus();
+            return status.familyReadOnly === true;
+        }
+
+        function sanitizeModerationReason(value = '') {
+            return String(value || '').replace(/\s+/g, ' ').trim().slice(0, 240);
+        }
+
+        function sanitizeReportDetails(value = '') {
+            return String(value || '').replace(/\s+/g, ' ').trim().slice(0, 1200);
+        }
+
+        function getDurationLabel(durationUnit, durationValue, isPermanent = false) {
+            if (isPermanent) return 'Permanent';
+            const value = Math.max(1, Number(durationValue) || 1);
+            if (durationUnit === 'weeks') return `${value} week${value === 1 ? '' : 's'}`;
+            if (durationUnit === 'months') return `${value} month${value === 1 ? '' : 's'}`;
+            return `${value} day${value === 1 ? '' : 's'}`;
+        }
+
+        function getDurationExpirationIso(durationUnit, durationValue, isPermanent = false) {
+            if (isPermanent) return '';
+            const value = Math.max(1, Number(durationValue) || 1);
+            const now = new Date();
+            const next = new Date(now.getTime());
+            if (durationUnit === 'weeks') {
+                next.setDate(next.getDate() + (value * 7));
+            } else if (durationUnit === 'months') {
+                next.setMonth(next.getMonth() + value);
+            } else {
+                next.setDate(next.getDate() + value);
+            }
+            return next.toISOString();
+        }
+
+        function getNextPermabanReviewIso() {
+            const reviewDate = new Date();
+            reviewDate.setFullYear(reviewDate.getFullYear() + 3);
+            return reviewDate.toISOString();
+        }
+
+        function getModerationLogEntryBase(action = '', payload = {}) {
+            return {
+                action: String(action || '').trim(),
+                actorId: currentUser?.uid || '',
+                actorEmail: currentUser?.email || '',
+                targetUserId: String(payload?.targetUserId || ''),
+                targetEmail: String(payload?.targetEmail || ''),
+                reason: sanitizeModerationReason(payload?.reason || ''),
+                details: payload?.details && typeof payload.details === 'object' ? payload.details : {},
+                createdAt: new Date().toISOString(),
+                clientTimestamp: Date.now(),
+                appView: currentView || ''
+            };
+        }
+
+        function loadModerationLogCache() {
+            try {
+                const raw = localStorage.getItem(moderationLogStorageKey);
+                moderationLogCache = raw ? JSON.parse(raw) : [];
+                if (!Array.isArray(moderationLogCache)) moderationLogCache = [];
+            } catch (error) {
+                moderationLogCache = [];
+            }
+        }
+
+        function persistModerationLogCache() {
+            localStorage.setItem(moderationLogStorageKey, JSON.stringify(moderationLogCache.slice(0, 2500)));
+        }
+
+        async function logModerationAction(action, payload = {}) {
+            const entry = getModerationLogEntryBase(action, payload);
+            moderationLogCache.unshift(entry);
+            persistModerationLogCache();
+
+            if (!firebaseInitialized || !isAuthenticated || !currentUser) return;
+            try {
+                await firebase.firestore().collection('moderation-log').add({
+                    ...entry,
+                    createdAtServer: new Date()
+                });
+            } catch (error) {
+                console.error('Moderation log write failed:', error);
+            }
+        }
+
+        async function loadCurrentUserModerationStatusFromCloud() {
+            if (!firebaseInitialized || !isAuthenticated || !currentUser?.uid) {
+                currentUserModerationStatus = getDefaultModerationStatus();
+                return;
+            }
+
+            try {
+                const snapshot = await firebase.firestore().collection('user-moderation').doc(currentUser.uid).get();
+                currentUserModerationStatus = snapshot.exists
+                    ? normalizeModerationStatus({ ...snapshot.data(), uid: currentUser.uid })
+                    : getDefaultModerationStatus();
+
+                const notification = currentUserModerationStatus.latestNotification;
+                if (notification?.id && notification.id !== String(userSettings.lastModerationNotificationId || '')) {
+                    addUserNotification({
+                        type: 'moderation-status',
+                        title: notification.title || 'Account moderation update',
+                        message: notification.message || getActiveModerationMessage(currentUserModerationStatus)
+                    });
+                    userSettings.lastModerationNotificationId = notification.id;
+                    saveData();
+                }
+            } catch (error) {
+                console.error('Moderation status load failed:', error);
+                currentUserModerationStatus = getDefaultModerationStatus();
+            }
+            syncNotificationBell();
+        }
+
+        function getActiveModerationMessage(status = null) {
+            const resolved = normalizeModerationStatus(status || getResolvedCurrentUserModerationStatus());
+            if (!isModerationActive(resolved)) return '';
+            if (resolved.state === 'permaban') {
+                return `Account is on permanent social restriction. Next review: ${resolved.permabanReviewAt ? new Date(resolved.permabanReviewAt).toLocaleDateString() : 'scheduled by admins'}.`;
+            }
+            const untilLabel = resolved.expiresAt ? new Date(resolved.expiresAt).toLocaleString() : 'unspecified';
+            return `Publishing is restricted until ${untilLabel}. Reason: ${resolved.reason || 'No reason provided.'}`;
+        }
+
+        function getFamilyNameProfanityMatch(name = '') {
+            const normalized = String(name || '').trim().toLowerCase();
+            if (!normalized) return '';
+            for (const pattern of familyNameProfanityPatterns) {
+                const match = normalized.match(pattern);
+                if (match?.[0]) return match[0];
+            }
+            return '';
+        }
+
+        function validateFamilyNameForModeration(name = '') {
+            const match = getFamilyNameProfanityMatch(name);
+            if (!match) return true;
+            showToast('Family name contains blocked language. Choose a respectful name.', 'alert-circle', true);
+            return false;
+        }
+
+        async function submitModerationReport(payload = {}) {
+            if (!isAuthenticated || !firebaseInitialized || !currentUser?.uid) {
+                showToast('Log in first to submit a report.', 'alert-circle', true);
+                return false;
+            }
+            if (isCurrentUserSociallyIsolated()) {
+                showToast('Reporting is disabled while your account is under permanent social restriction.', 'alert-circle', true);
+                return false;
+            }
+
+            const reason = String(payload.reason || '').trim();
+            const details = sanitizeReportDetails(payload.details || '');
+            if (!reason) {
+                showToast('Choose a report reason.', 'alert-circle', true);
+                return false;
+            }
+            if (details.length < 8) {
+                showToast('Add a short explanation (at least 8 characters).', 'alert-circle', true);
+                return false;
+            }
+
+            const reportBody = {
+                reportType: String(payload.reportType || ''),
+                reason,
+                details,
+                targetUserId: String(payload.targetUserId || ''),
+                targetEmail: String(payload.targetEmail || ''),
+                targetName: String(payload.targetName || ''),
+                targetRecipeId: String(payload.targetRecipeId || ''),
+                targetPublishedRecipeId: String(payload.targetPublishedRecipeId || ''),
+                targetRecipeTitle: String(payload.targetRecipeTitle || ''),
+                reporterId: currentUser.uid,
+                reporterEmail: currentUser.email || userSettings.email || '',
+                reporterName: userSettings.name || currentUser.displayName || '',
+                status: 'open',
+                createdAt: new Date(),
+                updatedAt: new Date()
+            };
+
+            try {
+                await firebase.firestore().collection('moderation-reports').add(reportBody);
+                await logModerationAction('report-submitted', {
+                    targetUserId: reportBody.targetUserId,
+                    targetEmail: reportBody.targetEmail,
+                    reason: reportBody.reason,
+                    details: {
+                        reportType: reportBody.reportType,
+                        targetRecipeId: reportBody.targetRecipeId,
+                        targetPublishedRecipeId: reportBody.targetPublishedRecipeId,
+                        targetRecipeTitle: reportBody.targetRecipeTitle
+                    }
+                });
+                showToast('Report submitted. Admins will review it.', 'shield-check');
+                return true;
+            } catch (error) {
+                console.error('Report submit failed:', error);
+                showToast('Could not submit report. Try again.', 'alert-circle', true);
+                return false;
+            }
+        }
+
+        function openReportModal({
+            reportType,
+            targetUserId = '',
+            targetEmail = '',
+            targetName = '',
+            targetRecipeId = '',
+            targetPublishedRecipeId = '',
+            targetRecipeTitle = ''
+        } = {}) {
+            if (!isAuthenticated || !currentUser?.uid) {
+                showToast('Log in first to submit reports.', 'alert-circle', true);
+                return;
+            }
+            if (isCurrentUserSociallyIsolated()) {
+                showToast('Reporting is disabled while your account is under permanent social restriction.', 'alert-circle', true);
+                return;
+            }
+
+            const reasonOptions = moderationReportReasonOptions
+                .map(option => `<option value="${escapeHTML(option)}">${escapeHTML(option)}</option>`)
+                .join('');
+
+            let modalId = null;
+            modalId = createModal('Report content', `
+                <div class="space-y-4 text-inkDark">
+                    <div class="rounded-2xl border border-parchmentDark bg-parchment p-4 shadow-sm">
+                        <p class="text-[11px] font-bold uppercase tracking-[0.24em] text-sage">Report target</p>
+                        <p class="mt-2 text-sm font-semibold leading-relaxed text-forest">${escapeHTML(targetRecipeTitle || targetName || 'Selected item')}</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-1">Reason</label>
+                        <select id="report-reason-select" class="${inputClass}">${reasonOptions}</select>
+                    </div>
+                    <div>
+                        <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-1">Details (required)</label>
+                        <textarea id="report-details-input" class="${textareaClass}" maxlength="1200" placeholder="Explain what happened and why this should be reviewed."></textarea>
+                    </div>
+                </div>
+            `, [
+                { text: 'Cancel', onClick: () => closeModal(modalId) },
+                {
+                    text: 'Submit report',
+                    primary: true,
+                    onClick: async () => {
+                        const reason = document.getElementById('report-reason-select')?.value || '';
+                        const details = document.getElementById('report-details-input')?.value || '';
+                        const success = await submitModerationReport({
+                            reportType,
+                            reason,
+                            details,
+                            targetUserId,
+                            targetEmail,
+                            targetName,
+                            targetRecipeId,
+                            targetPublishedRecipeId,
+                            targetRecipeTitle
+                        });
+                        if (!success) return;
+                        closeModal(modalId);
+                    }
+                }
+            ]);
         }
 
         function getDefaultAdminConfig() {
@@ -2152,6 +2543,7 @@
                 billing: getDefaultBillingProfile(),
                 shoppingList: getDefaultShoppingList(),
                 notifications: [],
+                lastModerationNotificationId: '',
                 recipeUndo: null,
                 hasCompletedTutorial: false,
                 favorites: [],
@@ -2235,6 +2627,8 @@
         let activeNotificationsModalId = null;
         let activeDetailRecipeId = null;
         let pendingCloudSyncTimer = null;
+        let currentUserModerationStatus = null;
+        let moderationLogCache = [];
         const familyDeletionVoteTimeoutMs = 72 * 60 * 60 * 1000;
         const familyPublicationVoteTimeoutMs = 24 * 60 * 60 * 1000;
         const publicationQuickRetractionWindowMs = 60 * 60 * 1000;
@@ -3778,6 +4172,7 @@
 
         function loadData() {
             resetAuthenticatedUserState();
+            loadModerationLogCache();
 
             const savedAdminConfig = localStorage.getItem(adminConfigStorageKey);
             adminConfig = normalizeAdminConfig(savedAdminConfig ? JSON.parse(savedAdminConfig) : getDefaultAdminConfig());
@@ -3790,6 +4185,7 @@
 
             ensureInitialAdminBootstrap();
             loadAdminConfigFromCloud();
+            loadCurrentUserModerationStatusFromCloud();
 
             const savedSettings = localStorage.getItem(getScopedStorageKey(legacyRecipeSettingsStorageKey));
             let shouldResaveSettings = false;
@@ -4428,6 +4824,11 @@
             }
 
             updateAdminConfig({ enabledEmails: [...emailSet] });
+            logModerationAction('admin-account-toggle', {
+                targetEmail: normalizedEmail,
+                reason: enabled ? 'Admin enabled' : 'Admin disabled',
+                details: { enabled }
+            });
             showToast(enabled ? `Admin enabled for ${normalizedEmail}.` : `Admin disabled for ${normalizedEmail}.`, 'shield-check');
             renderSettings();
         }
@@ -4437,6 +4838,307 @@
             const email = normalizeAdminEmail(input?.value || '');
             setAccountAdminState(email, enable);
             if (input) input.value = '';
+        }
+
+        async function clearAccountModeration(targetUserId, reason) {
+            if (!firebaseInitialized || !isAuthenticated || !currentUser || !isCurrentUserAdmin()) return false;
+            if (!targetUserId) {
+                showToast('Provide a target user ID.', 'alert-circle', true);
+                return false;
+            }
+
+            const nowIso = new Date().toISOString();
+            const sanitizedReason = sanitizeModerationReason(reason || 'Admin cleared moderation state.');
+            const docRef = firebase.firestore().collection('user-moderation').doc(String(targetUserId));
+            const snapshot = await docRef.get();
+            const previous = snapshot.exists ? normalizeModerationStatus({ ...snapshot.data(), uid: targetUserId }) : getDefaultModerationStatus();
+
+            await docRef.set({
+                uid: String(targetUserId),
+                state: 'clear',
+                sanctionType: '',
+                reason: sanitizedReason,
+                startedAt: '',
+                expiresAt: '',
+                actorId: currentUser.uid || '',
+                actorEmail: currentUser.email || '',
+                strikeCount: previous.strikeCount || 0,
+                banCount: previous.banCount || 0,
+                publishBlocked: false,
+                profileOffline: false,
+                socialIsolation: false,
+                familyReadOnly: false,
+                permabanReviewAt: previous.permabanReviewAt || '',
+                latestNotification: {
+                    id: `moderation-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                    title: 'Moderation updated',
+                    message: `Your account restriction was cleared by an admin. Reason: ${sanitizedReason}`,
+                    createdAt: nowIso
+                },
+                updatedAt: nowIso
+            }, { merge: true });
+
+            await logModerationAction('account-moderation-cleared', {
+                targetUserId,
+                reason: sanitizedReason,
+                details: { previousState: previous.state || 'clear' }
+            });
+            showToast('Account moderation cleared.', 'shield-check');
+            return true;
+        }
+
+        async function applyAccountModeration({
+            targetUserId,
+            targetEmail,
+            reason,
+            sanctionType,
+            durationUnit,
+            durationValue,
+            offlineProfileNow
+        } = {}) {
+            if (!firebaseInitialized || !isAuthenticated || !currentUser || !isCurrentUserAdmin()) return false;
+
+            const sanitizedTargetUserId = String(targetUserId || '').trim();
+            const sanitizedTargetEmail = normalizeAdminEmail(targetEmail || '');
+            const sanitizedReason = sanitizeModerationReason(reason || 'No reason provided.');
+            const normalizedSanctionType = String(sanctionType || 'timeout').toLowerCase();
+            const isPermanent = durationUnit === 'permanent';
+            const expiresAt = getDurationExpirationIso(durationUnit, durationValue, isPermanent);
+            const durationLabel = getDurationLabel(durationUnit, durationValue, isPermanent);
+            const nowIso = new Date().toISOString();
+
+            if (!sanitizedTargetUserId) {
+                showToast('Provide the target user ID.', 'alert-circle', true);
+                return false;
+            }
+
+            if (sanitizedReason.length < 4) {
+                showToast('Please provide a short clear reason.', 'alert-circle', true);
+                return false;
+            }
+
+            const moderationRef = firebase.firestore().collection('user-moderation').doc(sanitizedTargetUserId);
+            const moderationSnap = await moderationRef.get();
+            const previous = moderationSnap.exists
+                ? normalizeModerationStatus({ ...moderationSnap.data(), uid: sanitizedTargetUserId })
+                : getDefaultModerationStatus();
+
+            const nextStrikeCount = (previous.strikeCount || 0) + 1;
+            const nextBanCount = normalizedSanctionType === 'ban'
+                ? (previous.banCount || 0) + 1
+                : (previous.banCount || 0);
+            const escalationToPermaban = nextBanCount >= 3;
+            const nextState = escalationToPermaban ? 'permaban' : normalizedSanctionType;
+            const shouldProfileOffline = escalationToPermaban || offlineProfileNow === true;
+            const socialIsolation = escalationToPermaban;
+            const familyReadOnly = escalationToPermaban;
+            const publishBlocked = true;
+            const reviewAt = escalationToPermaban ? getNextPermabanReviewIso() : (previous.permabanReviewAt || '');
+            const messageBody = escalationToPermaban
+                ? `Your account has been placed on permanent social restriction after repeated bans. Reason: ${sanitizedReason}. Admin review date: ${new Date(reviewAt).toLocaleDateString()}.`
+                : `Admin moderation applied: ${nextState} for ${durationLabel}. Reason: ${sanitizedReason}.`;
+
+            await moderationRef.set({
+                uid: sanitizedTargetUserId,
+                targetEmail: sanitizedTargetEmail,
+                state: nextState,
+                sanctionType: normalizedSanctionType,
+                reason: sanitizedReason,
+                startedAt: nowIso,
+                expiresAt: escalationToPermaban ? '' : expiresAt,
+                actorId: currentUser.uid || '',
+                actorEmail: currentUser.email || '',
+                strikeCount: nextStrikeCount,
+                banCount: nextBanCount,
+                publishBlocked,
+                profileOffline: shouldProfileOffline,
+                socialIsolation,
+                familyReadOnly,
+                permabanReviewAt: reviewAt,
+                latestNotification: {
+                    id: `moderation-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                    title: escalationToPermaban ? 'Permanent account restriction' : 'Account moderation update',
+                    message: messageBody,
+                    createdAt: nowIso
+                },
+                updatedAt: nowIso
+            }, { merge: true });
+
+            if (shouldProfileOffline) {
+                await firebase.firestore().collection('users').doc(sanitizedTargetUserId).set({
+                    isPublic: false,
+                    displayName: '',
+                    country: '',
+                    bio: '',
+                    updatedAt: new Date(),
+                    moderationProfileClearedAt: new Date()
+                }, { merge: true });
+            }
+
+            await logModerationAction('account-moderation-applied', {
+                targetUserId: sanitizedTargetUserId,
+                targetEmail: sanitizedTargetEmail,
+                reason: sanitizedReason,
+                details: {
+                    sanctionType: normalizedSanctionType,
+                    state: nextState,
+                    durationLabel,
+                    expiresAt: escalationToPermaban ? '' : expiresAt,
+                    strikeCount: nextStrikeCount,
+                    banCount: nextBanCount,
+                    profileOffline: shouldProfileOffline,
+                    socialIsolation,
+                    familyReadOnly,
+                    permabanReviewAt: reviewAt
+                }
+            });
+
+            showToast(escalationToPermaban ? 'Permaban applied (3rd ban reached).' : 'Account moderation saved.', escalationToPermaban ? 'shield-x' : 'shield-check');
+            return true;
+        }
+
+        function showAdminModerateAccountModal() {
+            if (!isCurrentUserAdmin()) {
+                showToast('Admin rights required.', 'alert-circle', true);
+                return;
+            }
+
+            let modalId = null;
+            modalId = createModal('Moderate account', `
+                <div class="space-y-4 text-inkDark">
+                    <div class="rounded-2xl border border-parchmentDark bg-parchment p-4 shadow-sm">
+                        <p class="text-[11px] font-bold uppercase tracking-[0.24em] text-sage">Reason required</p>
+                        <p class="mt-2 text-sm font-semibold leading-relaxed text-forest">Apply a temporary sanction or clear an existing one. After 3 bans, the system escalates to permanent social restriction automatically.</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-1">Target user ID</label>
+                        <input id="admin-mod-target-user-id" type="text" placeholder="Firebase auth UID" class="${inputClass}">
+                    </div>
+                    <div>
+                        <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-1">Target user email (optional)</label>
+                        <input id="admin-mod-target-email" type="email" placeholder="user@email.com" class="${inputClass}">
+                    </div>
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div>
+                            <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-1">Action</label>
+                            <select id="admin-mod-action" class="${inputClass}" onchange="document.getElementById('admin-mod-duration-wrap').style.display = this.value === 'clear' ? 'none' : ''; document.getElementById('admin-mod-scope-wrap').style.display = this.value === 'clear' ? 'none' : '';">
+                                <option value="timeout">Timeout</option>
+                                <option value="ban">Ban</option>
+                                <option value="clear">Clear sanction</option>
+                            </select>
+                        </div>
+                        <div id="admin-mod-duration-wrap">
+                            <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-1">Duration</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <input id="admin-mod-duration-value" type="number" min="1" value="7" class="${inputClass}" />
+                                <select id="admin-mod-duration-unit" class="${inputClass}" onchange="document.getElementById('admin-mod-duration-value').disabled = this.value === 'permanent';">
+                                    <option value="days">Days</option>
+                                    <option value="weeks">Weeks</option>
+                                    <option value="months">Months</option>
+                                    <option value="permanent">Permanent</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="admin-mod-scope-wrap" class="rounded-xl border border-parchmentDark bg-white p-3">
+                        <label class="inline-flex items-center gap-2 text-sm font-semibold text-forest">
+                            <input id="admin-mod-profile-offline" type="checkbox" class="h-4 w-4" />
+                            Also set public profile offline now (and clear public profile fields)
+                        </label>
+                    </div>
+                    <div>
+                        <label class="block text-xs uppercase tracking-wide font-bold text-sage mb-1">Reason (required)</label>
+                        <textarea id="admin-mod-reason" class="${textareaClass}" maxlength="240" placeholder="Short moderation reason..."></textarea>
+                    </div>
+                </div>
+            `, [
+                { text: 'Cancel', onClick: () => closeModal(modalId) },
+                {
+                    text: 'Apply',
+                    primary: true,
+                    onClick: async () => {
+                        const targetUserId = document.getElementById('admin-mod-target-user-id')?.value?.trim() || '';
+                        const targetEmail = document.getElementById('admin-mod-target-email')?.value?.trim() || '';
+                        const action = document.getElementById('admin-mod-action')?.value || 'timeout';
+                        const durationValue = Number(document.getElementById('admin-mod-duration-value')?.value || 1);
+                        const durationUnit = document.getElementById('admin-mod-duration-unit')?.value || 'days';
+                        const reason = document.getElementById('admin-mod-reason')?.value || '';
+                        const offlineProfileNow = document.getElementById('admin-mod-profile-offline')?.checked === true;
+
+                        let success = false;
+                        if (action === 'clear') {
+                            success = await clearAccountModeration(targetUserId, reason || 'Admin cleared moderation state.');
+                        } else {
+                            success = await applyAccountModeration({
+                                targetUserId,
+                                targetEmail,
+                                reason,
+                                sanctionType: action,
+                                durationUnit,
+                                durationValue,
+                                offlineProfileNow
+                            });
+                        }
+
+                        if (!success) return;
+                        closeModal(modalId);
+                        if (currentView === 'settings') renderSettings();
+                    }
+                }
+            ]);
+        }
+
+        async function showModerationLogbookModal() {
+            if (!isCurrentUserAdmin()) {
+                showToast('Admin rights required.', 'alert-circle', true);
+                return;
+            }
+
+            let entries = Array.isArray(moderationLogCache) ? [...moderationLogCache] : [];
+            if (firebaseInitialized && isAuthenticated && currentUser) {
+                try {
+                    const snapshot = await firebase.firestore()
+                        .collection('moderation-log')
+                        .orderBy('createdAtServer', 'desc')
+                        .limit(120)
+                        .get();
+                    const cloudEntries = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                    entries = [...cloudEntries, ...entries];
+                } catch (error) {
+                    console.error('Moderation logbook cloud load failed:', error);
+                }
+            }
+
+            const normalized = entries
+                .map((entry, index) => ({
+                    id: String(entry.id || `log-${index}`),
+                    action: String(entry.action || 'unknown-action'),
+                    actorEmail: String(entry.actorEmail || ''),
+                    targetUserId: String(entry.targetUserId || ''),
+                    reason: String(entry.reason || ''),
+                    createdAt: String(entry.createdAt || entry.createdAtServer?.toDate?.().toISOString?.() || ''),
+                    details: entry.details && typeof entry.details === 'object' ? entry.details : {}
+                }))
+                .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+            const markup = normalized.length > 0
+                ? normalized.slice(0, 250).map(entry => `
+                    <div class="rounded-xl border border-parchmentDark bg-white p-3 shadow-sm">
+                        <div class="flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-sage">
+                            <span>${escapeHTML(entry.action)}</span>
+                            <span>•</span>
+                            <span>${escapeHTML(entry.createdAt ? new Date(entry.createdAt).toLocaleString() : 'Unknown time')}</span>
+                        </div>
+                        <p class="mt-1 text-xs font-semibold text-forest">Actor: ${escapeHTML(entry.actorEmail || 'unknown')}</p>
+                        <p class="text-xs font-semibold text-forest">Target UID: ${escapeHTML(entry.targetUserId || '-')}</p>
+                        <p class="mt-2 text-xs text-sage">Reason: ${escapeHTML(entry.reason || '-')}</p>
+                    </div>
+                `).join('')
+                : '<div class="rounded-xl border border-parchmentDark bg-parchment p-4 text-sm font-semibold text-sage">No moderation log entries yet.</div>';
+
+            createModal('Moderation logbook', `
+                <div class="space-y-3 max-h-[65vh] overflow-y-auto">${markup}</div>
+            `, [{ text: 'Close', primary: true, onClick: () => closeModal() }]);
         }
 
         function analyzeRecipeHarmfulContent(recipe) {
@@ -4545,6 +5247,16 @@
                     saveData();
                 }
 
+                logModerationAction('admin-force-recipe-offline', {
+                    targetUserId: String(existing.authorId || ''),
+                    reason: sourceLabel,
+                    details: {
+                        publishedRecipeId: String(publishedRecipeId || ''),
+                        title: String(existing.title || ''),
+                        source: sourceLabel
+                    }
+                });
+
                 showToast('Recipe forced offline by admin.', 'shield-check');
                 return true;
             } catch (error) {
@@ -4605,11 +5317,19 @@
                 });
 
                 if (duplicates.length === 0) {
+                    logModerationAction('admin-duplicate-scan', {
+                        reason: 'No duplicates found',
+                        details: { autoRetract: autoRetract === true, duplicateCount: 0 }
+                    });
                     if (!silent) showToast('No duplicate published recipes found.', 'check-circle');
                     return;
                 }
 
                 if (!autoRetract) {
+                    logModerationAction('admin-duplicate-scan', {
+                        reason: 'Duplicates detected',
+                        details: { autoRetract: false, duplicateCount: duplicates.length }
+                    });
                     if (!silent) {
                         createModal('Duplicate scan results', `
                             <div class="space-y-3">
@@ -4656,6 +5376,10 @@
                     recipe.retractionRequestedAt = '';
                 });
                 saveData();
+                logModerationAction('admin-duplicate-auto-clean', {
+                    reason: 'Auto-clean duplicates executed',
+                    details: { duplicateCount: duplicates.length }
+                });
                 if (!silent) showToast(`Auto-clean completed. ${duplicates.length} duplicate recipe${duplicates.length === 1 ? '' : 's'} set offline.`, 'shield-check');
             } catch (error) {
                 showToast(`Duplicate scan failed: ${error.message}`, 'alert-circle');
@@ -4692,11 +5416,19 @@
                     .filter(entry => entry.result.flagged);
 
                 if (flagged.length === 0) {
+                    logModerationAction('admin-harmful-content-scan', {
+                        reason: 'No harmful content detected',
+                        details: { autoRetract: autoRetract === true, flaggedCount: 0 }
+                    });
                     showToast('No harmful content detected in live published recipes.', 'check-circle');
                     return;
                 }
 
                 if (!autoRetract) {
+                    logModerationAction('admin-harmful-content-scan', {
+                        reason: 'Flagged recipes found',
+                        details: { autoRetract: false, flaggedCount: flagged.length }
+                    });
                     createModal('Harmful-content scan', `
                         <div class="space-y-3">
                             <p class="text-sm font-semibold text-forest">Flagged recipes found: ${flagged.length}</p>
@@ -4710,6 +5442,11 @@
                     await adminForceUnpublishByPublishedId(entry.recipe.id, 'harmful-content-auto-cleanup');
                 }
 
+                logModerationAction('admin-harmful-content-auto-clean', {
+                    reason: 'Auto-retract flagged recipes executed',
+                    details: { flaggedCount: flagged.length }
+                });
+
                 showToast(`Harmful-content cleanup finished. ${flagged.length} recipe${flagged.length === 1 ? '' : 's'} moved offline.`, 'shield-check');
             } catch (error) {
                 showToast(`Harmful-content scan failed: ${error.message}`, 'alert-circle');
@@ -4722,6 +5459,10 @@
                 return;
             }
             updateAdminConfig({ harmfulContentGuardEnabled: !adminConfig.harmfulContentGuardEnabled });
+            logModerationAction('admin-harmful-guard-toggle', {
+                reason: `Harmful-content guard ${adminConfig.harmfulContentGuardEnabled ? 'enabled' : 'disabled'}`,
+                details: { enabled: adminConfig.harmfulContentGuardEnabled === true }
+            });
             showToast(`Harmful-content guard ${adminConfig.harmfulContentGuardEnabled ? 'enabled' : 'disabled'}.`, 'shield-check');
             renderSettings();
         }
@@ -4732,6 +5473,10 @@
                 return;
             }
             updateAdminConfig({ duplicateAutoCleanupEnabled: !adminConfig.duplicateAutoCleanupEnabled });
+            logModerationAction('admin-duplicate-auto-clean-toggle', {
+                reason: `Duplicate auto-cleanup ${adminConfig.duplicateAutoCleanupEnabled ? 'enabled' : 'disabled'}`,
+                details: { enabled: adminConfig.duplicateAutoCleanupEnabled === true }
+            });
             showToast(`Duplicate auto-cleanup ${adminConfig.duplicateAutoCleanupEnabled ? 'enabled' : 'disabled'}.`, 'shield-check');
             renderSettings();
         }
@@ -4777,6 +5522,7 @@
         function resetAuthenticatedUserState() {
             recipes = [];
             userFamilies = [];
+            currentUserModerationStatus = getDefaultModerationStatus();
             indexViewMode = 'cards';
             notebookPageIndex = 0;
             notebookSpreadPageIndex = 0;
@@ -5234,14 +5980,16 @@
 
             try {
                 const db = firebase.firestore();
+                const moderationStatus = getResolvedCurrentUserModerationStatus();
+                const enforceProfileOffline = moderationStatus.profileOffline === true || moderationStatus.socialIsolation === true;
                 await db.collection('users').doc(currentUser.uid).set({
                     email: currentUser.email || '',
-                    displayName: userSettings.name || currentUser.displayName || 'Chef',
+                    displayName: enforceProfileOffline ? '' : (userSettings.name || currentUser.displayName || 'Chef'),
                     photoURL: currentUser.photoURL || userSettings.profilePic || '',
                     bannerPic: userSettings.bannerPic || '',
-                    country: userSettings.country || '',
-                    bio: userSettings.bio || '',
-                    isPublic: userSettings.isPublic,
+                    country: enforceProfileOffline ? '' : (userSettings.country || ''),
+                    bio: enforceProfileOffline ? '' : (userSettings.bio || ''),
+                    isPublic: enforceProfileOffline ? false : userSettings.isPublic,
                     preferredLanguage: userSettings.language || 'en',
                     familyBookIds: (userFamilies || []).map(family => family.id).filter(Boolean),
                     updatedAt: new Date()
@@ -5645,6 +6393,11 @@
                 return false;
             }
 
+            if (isCurrentUserPublishBlocked()) {
+                showToast(getActiveModerationMessage() || 'Publishing is currently blocked for your account.', 'shield-x', true);
+                return false;
+            }
+
             try {
                 const recipe = recipes.find(r => r.id === recipeId);
                 if (!recipe) return false;
@@ -6018,6 +6771,11 @@
                 return;
             }
 
+            if (isCurrentUserSociallyIsolated()) {
+                showToast('Likes are disabled while your account is under permanent social restriction.', 'alert-circle', true);
+                return;
+            }
+
             const actorId = getCurrentLikeActorId();
             if (!actorId) {
                 showToast('Kon je profiel niet bepalen voor likes.', 'alert-circle', true);
@@ -6081,6 +6839,11 @@
         }
 
         function toggleSavedPublishedRecipe(publishedRecipeId, returnView = 'browse') {
+            if (isCurrentUserSociallyIsolated()) {
+                showToast('Saving community recipes is disabled while your account is under permanent social restriction.', 'alert-circle', true);
+                return;
+            }
+
             const existingIndex = recipes.findIndex(recipe => recipe.source === 'published' && recipe.publishedId === publishedRecipeId);
 
             if (existingIndex !== -1) {
@@ -7132,6 +7895,10 @@
             return userSettings.notifications;
         }
 
+        function hasModerationNotifications() {
+            return getFamilyNotifications().some(notification => notification.type === 'moderation-status' || notification.type === 'report-status');
+        }
+
         function getUnreadFamilyNotificationCount() {
             return getFamilyNotifications().filter(notification => !notification.readAt).length;
         }
@@ -7166,9 +7933,10 @@
             if (!button || !badge) return;
 
             const hasActiveFamilies = getActiveFamiliesForCurrentUser().length > 0;
-            button.classList.toggle('hidden', !hasActiveFamilies);
-            button.classList.toggle('inline-flex', hasActiveFamilies);
-            if (!hasActiveFamilies) {
+            const shouldShowBell = hasActiveFamilies || hasModerationNotifications();
+            button.classList.toggle('hidden', !shouldShowBell);
+            button.classList.toggle('inline-flex', shouldShowBell);
+            if (!shouldShowBell) {
                 badge.classList.add('hidden');
                 badge.textContent = '';
                 return;
@@ -7236,6 +8004,32 @@
                 } : null
             });
             userSettings.notifications = notifications.slice(0, 120);
+        }
+
+        function addUserNotification({ type, title, message, action = null, recipeId = 0, recipeTitle = '' }) {
+            const notifications = getFamilyNotifications();
+            notifications.unshift({
+                id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                type: String(type || 'system-update'),
+                title: String(title || 'Update'),
+                message: String(message || ''),
+                createdAt: new Date().toISOString(),
+                readAt: '',
+                resolvedAt: '',
+                familyId: '',
+                recipeId: Number(recipeId) || 0,
+                recipeTitle: String(recipeTitle || ''),
+                action: action && typeof action === 'object' ? {
+                    kind: String(action.kind || ''),
+                    expiresAt: action.expiresAt || '',
+                    threshold: Number(action.threshold) || 0,
+                    requiredMemberIds: Array.isArray(action.requiredMemberIds) ? action.requiredMemberIds.filter(Boolean) : [],
+                    votes: action.votes && typeof action.votes === 'object' ? { ...action.votes } : {}
+                } : null
+            });
+            userSettings.notifications = notifications.slice(0, 200);
+            saveData();
+            syncNotificationBell();
         }
 
         function markNotificationsAsRead() {
@@ -7515,8 +8309,10 @@
         }
 
         function showNotificationsModal() {
-            if (getActiveFamiliesForCurrentUser().length === 0) {
-                showToast('Notifications appear when you are in an active family.', 'bell-off');
+            const hasFamilies = getActiveFamiliesForCurrentUser().length > 0;
+            const hasModeration = hasModerationNotifications();
+            if (!hasFamilies && !hasModeration) {
+                showToast('No notifications right now.', 'bell-off');
                 return;
             }
 
@@ -7527,14 +8323,14 @@
             const notifications = getFamilyNotifications();
             const markup = notifications.length > 0
                 ? notifications.map(renderNotificationMarkup).join('')
-                : '<div class="rounded-xl border border-parchmentDark bg-parchment p-5 text-sm font-semibold text-sage">No family notifications yet.</div>';
+                : '<div class="rounded-xl border border-parchmentDark bg-parchment p-5 text-sm font-semibold text-sage">No notifications yet.</div>';
 
             if (activeNotificationsModalId) {
                 closeModal(activeNotificationsModalId);
                 activeNotificationsModalId = null;
             }
 
-            activeNotificationsModalId = createModal('Family Notifications', `
+            activeNotificationsModalId = createModal('Notifications', `
                 <div class="space-y-3 max-h-[65vh] overflow-y-auto">${markup}</div>
             `, [
                 {
@@ -8299,6 +9095,11 @@
         }
 
         function renderProfileEditor() {
+            if (isCurrentUserSociallyIsolated()) {
+                showToast('Profile editing is disabled while your account is under permanent social restriction.', 'alert-circle', true);
+                return;
+            }
+
             isCookingMode = false;
             document.getElementById('body').classList.remove('cooking-mode-active');
             setActiveNav('profile');
@@ -8420,6 +9221,10 @@
 
         function saveProfile(e) {
             e.preventDefault();
+            if (isCurrentUserSociallyIsolated()) {
+                showToast('Profile editing is disabled while your account is under permanent social restriction.', 'alert-circle', true);
+                return;
+            }
             userSettings.name = document.getElementById('profile-name').value;
             userSettings.country = document.getElementById('profile-country').value;
             userSettings.bio = document.getElementById('profile-bio').value;
@@ -8495,6 +9300,8 @@
             const cloudAuthActionVariant = firebaseInitialized ? 'accent' : 'muted';
             const cloudAuthActionIcon = firebaseInitialized ? 'log-in' : 'cloud-off';
             const cloudSetupSecondaryAction = `<button onclick="showCloudSetupStatusModal('settings-cloud')" class="${getAppButtonClasses('secondary', { fullWidth: true, size: 'lg' })}"><i data-lucide="badge-info" class="w-4 h-4"></i> Why unavailable?</button>`;
+            const moderationStatus = getResolvedCurrentUserModerationStatus();
+            const moderationMessage = getActiveModerationMessage(moderationStatus);
             const cloudContent = isAuthenticated
                 ? `
                     <div class="rounded-sm border border-sage bg-white p-4 shadow-sm">
@@ -8594,6 +9401,12 @@
                         <div class="rounded-xl border border-parchmentDark bg-white p-4">
                             <p class="text-[11px] font-bold uppercase tracking-[0.24em] text-sage">Safety controls</p>
                             <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                                <button onclick="showAdminModerateAccountModal()" class="${getAppButtonClasses('primary', { fullWidth: true, size: 'lg' })}">
+                                    <i data-lucide="user-cog" class="w-4 h-4"></i> Moderate account
+                                </button>
+                                <button onclick="showModerationLogbookModal()" class="${getAppButtonClasses('secondary', { fullWidth: true, size: 'lg' })}">
+                                    <i data-lucide="notebook-tabs" class="w-4 h-4"></i> Open moderation logbook
+                                </button>
                                 <button onclick="toggleAdminHarmfulGuard()" class="${getAppButtonClasses(adminConfig.harmfulContentGuardEnabled ? 'accent' : 'secondary', { fullWidth: true, size: 'lg' })}">
                                     <i data-lucide="shield" class="w-4 h-4"></i> Harmful guard: ${adminConfig.harmfulContentGuardEnabled ? 'ON' : 'OFF'}
                                 </button>
@@ -8709,6 +9522,7 @@
 
             const accountContent = `
                 <div class="space-y-4">
+                    ${moderationMessage ? `<div class="rounded-xl border border-coral/40 bg-coral/10 p-4"><p class="text-[10px] font-bold uppercase tracking-[0.2em] text-coral">Account moderation</p><p class="mt-2 text-sm font-semibold text-forest">${escapeHTML(moderationMessage)}</p></div>` : ''}
                     ${cloudContent}
                 </div>
             `;
@@ -10813,6 +11627,12 @@
                 }
             }
 
+            if (userDoc && userDoc.isPublic === false) {
+                showToast('This profile is currently offline.', 'shield-off', true);
+                renderBrowse();
+                return;
+            }
+
             const firstRecipe = authorRecipes[0] || null;
             const displayName = userDoc?.displayName || firstRecipe?.authorName || firstRecipe?.author || fallbackName;
             const displayCountry = userDoc?.country || firstRecipe?.country || 'Community';
@@ -10851,6 +11671,9 @@
                                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1.5 text-[11px] font-bold text-sage shadow-sm ring-1 ring-parchmentDark/50">
                                                 <i data-lucide="book-open" class="h-3.5 w-3.5"></i>${authorRecipes.length} published
                                             </span>
+                                            <button onclick="openReportModal({ reportType: 'profile', targetUserId: '${authorId}', targetName: '${escapeHTML(String(displayName || 'Chef').replace(/'/g, "&#39;"))}' })" class="inline-flex items-center gap-1.5 rounded-full border border-parchmentDark bg-white px-3 py-1.5 text-[11px] font-bold text-sage shadow-sm transition-all hover:border-coral hover:text-coral">
+                                                <i data-lucide="flag" class="h-3.5 w-3.5"></i>Report profile
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -10901,6 +11724,9 @@
                                                             <i data-lucide="bookmark" class="h-4 w-4"></i>${saved ? 'Saved' : 'Save'}
                                                         </button>
                                                     ` : `<span class="inline-flex items-center rounded-full border border-parchmentDark bg-parchment px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-sage">Family or own recipe</span>`}
+                                                    <button onclick="openReportModal({ reportType: 'published-recipe', targetUserId: '${recipe.authorId || ''}', targetName: '${escapeHTML(String(recipe.authorName || recipe.author || 'Chef').replace(/'/g, "&#39;"))}', targetPublishedRecipeId: '${recipe.id}', targetRecipeTitle: '${escapeHTML(String(recipe.title || 'Untitled').replace(/'/g, "&#39;"))}' })" class="${getAppButtonClasses('secondary')}">
+                                                        <i data-lucide="flag" class="h-4 w-4"></i>Report
+                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
@@ -10997,9 +11823,14 @@
                                 ${owned ? `
                                     <span class="inline-flex items-center gap-1 rounded-full bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-sage shadow-md">Yours${versionLabel ? ` · ${versionLabel}` : ''}</span>
                                 ` : `
-                                    <button onclick="event.stopPropagation(); toggleSavedPublishedRecipe('${recipe.id}')" class="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white bg-white ${saved ? 'text-red-500' : 'text-sage'} shadow-md transition-all hover:scale-105">
-                                        <i data-lucide="heart" class="w-5 h-5 ${saved ? 'fill-current' : ''}"></i>
-                                    </button>
+                                    <div class="flex items-center gap-2">
+                                        <button onclick="event.stopPropagation(); openReportModal({ reportType: 'published-recipe', targetUserId: '${recipe.authorId || ''}', targetName: '${escapeHTML(String(recipe.authorName || recipe.author || 'Chef').replace(/'/g, "&#39;"))}', targetPublishedRecipeId: '${recipe.id}', targetRecipeTitle: '${escapeHTML(String(recipe.title || 'Untitled').replace(/'/g, "&#39;"))}' })" class="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white bg-white text-sage shadow-md transition-all hover:scale-105" title="Report">
+                                            <i data-lucide="flag" class="w-5 h-5"></i>
+                                        </button>
+                                        <button onclick="event.stopPropagation(); toggleSavedPublishedRecipe('${recipe.id}')" class="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white bg-white ${saved ? 'text-red-500' : 'text-sage'} shadow-md transition-all hover:scale-105">
+                                            <i data-lucide="heart" class="w-5 h-5 ${saved ? 'fill-current' : ''}"></i>
+                                        </button>
+                                    </div>
                                 `}
                             </div>
                             <div class="w-full h-48 bg-cover bg-center" style="background-image: url('${recipe.profile || defaultPlaceholderProfile}')"></div>
@@ -11071,7 +11902,9 @@
                             <div class="pointer-events-auto flex flex-wrap items-center justify-end gap-2">
                                 ${recipe.authorId ? `<button onclick="renderPublicProfile('${recipe.authorId}', '${escapeHTML((recipe.authorName || recipe.author || 'Chef').replace(/'/g, "&#39;"))}')" class="${getAppButtonClasses('secondary', { size: 'lg' })} border-2 border-white shadow-xl"><i data-lucide="user-round" class="w-4 h-4"></i>View profile</button>` : ''}
                                 ${!familyAuthored ? `<button onclick="togglePublishedRecipeLike('${recipe.id}', 'detail')" class="${getAppButtonClasses(hasUserLikedPublishedRecipe(recipe) ? 'danger' : 'secondary', { size: 'lg' })} border-2 border-white shadow-xl"><i data-lucide="heart" class="w-5 h-5 ${hasUserLikedPublishedRecipe(recipe) ? 'fill-current' : ''}"></i>Like (${getPublishedRecipeLikeCount(recipe)})</button>
-                                <button onclick="toggleSavedPublishedRecipe('${recipe.id}', 'detail')" class="${getAppButtonClasses(saved ? 'danger' : 'secondary', { size: 'lg' })} border-2 border-white shadow-xl"><i data-lucide="bookmark" class="w-5 h-5"></i>${saved ? 'Saved to Index' : 'Save to Index'}</button>` : `<span class="inline-flex items-center rounded-full bg-white px-4 py-3 text-xs font-bold uppercase tracking-[0.24em] text-sage shadow-xl border border-white">Family recipe</span>`}
+                                <button onclick="toggleSavedPublishedRecipe('${recipe.id}', 'detail')" class="${getAppButtonClasses(saved ? 'danger' : 'secondary', { size: 'lg' })} border-2 border-white shadow-xl"><i data-lucide="bookmark" class="w-5 h-5"></i>${saved ? 'Saved to Index' : 'Save to Index'}</button>
+                                ` : `<span class="inline-flex items-center rounded-full bg-white px-4 py-3 text-xs font-bold uppercase tracking-[0.24em] text-sage shadow-xl border border-white">Family recipe</span>`}
+                                <button onclick="openReportModal({ reportType: 'published-recipe', targetUserId: '${recipe.authorId || ''}', targetName: '${escapeHTML(String(recipe.authorName || recipe.author || 'Chef').replace(/'/g, "&#39;"))}', targetPublishedRecipeId: '${recipe.id}', targetRecipeTitle: '${escapeHTML(String(recipe.title || 'Untitled').replace(/'/g, "&#39;"))}' })" class="${getAppButtonClasses('secondary', { size: 'lg' })} border-2 border-white shadow-xl"><i data-lucide="flag" class="w-4 h-4"></i>Report</button>
                                 ${canAdminForceOfflinePublished ? `<button onclick="adminForceUnpublishByPublishedId('${recipe.id}', 'admin-force-browse-detail')" class="${getAppButtonClasses('danger', { size: 'lg' })} border-2 border-white shadow-xl"><i data-lucide="shield-x" class="w-4 h-4"></i>Admin offline now</button>` : ''}
                             </div>
                         `}
@@ -11487,6 +12320,10 @@
         }
 
         function saveFamilyOrder(orderedIds) {
+            if (isCurrentUserFamilyReadOnly() || isCurrentUserSociallyIsolated()) {
+                showToast('Family order changes are disabled for your account.', 'alert-circle', true);
+                return;
+            }
             if (!Array.isArray(orderedIds)) return;
             userFamilies = orderedIds.map(id => userFamilies.find(f => f.id === id)).filter(Boolean);
             // Preserve any families beyond the sortable list
@@ -11497,6 +12334,10 @@
         }
 
         function showCreateFamilyModal() { if(!hasPremiumAccess()) { showPremiumModal("create families"); return; }
+            if (isCurrentUserFamilyReadOnly() || isCurrentUserSociallyIsolated()) {
+                showToast('Family changes are disabled for your account.', 'alert-circle', true);
+                return;
+            }
             if (!isAuthenticated) return showToast('Please sign in to create a family.', 'alert-circle', true);
             const activeFamilies = getActiveFamiliesForCurrentUser();
             if (activeFamilies.length >= 3) {
@@ -11543,6 +12384,7 @@
                     const colorKey = document.querySelector('input[name="new-family-color"]:checked')?.value || familyColorOptions[0].key;
                     if (!name || !pin) return showToast('Please fill out all fields.', 'alert-circle', true);
                     if (pin.length < 4) return showToast('Pincode must be at least 4 characters.', 'alert-circle', true);
+                    if (!validateFamilyNameForModeration(name)) return;
                     submitCreateFamily(name, pin, colorKey);
                     closeModal();
                 }}
@@ -11552,6 +12394,10 @@
         }
 
         function showJoinFamilyModal() {
+            if (isCurrentUserFamilyReadOnly() || isCurrentUserSociallyIsolated()) {
+                showToast('Family changes are disabled for your account.', 'alert-circle', true);
+                return;
+            }
             if (!isAuthenticated || !currentUser) {
                 showToast('Je moet ingelogd zijn om een familie te joinen.', 'alert-circle', true);
                 return;
@@ -11598,6 +12444,10 @@
                         if (errEl) { errEl.textContent = 'De familiecode bestaat uit precies 4 cijfers.'; errEl.classList.remove('hidden'); }
                         return;
                     }
+                    if (!validateFamilyNameForModeration(name)) {
+                        if (errEl) { errEl.textContent = 'De familienaam bevat geblokkeerde woorden.'; errEl.classList.remove('hidden'); }
+                        return;
+                    }
                     closeModal(modalId);
                     await submitJoinFamily(name, tag, pin);
                 }}
@@ -11605,6 +12455,7 @@
         }
 
         async function submitCreateFamily(name, pin, colorKey = familyColorOptions[0].key) {
+            if (!validateFamilyNameForModeration(name)) return;
             showToast('Creating family...', 'loader');
             const tag = Math.floor(1000 + Math.random() * 9000).toString();
             const color = getFamilyColorOption(colorKey);
@@ -11627,6 +12478,7 @@
         }
 
         async function submitJoinFamily(name, tag, pin) {
+            if (!validateFamilyNameForModeration(name)) return;
             if (!isAuthenticated || !currentUser) {
                 showToast('Je moet ingelogd zijn.', 'alert-circle', true);
                 return;
@@ -11787,6 +12639,10 @@
         }
 
         async function removeFamilyMember(familyId, userId) {
+            if (isCurrentUserFamilyReadOnly() || isCurrentUserSociallyIsolated()) {
+                showToast('Family member changes are disabled for your account.', 'alert-circle', true);
+                return;
+            }
             if (!confirm('Are you sure you want to remove this member? They will have a 30-day grace period to download their shared recipes before losing access permanently.')) return;
             
             const fam = userFamilies.find(f => f.id === familyId);
@@ -11808,6 +12664,10 @@
         }
 
         async function handleLeaveFamily(familyId) {
+            if (isCurrentUserFamilyReadOnly() || isCurrentUserSociallyIsolated()) {
+                showToast('Family changes are disabled for your account.', 'alert-circle', true);
+                return;
+            }
             if (!confirm('Are you sure you want to leave this family? You will instantly lose access to all family recipes, and all your recipes shared to this family will be withdrawn.')) return;
 
             const fam = userFamilies.find(f => f.id === familyId);
@@ -13348,6 +14208,10 @@
 
         async function saveRecipe(event) {
             event.preventDefault();
+            if (isCurrentUserSociallyIsolated()) {
+                showToast('Recipe editing is disabled while your account is under permanent social restriction.', 'alert-circle', true);
+                return;
+            }
             if (draftIngredients.length === 0) { showToast('Add at least one ingredient!', 'alert-circle'); return; }
             if (draftSteps.length === 0) { showToast('Add at least one step!', 'alert-circle'); return; }
 
@@ -13376,6 +14240,10 @@
             const manualCuisine = document.getElementById('r-cuisine').value || '';
             const selectedFamilyId = document.getElementById('r-family-book')?.value || '';
             const selectedFamily = getFamilyById(selectedFamilyId);
+            if ((isCurrentUserFamilyReadOnly() || isCurrentUserSociallyIsolated()) && selectedFamily?.id) {
+                showToast('You can only view family recipes right now. Editing or adding family recipes is blocked.', 'alert-circle', true);
+                return;
+            }
             const recipePayload = {
                 ...existingRecipe,
                 id: existingRecipe?.id || generateId(),

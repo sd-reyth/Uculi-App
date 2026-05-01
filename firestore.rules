@@ -1,0 +1,103 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function authEmail() {
+      return signedIn() && request.auth.token.email != null
+        ? request.auth.token.email
+        : '';
+    }
+
+    function adminConfigExists() {
+      return exists(/databases/$(database)/documents/app-config/admin);
+    }
+
+    function adminEmails() {
+      return adminConfigExists()
+        ? get(/databases/$(database)/documents/app-config/admin).data.enabledEmails
+        : [];
+    }
+
+    function isAdminEmail() {
+      return signedIn() && authEmail() != '' && authEmail() in adminEmails();
+    }
+
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function canReadPublicProfile(uid) {
+      return isSelf(uid) || (resource.data.isPublic == true);
+    }
+
+    match /users/{uid} {
+      allow read: if canReadPublicProfile(uid) || isAdminEmail();
+      allow create: if isSelf(uid);
+      allow update: if isSelf(uid)
+        && !('moderationProfileClearedAt' in request.resource.data)
+        && !('socialIsolation' in request.resource.data)
+        && !('publishBlocked' in request.resource.data)
+        || isAdminEmail();
+      allow delete: if isSelf(uid) || isAdminEmail();
+    }
+
+    match /published-recipes/{recipeId} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.authorId == request.auth.uid;
+      allow update: if signedIn() && (
+        resource.data.authorId == request.auth.uid || isAdminEmail()
+      );
+      allow delete: if signedIn() && (
+        resource.data.authorId == request.auth.uid || isAdminEmail()
+      );
+    }
+
+    match /family-books/{familyId} {
+      allow read: if signedIn() && (
+        request.auth.uid in resource.data.memberIds
+        || request.auth.uid in resource.data.removedMemberIds
+        || isAdminEmail()
+      );
+      allow create: if signedIn() && request.resource.data.creatorId == request.auth.uid;
+      allow update: if signedIn() && (
+        resource.data.creatorId == request.auth.uid
+        || request.auth.uid in resource.data.memberIds
+        || isAdminEmail()
+      );
+      allow delete: if signedIn() && (
+        resource.data.creatorId == request.auth.uid || isAdminEmail()
+      );
+    }
+
+    match /app-config/{docId} {
+      allow read: if signedIn();
+      allow write: if isAdminEmail();
+    }
+
+    match /user-moderation/{uid} {
+      allow read: if isSelf(uid) || isAdminEmail();
+      allow create, update, delete: if isAdminEmail();
+    }
+
+    match /moderation-reports/{reportId} {
+      allow create: if signedIn()
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.status == 'open';
+      allow read: if isAdminEmail() || (signedIn() && resource.data.reporterId == request.auth.uid);
+      allow update, delete: if isAdminEmail();
+    }
+
+    match /moderation-log/{entryId} {
+      allow create: if isAdminEmail();
+      allow read: if isAdminEmail();
+      allow update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
