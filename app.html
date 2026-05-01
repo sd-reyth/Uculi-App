@@ -136,6 +136,45 @@
             z-index: 40;
         }
 
+        .floating-back-button {
+            position: absolute;
+            left: 1rem;
+            bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
+            width: 3rem;
+            height: 3rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.9rem;
+            border: 1px solid rgba(122, 139, 118, 0.28);
+            background: rgba(255, 255, 255, 0.96);
+            color: #2C3D2E;
+            box-shadow: 0 10px 22px rgba(44, 61, 46, 0.16);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            z-index: 46;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(6px) scale(0.96);
+            transition: opacity 180ms ease, transform 180ms ease, color 180ms ease, border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+        }
+
+        .floating-back-button.is-visible {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0) scale(1);
+        }
+
+        .floating-back-button:hover {
+            border-color: rgba(197, 160, 89, 0.55);
+            color: #8c6a22;
+            box-shadow: 0 12px 24px rgba(44, 61, 46, 0.2);
+        }
+
+        .floating-back-button:active {
+            transform: translateY(1px) scale(0.98);
+        }
+
         .app-nav-inner {
             display: flex;
             align-items: center;
@@ -220,6 +259,14 @@
                 flex: 0 1 auto;
                 min-width: 5.2rem;
                 padding: 0.85rem 0.95rem 0.75rem;
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .floating-back-button {
+                left: 1.25rem;
+                top: 5.25rem;
+                bottom: auto;
             }
         }
 
@@ -1683,6 +1730,11 @@
             display: flex;
         }
 
+        .cooking-mode-active .detail-back-row,
+        .cooking-mode-active .detail-cook-toggle-btn {
+            display: none !important;
+        }
+
         .cooking-mode-active .detail-content-shell {
             padding: 0;
         }
@@ -1773,10 +1825,6 @@
                     <p class="app-header-subtitle">A Sneezing Donkey product</p>
                 </div>
             </div>
-            <button id="top-back-button" onclick="handleTopBackAction()" class="hidden max-lg:hidden items-center gap-2 rounded-xl border border-parchmentDark bg-white px-3 py-2 text-xs font-bold uppercase tracking-[0.16em] text-forest shadow-sm transition-all hover:border-gold hover:text-sage lg:inline-flex" title="Back" aria-label="Back">
-                <i data-lucide="arrow-left" class="w-4 h-4"></i>
-                Back
-            </button>
             <div class="flex items-center gap-2">
                 <button id="notifications-button" onclick="showNotificationsModal()" class="relative hidden h-10 w-10 items-center justify-center rounded-xl border border-parchmentDark bg-white text-forest shadow-sm transition-all hover:border-gold hover:text-sage" title="Notifications" aria-label="Notifications">
                     <i data-lucide="bell" class="w-5 h-5"></i>
@@ -1791,6 +1839,10 @@
                 </button>
             </div>
         </header>
+
+        <button id="floating-back-button" onclick="handleTopBackAction()" class="floating-back-button" title="Back" aria-label="Back">
+            <i data-lucide="arrow-left" class="w-5 h-5"></i>
+        </button>
 
                     <!-- PERSONAL NOTES MODAL -->
                     <div id="notes-modal" class="app-overlay fixed inset-0 bg-black bg-opacity-50 hidden opacity-0 transition-all duration-300 flex z-50">
@@ -2014,7 +2066,39 @@
         const legacyRecipeSettingsStorageKey = 'recipeArchiveSettings';
         const legacyRecipeDataStorageKey = 'recipeArchiveData';
         const legacyRecipeFamiliesStorageKey = 'recipeArchiveFamilies';
+        const adminConfigStorageKey = 'recipeArchiveAdminConfig';
         const accountStorageMigrationPrefix = 'recipeArchiveMigrated';
+
+        const harmfulContentPatterns = [
+            { label: 'Violence', pattern: /\b(kill|murder|stab|behead|torture|suicide|explode|bomb)\b/i },
+            { label: 'Hate', pattern: /\b(nazi|kkk|white\s+power|ethnic\s+cleansing|genocide)\b/i },
+            { label: 'Sexual explicit', pattern: /\b(porn|porno|nsfw|explicit\s+sex|rape)\b/i },
+            { label: 'Drugs', pattern: /\b(cocaine|heroin|meth|amphetamine|mdma|ecstasy)\b/i }
+        ];
+
+        function normalizeAdminEmail(value = '') {
+            return String(value || '').trim().toLowerCase();
+        }
+
+        function getDefaultAdminConfig() {
+            return {
+                enabledEmails: [],
+                harmfulContentGuardEnabled: true,
+                duplicateAutoCleanupEnabled: false,
+                lastUpdatedAt: ''
+            };
+        }
+
+        function normalizeAdminConfig(config = {}) {
+            return {
+                ...getDefaultAdminConfig(),
+                ...(config || {}),
+                enabledEmails: Array.from(new Set((config?.enabledEmails || []).map(normalizeAdminEmail).filter(Boolean))),
+                harmfulContentGuardEnabled: config?.harmfulContentGuardEnabled !== false,
+                duplicateAutoCleanupEnabled: config?.duplicateAutoCleanupEnabled === true,
+                lastUpdatedAt: String(config?.lastUpdatedAt || '')
+            };
+        }
 
         function getDefaultBillingProfile() {
             return {
@@ -2152,6 +2236,9 @@
         let activeDetailRecipeId = null;
         let pendingCloudSyncTimer = null;
         const familyDeletionVoteTimeoutMs = 72 * 60 * 60 * 1000;
+        const familyPublicationVoteTimeoutMs = 24 * 60 * 60 * 1000;
+        const publicationQuickRetractionWindowMs = 60 * 60 * 1000;
+        const publicationRetractionDelayMs = 24 * 60 * 60 * 1000;
         const recipeDeleteUndoWindowMs = 5 * 60 * 1000;
         const supportedAppLanguages = ['en', 'nl', 'fr', 'de', 'es'];
         const globalUiLanguageStorageKey = 'uculiPreferredUiLanguage';
@@ -3692,11 +3779,17 @@
         function loadData() {
             resetAuthenticatedUserState();
 
+            const savedAdminConfig = localStorage.getItem(adminConfigStorageKey);
+            adminConfig = normalizeAdminConfig(savedAdminConfig ? JSON.parse(savedAdminConfig) : getDefaultAdminConfig());
+
             if (!currentUser?.uid) {
                 applyUserModeClasses();
                 document.documentElement.style.colorScheme = 'light';
                 return;
             }
+
+            ensureInitialAdminBootstrap();
+            loadAdminConfigFromCloud();
 
             const savedSettings = localStorage.getItem(getScopedStorageKey(legacyRecipeSettingsStorageKey));
             let shouldResaveSettings = false;
@@ -3773,6 +3866,8 @@
             if (shouldResaveSettings) {
                 saveData();
             }
+
+            maybeRunAutomaticDuplicateCleanup();
         }
 
         function saveData() {
@@ -4241,6 +4336,405 @@
         let isAuthenticated = false;
         let firebaseInitialized = false;
         let publishedRecipesCache = [];
+        let adminConfig = getDefaultAdminConfig();
+        let duplicateCleanupInFlight = false;
+        let lastDuplicateCleanupAt = 0;
+
+        function getCurrentUserEmail() {
+            return normalizeAdminEmail(currentUser?.email || userSettings?.email || '');
+        }
+
+        function isCurrentUserAdmin() {
+            const email = getCurrentUserEmail();
+            if (!email) return false;
+            return adminConfig.enabledEmails.includes(email);
+        }
+
+        function persistAdminConfigLocally() {
+            localStorage.setItem(adminConfigStorageKey, JSON.stringify(adminConfig));
+        }
+
+        async function syncAdminConfigToCloud() {
+            if (!firebaseInitialized || !isAuthenticated || !currentUser || !isCurrentUserAdmin()) return;
+
+            try {
+                await firebase.firestore().collection('app-config').doc('admin').set({
+                    enabledEmails: [...adminConfig.enabledEmails],
+                    harmfulContentGuardEnabled: adminConfig.harmfulContentGuardEnabled === true,
+                    duplicateAutoCleanupEnabled: adminConfig.duplicateAutoCleanupEnabled === true,
+                    updatedBy: currentUser.uid,
+                    updatedByEmail: currentUser.email || '',
+                    updatedAt: new Date()
+                }, { merge: true });
+            } catch (error) {
+                console.error('Admin config cloud sync failed:', error);
+            }
+        }
+
+        async function loadAdminConfigFromCloud() {
+            if (!firebaseInitialized || !isAuthenticated || !currentUser) return;
+
+            try {
+                const snapshot = await firebase.firestore().collection('app-config').doc('admin').get();
+                if (!snapshot.exists) return;
+
+                const cloudConfig = normalizeAdminConfig(snapshot.data() || {});
+                adminConfig = cloudConfig;
+                persistAdminConfigLocally();
+            } catch (error) {
+                console.error('Admin config cloud load failed:', error);
+            }
+        }
+
+        function ensureInitialAdminBootstrap() {
+            if (adminConfig.enabledEmails.length > 0) return;
+            const email = getCurrentUserEmail();
+            if (!email) return;
+
+            adminConfig.enabledEmails = [email];
+            adminConfig.lastUpdatedAt = new Date().toISOString();
+            persistAdminConfigLocally();
+            syncAdminConfigToCloud();
+            showToast('Admin bootstrap completed for your account.', 'shield-check');
+        }
+
+        function updateAdminConfig(patch = {}) {
+            adminConfig = normalizeAdminConfig({
+                ...adminConfig,
+                ...(patch || {}),
+                lastUpdatedAt: new Date().toISOString()
+            });
+            persistAdminConfigLocally();
+            syncAdminConfigToCloud();
+        }
+
+        function setAccountAdminState(email, enabled) {
+            if (!isCurrentUserAdmin()) {
+                showToast('Admin rights required.', 'alert-circle');
+                return;
+            }
+
+            const normalizedEmail = normalizeAdminEmail(email);
+            if (!normalizedEmail) {
+                showToast('Provide a valid email address.', 'alert-circle');
+                return;
+            }
+
+            const emailSet = new Set(adminConfig.enabledEmails);
+            if (enabled) {
+                emailSet.add(normalizedEmail);
+            } else {
+                emailSet.delete(normalizedEmail);
+            }
+
+            updateAdminConfig({ enabledEmails: [...emailSet] });
+            showToast(enabled ? `Admin enabled for ${normalizedEmail}.` : `Admin disabled for ${normalizedEmail}.`, 'shield-check');
+            renderSettings();
+        }
+
+        function submitAdminAccountToggle(enable) {
+            const input = document.getElementById('admin-account-email');
+            const email = normalizeAdminEmail(input?.value || '');
+            setAccountAdminState(email, enable);
+            if (input) input.value = '';
+        }
+
+        function analyzeRecipeHarmfulContent(recipe) {
+            const haystack = [
+                recipe?.title,
+                recipe?.author,
+                recipe?.category,
+                recipe?.country,
+                recipe?.cuisine,
+                recipe?.tips,
+                ...(recipe?.ingredients || []),
+                ...(recipe?.instructions || []).map(step => getRecipeInstructionText(step))
+            ].filter(Boolean).join('\n');
+
+            const findings = harmfulContentPatterns
+                .map(entry => {
+                    const match = haystack.match(entry.pattern);
+                    if (!match) return null;
+                    return {
+                        label: entry.label,
+                        matchedText: String(match[0] || '').trim()
+                    };
+                })
+                .filter(Boolean);
+
+            return {
+                flagged: findings.length > 0,
+                findings
+            };
+        }
+
+        function showHarmfulContentBlockedModal(recipeTitle, moderationResult) {
+            const items = moderationResult.findings
+                .map(entry => `<li><strong>${escapeHTML(entry.label)}:</strong> ${escapeHTML(entry.matchedText)}</li>`)
+                .join('');
+
+            createModal('Publish blocked by safety filter', `
+                <div class="space-y-4">
+                    <p class="text-sm font-semibold text-forest">"${escapeHTML(recipeTitle || 'Recipe')}" contains blocked terms. Please edit the recipe before publishing.</p>
+                    <ul class="list-disc pl-5 text-sm text-sage space-y-1">${items}</ul>
+                </div>
+            `, [{ text: 'Close', primary: true, onClick: () => closeModal() }]);
+        }
+
+        function getPublishedRecipeSignature(recipe) {
+            if (!recipe) return '';
+            if (recipe.publishedContentSignature) return String(recipe.publishedContentSignature);
+
+            return buildPublishedContentSignature({
+                ...recipe,
+                instructions: normalizeRecipeInstructions(recipe.instructions)
+            });
+        }
+
+        async function adminForceUnpublishByPublishedId(publishedRecipeId, sourceLabel = 'admin-force') {
+            if (!isCurrentUserAdmin()) {
+                showToast('Admin rights required.', 'shield-alert');
+                return false;
+            }
+            if (!firebaseInitialized || !isAuthenticated || !currentUser || !publishedRecipeId) {
+                showToast('Sign in required for admin moderation actions.', 'alert-circle');
+                return false;
+            }
+
+            try {
+                const db = firebase.firestore();
+                const docRef = db.collection('published-recipes').doc(String(publishedRecipeId));
+                const snapshot = await docRef.get();
+                if (!snapshot.exists) {
+                    showToast('Published recipe not found.', 'alert-circle');
+                    return false;
+                }
+
+                const existing = { ...snapshot.data(), id: snapshot.id };
+                if (existing.publicationState === 'retracted') {
+                    showToast('Recipe is already offline.', 'info');
+                    return true;
+                }
+
+                const updatedAt = new Date();
+                await docRef.set({
+                    publicationState: 'retracted',
+                    retractedAt: updatedAt,
+                    updatedAt,
+                    moderation: {
+                        action: sourceLabel,
+                        actorId: currentUser.uid || '',
+                        actorEmail: currentUser.email || '',
+                        at: updatedAt
+                    }
+                }, { merge: true });
+
+                upsertPublishedRecipeCacheEntry({
+                    ...existing,
+                    id: snapshot.id,
+                    publicationState: 'retracted',
+                    retractedAt: updatedAt,
+                    updatedAt
+                });
+
+                const linkedLocal = getLocalRecipeByPublishedId(snapshot.id);
+                if (linkedLocal) {
+                    linkedLocal.publicationState = 'retracted';
+                    linkedLocal.scheduledRetractionAt = '';
+                    linkedLocal.retractionRequestedAt = '';
+                    saveData();
+                }
+
+                showToast('Recipe forced offline by admin.', 'shield-check');
+                return true;
+            } catch (error) {
+                showToast(`Admin force-offline failed: ${error.message}`, 'alert-circle');
+                return false;
+            }
+        }
+
+        async function adminForceOfflineRecipe(recipeId) {
+            const recipe = recipes.find(entry => entry.id === recipeId);
+            if (!recipe?.publishedId) {
+                showToast('Recipe is not published.', 'info');
+                return;
+            }
+
+            const success = await adminForceUnpublishByPublishedId(recipe.publishedId, 'admin-force-local-detail');
+            if (success) {
+                renderDetail(recipeId);
+            }
+        }
+
+        async function adminScanDuplicatePublishedRecipes({ autoRetract = false, silent = false } = {}) {
+            if (!isCurrentUserAdmin()) {
+                showToast('Admin rights required.', 'alert-circle');
+                return;
+            }
+            if (!firebaseInitialized || !isAuthenticated || !currentUser) {
+                showToast('Sign in required for duplicate scan.', 'alert-circle');
+                return;
+            }
+            if (duplicateCleanupInFlight) return;
+
+            duplicateCleanupInFlight = true;
+            try {
+                const db = firebase.firestore();
+                const snapshot = await db.collection('published-recipes').orderBy('publishedAt', 'desc').limit(300).get();
+                const liveRecipes = snapshot.docs
+                    .map(doc => ({ ...doc.data(), id: doc.id }))
+                    .filter(recipe => recipe.publicationState !== 'retracted');
+
+                const grouped = new Map();
+                liveRecipes.forEach(recipe => {
+                    const signature = getPublishedRecipeSignature(recipe);
+                    if (!signature) return;
+                    if (!grouped.has(signature)) grouped.set(signature, []);
+                    grouped.get(signature).push(recipe);
+                });
+
+                const duplicates = [];
+                grouped.forEach(items => {
+                    if (items.length < 2) return;
+                    const sorted = [...items].sort((a, b) => {
+                        const aMs = new Date(a.updatedAt || a.publishedAt || 0).getTime();
+                        const bMs = new Date(b.updatedAt || b.publishedAt || 0).getTime();
+                        return bMs - aMs;
+                    });
+                    sorted.slice(1).forEach(entry => duplicates.push(entry));
+                });
+
+                if (duplicates.length === 0) {
+                    if (!silent) showToast('No duplicate published recipes found.', 'check-circle');
+                    return;
+                }
+
+                if (!autoRetract) {
+                    if (!silent) {
+                        createModal('Duplicate scan results', `
+                            <div class="space-y-3">
+                                <p class="text-sm font-semibold text-forest">Found ${duplicates.length} duplicate live recipe${duplicates.length === 1 ? '' : 's'}.</p>
+                                <p class="text-sm text-sage">Use "Auto-clean duplicates now" to retract older copies automatically.</p>
+                            </div>
+                        `, [{ text: 'Close', primary: true, onClick: () => closeModal() }]);
+                    }
+                    return;
+                }
+
+                const batch = db.batch();
+                const now = new Date();
+                duplicates.forEach(recipe => {
+                    const ref = db.collection('published-recipes').doc(recipe.id);
+                    batch.set(ref, {
+                        publicationState: 'retracted',
+                        retractedAt: now,
+                        updatedAt: now,
+                        moderation: {
+                            action: 'duplicate-auto-cleanup',
+                            actorId: currentUser.uid || '',
+                            actorEmail: currentUser.email || '',
+                            at: now
+                        }
+                    }, { merge: true });
+                });
+                await batch.commit();
+
+                duplicates.forEach(recipe => {
+                    upsertPublishedRecipeCacheEntry({
+                        ...recipe,
+                        publicationState: 'retracted',
+                        retractedAt: now,
+                        updatedAt: now
+                    });
+                });
+
+                recipes.forEach(recipe => {
+                    if (!recipe?.publishedId) return;
+                    if (!duplicates.some(entry => entry.id === recipe.publishedId)) return;
+                    recipe.publicationState = 'retracted';
+                    recipe.scheduledRetractionAt = '';
+                    recipe.retractionRequestedAt = '';
+                });
+                saveData();
+                if (!silent) showToast(`Auto-clean completed. ${duplicates.length} duplicate recipe${duplicates.length === 1 ? '' : 's'} set offline.`, 'shield-check');
+            } catch (error) {
+                showToast(`Duplicate scan failed: ${error.message}`, 'alert-circle');
+            } finally {
+                duplicateCleanupInFlight = false;
+                lastDuplicateCleanupAt = Date.now();
+            }
+        }
+
+        async function maybeRunAutomaticDuplicateCleanup() {
+            if (!isCurrentUserAdmin() || !adminConfig.duplicateAutoCleanupEnabled) return;
+            if (Date.now() - lastDuplicateCleanupAt < 20 * 60 * 1000) return;
+            await adminScanDuplicatePublishedRecipes({ autoRetract: true, silent: true });
+        }
+
+        async function adminScanPublishedRecipesForHarmfulContent({ autoRetract = false } = {}) {
+            if (!isCurrentUserAdmin()) {
+                showToast('Admin rights required.', 'alert-circle');
+                return;
+            }
+            if (!firebaseInitialized || !isAuthenticated || !currentUser) {
+                showToast('Sign in required for harmful-content scan.', 'alert-circle');
+                return;
+            }
+
+            try {
+                const snapshot = await firebase.firestore().collection('published-recipes').orderBy('publishedAt', 'desc').limit(300).get();
+                const liveRecipes = snapshot.docs
+                    .map(doc => ({ ...doc.data(), id: doc.id }))
+                    .filter(recipe => recipe.publicationState !== 'retracted');
+
+                const flagged = liveRecipes
+                    .map(recipe => ({ recipe, result: analyzeRecipeHarmfulContent(recipe) }))
+                    .filter(entry => entry.result.flagged);
+
+                if (flagged.length === 0) {
+                    showToast('No harmful content detected in live published recipes.', 'check-circle');
+                    return;
+                }
+
+                if (!autoRetract) {
+                    createModal('Harmful-content scan', `
+                        <div class="space-y-3">
+                            <p class="text-sm font-semibold text-forest">Flagged recipes found: ${flagged.length}</p>
+                            <p class="text-sm text-sage">Use "Auto-retract flagged now" to immediately move all flagged recipes offline.</p>
+                        </div>
+                    `, [{ text: 'Close', primary: true, onClick: () => closeModal() }]);
+                    return;
+                }
+
+                for (const entry of flagged) {
+                    await adminForceUnpublishByPublishedId(entry.recipe.id, 'harmful-content-auto-cleanup');
+                }
+
+                showToast(`Harmful-content cleanup finished. ${flagged.length} recipe${flagged.length === 1 ? '' : 's'} moved offline.`, 'shield-check');
+            } catch (error) {
+                showToast(`Harmful-content scan failed: ${error.message}`, 'alert-circle');
+            }
+        }
+
+        function toggleAdminHarmfulGuard() {
+            if (!isCurrentUserAdmin()) {
+                showToast('Admin rights required.', 'alert-circle');
+                return;
+            }
+            updateAdminConfig({ harmfulContentGuardEnabled: !adminConfig.harmfulContentGuardEnabled });
+            showToast(`Harmful-content guard ${adminConfig.harmfulContentGuardEnabled ? 'enabled' : 'disabled'}.`, 'shield-check');
+            renderSettings();
+        }
+
+        function toggleAdminDuplicateAutoCleanup() {
+            if (!isCurrentUserAdmin()) {
+                showToast('Admin rights required.', 'shield-alert');
+                return;
+            }
+            updateAdminConfig({ duplicateAutoCleanupEnabled: !adminConfig.duplicateAutoCleanupEnabled });
+            showToast(`Duplicate auto-cleanup ${adminConfig.duplicateAutoCleanupEnabled ? 'enabled' : 'disabled'}.`, 'shield-check');
+            renderSettings();
+        }
 
         function getCurrentAccountStorageId() {
             if (!currentUser) return '';
@@ -4498,7 +4992,7 @@
         function initializeFirebase() {
             const firebaseConfig = {
                 apiKey: "AIzaSyD7JnQgnVrzsueRRKVc1GKZ9jRhb1iS51Q",
-                authDomain: "uculi.com",
+                authDomain: "uculi-24ecd.firebaseapp.com",
                 projectId: "uculi-24ecd",
                 storageBucket: "uculi-24ecd.firebasestorage.app",
                 messagingSenderId: "522301414957",
@@ -4943,9 +5437,54 @@
             return Boolean(recipe?.publishedId) && recipe.publicationState !== 'retracted';
         }
 
+        function getRecipePublishedAtMs(recipe) {
+            const publishedAtValue = recipe?.publishedAt;
+            if (!publishedAtValue) return Number.NaN;
+
+            if (typeof publishedAtValue?.toMillis === 'function') {
+                return publishedAtValue.toMillis();
+            }
+
+            if (publishedAtValue instanceof Date) {
+                return publishedAtValue.getTime();
+            }
+
+            if (typeof publishedAtValue === 'number') {
+                return publishedAtValue;
+            }
+
+            const parsedMs = new Date(publishedAtValue).getTime();
+            return Number.isFinite(parsedMs) ? parsedMs : Number.NaN;
+        }
+
+        function canUnpublishImmediately(recipe) {
+            if (!recipe || recipe.familyId || !isRecipePublishedLive(recipe)) return false;
+
+            const publishedAtMs = getRecipePublishedAtMs(recipe);
+            if (!Number.isFinite(publishedAtMs)) return false;
+
+            const ageMs = Date.now() - publishedAtMs;
+            return ageMs >= 0 && ageMs <= publicationQuickRetractionWindowMs;
+        }
+
         function getPublishActionLabel(recipe) {
-            if (!recipe?.publishedId) return 'Publish';
-            if (isRecipePublishedLive(recipe)) return hasRecipeChangesSincePublish(recipe) ? 'Update publish' : 'Published live';
+            if (!recipe?.publishedId) {
+                return recipe?.familyId ? 'Request publish vote' : 'Publish';
+            }
+
+            if (recipe?.publicationState === 'pending-retract') {
+                return 'Offline in 24h';
+            }
+
+            if (isRecipePublishedLive(recipe)) {
+                if (canUnpublishImmediately(recipe)) return 'Unpublish now (1h)';
+                return 'Take offline in 24h';
+            }
+
+            if (recipe?.familyId) {
+                return hasRecipeChangesSincePublish(recipe) ? 'Request republish vote' : 'Request publish vote';
+            }
+
             return hasRecipeChangesSincePublish(recipe) ? 'Republish update' : 'Republish';
         }
 
@@ -5007,7 +5546,100 @@
             };
         }
 
-        async function publishRecipe(recipeId) { if(!hasPremiumAccess()) { showPremiumModal("publish recipes"); return; }
+        function getActiveFamilyMemberIds(family) {
+            if (!family) return [];
+            const removedIds = new Set((family.removedMembers || []).map(member => member?.userId).filter(Boolean));
+            return [...new Set((family.memberIds || []).filter(Boolean))].filter(memberId => !removedIds.has(memberId));
+        }
+
+        function getPublicationApprovalThreshold(memberCount) {
+            return Math.floor(memberCount / 2) + 1;
+        }
+
+        function resolveRecipePublicationVoteNotifications(recipeId, resolutionMessage = '') {
+            const nowIso = new Date().toISOString();
+            let changed = false;
+            getFamilyNotifications().forEach(notification => {
+                if (notification.type !== 'publication-vote' || notification.recipeId !== recipeId) return;
+                if (!notification.resolvedAt) {
+                    notification.resolvedAt = nowIso;
+                    changed = true;
+                }
+                if (resolutionMessage) {
+                    notification.message = resolutionMessage;
+                    changed = true;
+                }
+            });
+            if (changed) saveData();
+        }
+
+        function scheduleRecipeRetraction(recipe) {
+            const retractionAtIso = new Date(Date.now() + publicationRetractionDelayMs).toISOString();
+            recipe.publicationState = 'pending-retract';
+            recipe.retractionRequestedAt = new Date().toISOString();
+            recipe.scheduledRetractionAt = retractionAtIso;
+            saveData();
+            showToast(`Recipe scheduled to go offline on ${new Date(retractionAtIso).toLocaleString()}.`, 'cloud-off');
+            return retractionAtIso;
+        }
+
+        async function requestFamilyPublicationVote(recipe) {
+            const family = recipe.familyId ? getFamilyById(recipe.familyId) : null;
+            if (!family?.id) {
+                showToast('This recipe is marked as family but has no active family book. Save it as personal to publish.', 'alert-circle');
+                return false;
+            }
+
+            const familyMembers = getActiveFamilyMemberIds(family);
+            if (familyMembers.length < 2) {
+                showToast('Family publication needs at least 2 active family members. Save it as personal to publish.', 'alert-circle');
+                return false;
+            }
+
+            if (recipe.pendingPublicationVote?.status === 'pending') {
+                showToast('A family publication vote is already pending. Open notifications to check votes.', 'bell');
+                showNotificationsModal();
+                return false;
+            }
+
+            const actorId = getCurrentActorId();
+            const expiresAtIso = new Date(Date.now() + familyPublicationVoteTimeoutMs).toISOString();
+            const threshold = getPublicationApprovalThreshold(familyMembers.length);
+
+            recipe.pendingPublicationVote = {
+                status: 'pending',
+                requestedAt: new Date().toISOString(),
+                requestedBy: actorId,
+                familyId: family.id,
+                requiredMemberIds: familyMembers,
+                threshold,
+                votes: { [actorId]: 'approve' },
+                expiresAt: expiresAtIso
+            };
+
+            addFamilyNotification({
+                type: 'publication-vote',
+                title: 'Publication vote requested',
+                message: `Vote to publish "${recipe.title}". Majority (${threshold}/${familyMembers.length}) is required before upload.`,
+                familyId: family.id,
+                recipeId: recipe.id,
+                recipeTitle: recipe.title,
+                action: {
+                    kind: 'publication-vote',
+                    expiresAt: expiresAtIso,
+                    requiredMemberIds: familyMembers,
+                    threshold,
+                    votes: { [actorId]: 'approve' }
+                }
+            });
+
+            saveData();
+            syncNotificationBell();
+            showToast('Family recipe: publish request sent for majority vote via notifications.', 'bell');
+            return false;
+        }
+
+        async function publishRecipe(recipeId, options = {}) { if(!hasPremiumAccess()) { showPremiumModal("publish recipes"); return; }
             if (!isAuthenticated || !firebaseInitialized || !currentUser) {
                 showToast('Sign in to publish recipes', 'alert-circle');
                 return false;
@@ -5016,6 +5648,49 @@
             try {
                 const recipe = recipes.find(r => r.id === recipeId);
                 if (!recipe) return false;
+
+                const bypassFamilyVote = options?.bypassFamilyVote === true;
+
+                if (recipe.publicationState === 'pending-retract') {
+                    const scheduledAtMs = new Date(recipe.scheduledRetractionAt || 0).getTime();
+                    if (Number.isFinite(scheduledAtMs) && scheduledAtMs > Date.now()) {
+                        showToast(`Already scheduled to go offline on ${new Date(scheduledAtMs).toLocaleString()}.`, 'clock');
+                        return false;
+                    }
+                }
+
+                if (isRecipePublishedLive(recipe) && recipe.publishedId) {
+                    if (canUnpublishImmediately(recipe)) {
+                        return unpublishRecipe(recipe.id, { source: 'quick-window' });
+                    }
+
+                    const retractionAtIso = scheduleRecipeRetraction(recipe);
+                    try {
+                        const db = firebase.firestore();
+                        await db.collection('published-recipes').doc(recipe.publishedId).set({
+                            publicationState: 'pending-retract',
+                            retractionRequestedAt: recipe.retractionRequestedAt,
+                            scheduledRetractionAt: retractionAtIso,
+                            updatedAt: new Date()
+                        }, { merge: true });
+                    } catch (error) {
+                        console.error('Retraction schedule sync failed:', error);
+                    }
+                    return true;
+                }
+
+                if (adminConfig.harmfulContentGuardEnabled) {
+                    const moderationResult = analyzeRecipeHarmfulContent(recipe);
+                    if (moderationResult.flagged) {
+                        showHarmfulContentBlockedModal(recipe.title, moderationResult);
+                        return false;
+                    }
+                }
+
+                if (!bypassFamilyVote && recipe.familyId) {
+                    return requestFamilyPublicationVote(recipe);
+                }
+
                 if (recipe.source === 'published' && !isPublishedRecipeOwnedByCurrentUser(recipe)) {
                     showToast('Only the original author can republish this community recipe.', 'alert-circle');
                     return false;
@@ -5064,13 +5739,19 @@
                 recipe.publishedVersion = formatPublishedVersion(versionCode);
                 recipe.publishedContentSignature = signature;
                 recipe.publicationState = 'live';
+                recipe.scheduledRetractionAt = '';
+                recipe.retractionRequestedAt = '';
+                delete recipe.pendingPublicationVote;
+                resolveRecipePublicationVoteNotifications(recipe.id, `Publication approved. "${recipe.title}" is now live in Browse.`);
                 saveData();
 
                 upsertPublishedRecipeCacheEntry({
                     ...payload,
                     id: docRef.id,
                     publishedAt,
-                    retractedAt: null
+                    retractedAt: null,
+                    scheduledRetractionAt: null,
+                    retractionRequestedAt: null
                 });
 
                 const versionLabel = `v${formatPublishedVersion(versionCode)}`;
@@ -5084,6 +5765,8 @@
                     showToast(`Recipe is already live as ${versionLabel}`, 'check-circle');
                 }
 
+                maybeRunAutomaticDuplicateCleanup();
+
                 return true;
             } catch (error) {
                 showToast(`Publish error: ${error.message}`, 'alert-circle');
@@ -5091,7 +5774,7 @@
             }
         }
 
-        async function unpublishRecipe(recipeId) {
+        async function unpublishRecipe(recipeId, options = {}) {
             if (!isAuthenticated || !firebaseInitialized || !currentUser) {
                 showToast('Sign in to retract published recipes', 'alert-circle');
                 return false;
@@ -5122,6 +5805,8 @@
                 }, { merge: true });
 
                 recipe.publicationState = 'retracted';
+                recipe.scheduledRetractionAt = '';
+                recipe.retractionRequestedAt = '';
                 saveData();
 
                 upsertPublishedRecipeCacheEntry({
@@ -5132,7 +5817,14 @@
                     updatedAt
                 });
 
-                showToast('Recipe removed from Browse. Saved copies stay with other cooks.', 'cloud-off');
+                const source = options?.source || 'manual';
+                if (source === 'quick-window') {
+                    showToast('Recipe unpublished instantly (within 1-hour window).', 'cloud-off');
+                } else if (source === 'scheduled') {
+                    showToast('Scheduled unpublish completed. Recipe is now offline.', 'cloud-off');
+                } else {
+                    showToast('Recipe removed from Browse. Saved copies stay with other cooks.', 'cloud-off');
+                }
                 return true;
             } catch (error) {
                 showToast(`Unpublish error: ${error.message}`, 'alert-circle');
@@ -5955,6 +6647,8 @@
                     button.removeAttribute('aria-current');
                 }
             });
+            processScheduledPublicationRetractions();
+            processRecipePublicationVotes();
             processRecipeDeletionVotes();
             syncNotificationBell();
             syncRecipeUndoButton();
@@ -5963,17 +6657,16 @@
         }
 
         function shouldShowTopBackButton() {
-            if (activeDetailRecipeId !== null) return true;
+            if (activeDetailRecipeId !== null) return false;
             return ['add', 'browse', 'shopping', 'profile', 'settings'].includes(currentView);
         }
 
         function syncTopBackButton() {
-            const backButton = document.getElementById('top-back-button');
+            const backButton = document.getElementById('floating-back-button');
             if (!backButton) return;
 
             const visible = shouldShowTopBackButton();
-            backButton.classList.toggle('hidden', !visible);
-            backButton.classList.toggle('inline-flex', visible);
+            backButton.classList.toggle('is-visible', visible);
         }
 
         function handleTopBackAction() {
@@ -6399,6 +7092,7 @@
                         ? {
                             kind: String(entry.action.kind || ''),
                             expiresAt: entry.action.expiresAt || '',
+                            threshold: Number(entry.action.threshold) || 0,
                             requiredMemberIds: Array.isArray(entry.action.requiredMemberIds) ? entry.action.requiredMemberIds.filter(Boolean) : [],
                             votes: entry.action.votes && typeof entry.action.votes === 'object' ? { ...entry.action.votes } : {}
                         }
@@ -6454,6 +7148,18 @@
             }).length;
         }
 
+        function getPendingPublicationVoteActionCount() {
+            const actorId = getCurrentActorId();
+            return getFamilyNotifications().filter(notification => {
+                if (notification.type !== 'publication-vote') return false;
+                if (notification.resolvedAt) return false;
+                const action = notification.action;
+                if (!action || action.kind !== 'publication-vote') return false;
+                if (new Date(action.expiresAt || 0).getTime() <= Date.now()) return false;
+                return !action.votes?.[actorId];
+            }).length;
+        }
+
         function syncNotificationBell() {
             const button = document.getElementById('notifications-button');
             const badge = document.getElementById('notifications-badge');
@@ -6469,7 +7175,7 @@
             }
 
             const unread = getUnreadFamilyNotificationCount();
-            const pendingVotes = getPendingDeletionVoteActionCount();
+            const pendingVotes = getPendingDeletionVoteActionCount() + getPendingPublicationVoteActionCount();
             const displayCount = Math.max(unread, pendingVotes);
             if (displayCount > 0) {
                 badge.classList.remove('hidden');
@@ -6524,6 +7230,7 @@
                 action: action && typeof action === 'object' ? {
                     kind: String(action.kind || ''),
                     expiresAt: action.expiresAt || '',
+                    threshold: Number(action.threshold) || 0,
                     requiredMemberIds: Array.isArray(action.requiredMemberIds) ? action.requiredMemberIds.filter(Boolean) : [],
                     votes: action.votes && typeof action.votes === 'object' ? { ...action.votes } : {}
                 } : null
@@ -6658,6 +7365,57 @@
             }
         }
 
+        function processRecipePublicationVotes() {
+            let didMutate = false;
+            const now = Date.now();
+
+            recipes.forEach(recipe => {
+                const vote = recipe?.pendingPublicationVote;
+                if (!vote || vote.status !== 'pending') return;
+
+                const requiredMemberIds = Array.isArray(vote.requiredMemberIds) ? vote.requiredMemberIds.filter(Boolean) : [];
+                const votes = vote.votes && typeof vote.votes === 'object' ? vote.votes : {};
+                const approvals = requiredMemberIds.filter(memberId => votes[memberId] === 'approve').length;
+                const threshold = Number(vote.threshold) > 0 ? Number(vote.threshold) : getPublicationApprovalThreshold(requiredMemberIds.length || 1);
+                const expiresAt = new Date(vote.expiresAt || 0).getTime();
+                const isExpired = Number.isFinite(expiresAt) && expiresAt > 0 ? now >= expiresAt : false;
+
+                if (approvals >= threshold) {
+                    recipe.pendingPublicationVote.status = 'approved';
+                    delete recipe.pendingPublicationVote;
+                    publishRecipe(recipe.id, { bypassFamilyVote: true });
+                    didMutate = true;
+                    return;
+                }
+
+                if (isExpired) {
+                    recipe.pendingPublicationVote.status = 'expired';
+                    resolveRecipePublicationVoteNotifications(recipe.id, `Publication vote expired for "${recipe.title}" (majority not reached). Save as personal to publish publicly.`);
+                    delete recipe.pendingPublicationVote;
+                    didMutate = true;
+                }
+            });
+
+            if (didMutate) {
+                saveData();
+                syncNotificationBell();
+            }
+        }
+
+        async function processScheduledPublicationRetractions() {
+            if (!isAuthenticated || !firebaseInitialized || !currentUser) return;
+
+            const dueRecipes = recipes.filter(recipe => {
+                if (recipe?.publicationState !== 'pending-retract' || !recipe?.publishedId) return false;
+                const retractionMs = new Date(recipe.scheduledRetractionAt || 0).getTime();
+                return Number.isFinite(retractionMs) && retractionMs > 0 && Date.now() >= retractionMs;
+            });
+
+            for (const recipe of dueRecipes) {
+                await unpublishRecipe(recipe.id, { source: 'scheduled' });
+            }
+        }
+
         function undoDeletedRecipe() {
             const undoEntry = getActiveRecipeUndoEntry();
             if (!undoEntry) {
@@ -6713,8 +7471,9 @@
 
         function renderNotificationMarkup(notification) {
             const actorId = getCurrentActorId();
-            const hasAction = notification?.action?.kind === 'deletion-vote';
+            const hasAction = notification?.action?.kind === 'deletion-vote' || notification?.action?.kind === 'publication-vote';
             const action = notification.action || null;
+            const actionKind = action?.kind || '';
             const actorVote = action?.votes?.[actorId] || '';
             const expiresAtMs = new Date(action?.expiresAt || 0).getTime();
             const isExpired = Number.isFinite(expiresAtMs) && expiresAtMs > 0 ? Date.now() >= expiresAtMs : false;
@@ -6723,6 +7482,11 @@
             const required = Array.isArray(action?.requiredMemberIds) ? action.requiredMemberIds : [];
             const approvals = required.filter(memberId => votes[memberId] === 'approve').length;
             const vetoes = required.filter(memberId => votes[memberId] === 'reject').length;
+            const threshold = Number(action?.threshold) > 0 ? Number(action.threshold) : (required.length > 0 ? getPublicationApprovalThreshold(required.length) : 1);
+            const voteLabel = actionKind === 'publication-vote'
+                ? `Votes: ${approvals}/${required.length} approved (need ${threshold})${vetoes ? `, ${vetoes} reject` : ''}`
+                : `Votes: ${approvals}/${required.length} approved${vetoes ? `, ${vetoes} veto` : ''}`;
+            const userVoteLabel = actorVote === 'approve' ? 'Approved' : 'Rejected';
 
             return `
                 <div class="rounded-xl border border-parchmentDark bg-white p-4 shadow-sm">
@@ -6736,15 +7500,15 @@
                     </div>
                     ${hasAction ? `
                         <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-sage">
-                            <span>Votes: ${approvals}/${required.length} approved${vetoes ? `, ${vetoes} veto` : ''}</span>
+                            <span>${voteLabel}</span>
                             <span>${isExpired ? 'Expired' : `Deadline: ${new Date(action.expiresAt).toLocaleString()}`}</span>
                         </div>
                         ${canVote ? `
                             <div class="mt-3 flex items-center gap-2">
-                                <button type="button" onclick="respondToDeletionVote('${notification.id}', 'approve')" class="inline-flex h-10 items-center justify-center rounded-lg border border-forest bg-white px-4 text-sm font-bold text-forest shadow-sm transition-all hover:bg-forest hover:text-white">V</button>
-                                <button type="button" onclick="respondToDeletionVote('${notification.id}', 'reject')" class="inline-flex h-10 items-center justify-center rounded-lg border border-red-300 bg-white px-4 text-sm font-bold text-red-500 shadow-sm transition-all hover:border-red-500 hover:text-red-600">X</button>
+                                <button type="button" onclick="respondToFamilyVote('${notification.id}', 'approve')" class="inline-flex h-10 items-center justify-center rounded-lg border border-forest bg-white px-4 text-sm font-bold text-forest shadow-sm transition-all hover:bg-forest hover:text-white">Approve</button>
+                                <button type="button" onclick="respondToFamilyVote('${notification.id}', 'reject')" class="inline-flex h-10 items-center justify-center rounded-lg border border-red-300 bg-white px-4 text-sm font-bold text-red-500 shadow-sm transition-all hover:border-red-500 hover:text-red-600">Reject</button>
                             </div>
-                        ` : actorVote ? `<p class="mt-3 text-xs font-bold uppercase tracking-[0.16em] ${actorVote === 'approve' ? 'text-forest' : 'text-red-500'}">Your vote: ${actorVote === 'approve' ? 'V' : 'X'}</p>` : ''}
+                        ` : actorVote ? `<p class="mt-3 text-xs font-bold uppercase tracking-[0.16em] ${actorVote === 'approve' ? 'text-forest' : 'text-red-500'}">Your vote: ${userVoteLabel}</p>` : ''}
                     ` : ''}
                 </div>
             `;
@@ -6756,6 +7520,8 @@
                 return;
             }
 
+            processScheduledPublicationRetractions();
+            processRecipePublicationVotes();
             processRecipeDeletionVotes();
             markNotificationsAsRead();
             const notifications = getFamilyNotifications();
@@ -6782,37 +7548,54 @@
             syncNotificationBell();
         }
 
-        function respondToDeletionVote(notificationId, decision) {
+        function respondToFamilyVote(notificationId, decision) {
             const notifications = getFamilyNotifications();
             const notification = notifications.find(entry => entry.id === notificationId);
-            if (!notification || notification.type !== 'deletion-vote') return;
+            const isDeletionVote = notification?.type === 'deletion-vote';
+            const isPublicationVote = notification?.type === 'publication-vote';
+            if (!notification || (!isDeletionVote && !isPublicationVote)) return;
 
             const recipe = recipes.find(entry => entry.id === notification.recipeId);
-            if (!recipe || !recipe.pendingDeletionVote || recipe.pendingDeletionVote.status !== 'pending') {
+            const pendingVote = isDeletionVote ? recipe?.pendingDeletionVote : recipe?.pendingPublicationVote;
+
+            if (!recipe || !pendingVote || pendingVote.status !== 'pending') {
                 notification.resolvedAt = new Date().toISOString();
-                notification.message = `Deletion vote closed for "${notification.recipeTitle || 'recipe'}".`;
+                notification.message = `${isPublicationVote ? 'Publication' : 'Deletion'} vote closed for "${notification.recipeTitle || 'recipe'}".`;
                 saveData();
                 showNotificationsModal();
                 return;
             }
 
             const actorId = getCurrentActorId();
-            recipe.pendingDeletionVote.votes = recipe.pendingDeletionVote.votes || {};
-            recipe.pendingDeletionVote.votes[actorId] = decision;
+            pendingVote.votes = pendingVote.votes || {};
+            pendingVote.votes[actorId] = decision;
 
-            notification.action = notification.action || { kind: 'deletion-vote', votes: {} };
+            notification.action = notification.action || { kind: isPublicationVote ? 'publication-vote' : 'deletion-vote', votes: {} };
             notification.action.votes = notification.action.votes || {};
             notification.action.votes[actorId] = decision;
             notification.readAt = new Date().toISOString();
 
             saveData();
-            processRecipeDeletionVotes();
-            if (decision === 'approve') {
+            if (isPublicationVote) {
+                processRecipePublicationVotes();
+            } else {
+                processRecipeDeletionVotes();
+            }
+
+            if (decision === 'approve' && isPublicationVote) {
+                showToast('Publication vote approved.', 'check-circle');
+            } else if (decision === 'approve') {
                 showToast('Deletion vote approved.', 'check-circle');
+            } else if (isPublicationVote) {
+                showToast('Publication vote rejected.', 'x-circle');
             } else {
                 showToast('Deletion vetoed. Recipe stays in the family book.', 'x-circle');
             }
             showNotificationsModal();
+        }
+
+        function respondToDeletionVote(notificationId, decision) {
+            respondToFamilyVote(notificationId, decision);
         }
 
         function getFamilyById(familyId) {
@@ -7040,7 +7823,7 @@
                 }
             } else {
                 showToast('Back to Archive', 'layout-template');
-                if(btnText) btnText.textContent = "Start Cooking";
+                if(btnText) btnText.textContent = "Cook Mode";
                 if(btnIcon) btnIcon.setAttribute('data-lucide', 'chef-hat');
             }
             lucide.createIcons();
@@ -7782,6 +8565,63 @@
                 </div>
             `;
 
+            const adminAccountRows = adminConfig.enabledEmails.length > 0
+                ? adminConfig.enabledEmails.map(email => `
+                    <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-parchmentDark bg-white px-3 py-2">
+                        <span class="text-xs font-bold uppercase tracking-[0.16em] text-forest">${escapeHTML(email)}</span>
+                        <button onclick="setAccountAdminState('${escapeHTML(email)}', false)" class="${getAppButtonClasses('danger', { size: 'sm' })}">
+                            <i data-lucide="shield-off" class="w-4 h-4"></i> Remove admin
+                        </button>
+                    </div>
+                `).join('')
+                : '<p class="text-xs font-semibold text-sage">No admin accounts configured yet.</p>';
+
+            const adminManagementContent = isCurrentUserAdmin()
+                ? `
+                    <div class="space-y-5">
+                        <div class="rounded-xl border border-parchmentDark bg-white p-4">
+                            <p class="text-[11px] font-bold uppercase tracking-[0.24em] text-sage">Admin accounts</p>
+                            <p class="mt-2 text-sm font-semibold text-sage">Add or remove admin rights per account email.</p>
+                            <div class="mt-3 flex flex-col gap-2 sm:flex-row">
+                                <input id="admin-account-email" type="email" placeholder="account@email.com" class="${inputClass} h-11" />
+                                <button onclick="submitAdminAccountToggle(true)" class="${getAppButtonClasses('primary', { size: 'lg' })}">
+                                    <i data-lucide="shield-check" class="w-4 h-4"></i> Set admin
+                                </button>
+                            </div>
+                            <div class="mt-3 space-y-2">${adminAccountRows}</div>
+                        </div>
+
+                        <div class="rounded-xl border border-parchmentDark bg-white p-4">
+                            <p class="text-[11px] font-bold uppercase tracking-[0.24em] text-sage">Safety controls</p>
+                            <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                                <button onclick="toggleAdminHarmfulGuard()" class="${getAppButtonClasses(adminConfig.harmfulContentGuardEnabled ? 'accent' : 'secondary', { fullWidth: true, size: 'lg' })}">
+                                    <i data-lucide="shield" class="w-4 h-4"></i> Harmful guard: ${adminConfig.harmfulContentGuardEnabled ? 'ON' : 'OFF'}
+                                </button>
+                                <button onclick="toggleAdminDuplicateAutoCleanup()" class="${getAppButtonClasses(adminConfig.duplicateAutoCleanupEnabled ? 'accent' : 'secondary', { fullWidth: true, size: 'lg' })}">
+                                    <i data-lucide="copy" class="w-4 h-4"></i> Duplicate auto-clean: ${adminConfig.duplicateAutoCleanupEnabled ? 'ON' : 'OFF'}
+                                </button>
+                                <button onclick="adminScanDuplicatePublishedRecipes({ autoRetract: false })" class="${getAppButtonClasses('secondary', { fullWidth: true, size: 'lg' })}">
+                                    <i data-lucide="scan-search" class="w-4 h-4"></i> Scan duplicates
+                                </button>
+                                <button onclick="adminScanDuplicatePublishedRecipes({ autoRetract: true })" class="${getAppButtonClasses('danger', { fullWidth: true, size: 'lg' })}">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i> Auto-clean duplicates now
+                                </button>
+                                <button onclick="adminScanPublishedRecipesForHarmfulContent({ autoRetract: false })" class="${getAppButtonClasses('secondary', { fullWidth: true, size: 'lg' })}">
+                                    <i data-lucide="search" class="w-4 h-4"></i> Scan harmful content
+                                </button>
+                                <button onclick="adminScanPublishedRecipesForHarmfulContent({ autoRetract: true })" class="${getAppButtonClasses('danger', { fullWidth: true, size: 'lg' })}">
+                                    <i data-lucide="shield-x" class="w-4 h-4"></i> Auto-retract flagged now
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `
+                : `
+                    <div class="rounded-xl border border-parchmentDark bg-white p-4">
+                        <p class="text-sm font-semibold text-sage">Admin tools are hidden for non-admin accounts. Ask an admin to enable your email if you need moderation access.</p>
+                    </div>
+                `;
+
             const billingContent = `
                 <div class="space-y-4">
                     <div class="rounded-2xl border border-parchmentDark bg-white p-4 shadow-sm">
@@ -7929,6 +8769,14 @@
                                 content: powerToolsContent,
                                 open: false
                             })}
+                            ${renderSettingsDisclosure({
+                                icon: 'shield-check',
+                                title: 'Admin & Safety',
+                                summary: 'Account admin rights, duplicate cleanup, and harmful-content moderation.',
+                                content: adminManagementContent,
+                                open: false,
+                                badge: isCurrentUserAdmin() ? 'Admin' : ''
+                            })}
                         </div>
                     </div>
                 </div>
@@ -7949,6 +8797,9 @@
                     <ul class="text-sm list-disc pl-5 space-y-1 my-2">
                         <li><strong>Rights:</strong> All active members can edit family recipes.</li>
                         <li><strong>Limit:</strong> Maximum 3 families per user.</li>
+                        <li><strong>Publishing family recipes:</strong> Public upload is locked behind a family vote in Notifications. A majority is required within 24 hours, otherwise upload is refused.</li>
+                        <li><strong>Public unpublish timing (personal recipes):</strong> During the first hour after publish you can unpublish instantly. After that, unpublish is scheduled and goes live after 24 hours.</li>
+                        <li><strong>Admin moderation:</strong> Admin accounts can force published recipes offline immediately, scan duplicate publications, and run harmful-content checks.</li>
                         <li><strong>History:</strong> The last 5 edits of a recipe are saved automatically.</li>
                         <li><strong>If you are removed:</strong> You get a 30-day grace period to review the shared recipes and copy them into your own collection if you still need them.</li>
                     </ul>
@@ -8108,6 +8959,26 @@
                         <p class="text-[11px] font-bold uppercase tracking-[0.24em] text-sage">Family Collaboration</p>
                         <p class="mt-2 text-sm font-semibold text-forest">Q: How does delete safety work in family books?</p>
                         <p class="mt-1 text-sm text-sage">A: Family deletions trigger a vote, any member can veto, and unresolved votes auto-resolve after 72 hours based on current vote state.</p>
+                    </div>
+                    <div class="rounded-2xl border border-parchmentDark bg-parchment p-4">
+                        <p class="text-[11px] font-bold uppercase tracking-[0.24em] text-sage">Publishing Rules</p>
+                        <p class="mt-2 text-sm font-semibold text-forest">Q: How does unpublish timing work for personal recipes?</p>
+                        <p class="mt-1 text-sm text-sage">A: In the first hour after publishing, unpublish is immediate. After that first hour, pressing the cloud action schedules unpublish and the recipe goes offline after 24 hours.</p>
+                    </div>
+                    <div class="rounded-2xl border border-parchmentDark bg-parchment p-4">
+                        <p class="text-[11px] font-bold uppercase tracking-[0.24em] text-sage">Family Publishing</p>
+                        <p class="mt-2 text-sm font-semibold text-forest">Q: Why can I not publish a family recipe directly?</p>
+                        <p class="mt-1 text-sm text-sage">A: Family recipes are never published directly. Clicking publish starts a family notification vote. Upload only proceeds when a majority approves within 24 hours. No majority or no vote means no upload; publish is then only possible after saving the recipe as personal.</p>
+                    </div>
+                    <div class="rounded-2xl border border-parchmentDark bg-parchment p-4">
+                        <p class="text-[11px] font-bold uppercase tracking-[0.24em] text-sage">Admin Accounts</p>
+                        <p class="mt-2 text-sm font-semibold text-forest">Q: How do I turn admin on/off for an account?</p>
+                        <p class="mt-1 text-sm text-sage">A: Open Settings > Admin & Safety. Enter an email and use "Set admin" to grant rights, or use "Remove admin" next to an existing admin email. The first signed-in account on a clean setup is auto-bootstrapped as initial admin.</p>
+                    </div>
+                    <div class="rounded-2xl border border-parchmentDark bg-parchment p-4">
+                        <p class="text-[11px] font-bold uppercase tracking-[0.24em] text-sage">Safety Automation</p>
+                        <p class="mt-2 text-sm font-semibold text-forest">Q: Is there automatic duplicate or harmful-content moderation?</p>
+                        <p class="mt-1 text-sm text-sage">A: Yes. In Settings > Admin & Safety you can run duplicate scans and harmful-content scans manually, or enable duplicate auto-cleanup. Harmful-content guard can also block new publish attempts before they go live.</p>
                     </div>
                     <div class="rounded-2xl border border-parchmentDark bg-parchment p-4">
                         <p class="text-[11px] font-bold uppercase tracking-[0.24em] text-sage">Notebook Controls</p>
@@ -10050,6 +10921,8 @@
             setActiveNav('browse');
             viewedPublicProfileAuthorId = null;
 
+            maybeRunAutomaticDuplicateCleanup();
+
             const remoteRecipes = firebaseInitialized ? await loadPublishedRecipes() : [];
             const normalizedQuery = browseQuery.trim().toLowerCase();
             const savedPublishedCount = recipes.filter(recipe => recipe.source === 'published').length;
@@ -10182,6 +11055,7 @@
             const headerBg = recipe.profile || defaultPlaceholderProfile;
             const versionLabel = getPublishedVersionLabel(recipe);
             const ownedLocalRecipe = getLocalRecipeByPublishedId(recipe.id);
+            const canAdminForceOfflinePublished = isCurrentUserAdmin() && recipe.publicationState !== 'retracted';
 
             contentDiv.innerHTML = `
                 <div class="bg-white rounded-sm shadow-sm mb-6 border border-parchmentDark relative w-full overflow-hidden">
@@ -10190,6 +11064,7 @@
                         ${owned ? `
                             <div class="pointer-events-auto flex flex-wrap items-center justify-end gap-2">
                                 ${ownedLocalRecipe ? `<button onclick="renderDetail(${ownedLocalRecipe.id})" class="${getAppButtonClasses('secondary', { size: 'lg' })} border-2 border-white shadow-xl"><i data-lucide="book-open" class="w-4 h-4"></i>Open local</button>` : ''}
+                                ${canAdminForceOfflinePublished ? `<button onclick="adminForceUnpublishByPublishedId('${recipe.id}', 'admin-force-browse-detail')" class="${getAppButtonClasses('danger', { size: 'lg' })} border-2 border-white shadow-xl"><i data-lucide="shield-x" class="w-4 h-4"></i>Admin offline now</button>` : ''}
                                 <span class="inline-flex items-center rounded-full bg-white px-4 py-3 text-xs font-bold uppercase tracking-[0.24em] text-sage shadow-xl border border-white">Published by you${versionLabel ? ` · ${versionLabel}` : ''}</span>
                             </div>
                         ` : `
@@ -10197,6 +11072,7 @@
                                 ${recipe.authorId ? `<button onclick="renderPublicProfile('${recipe.authorId}', '${escapeHTML((recipe.authorName || recipe.author || 'Chef').replace(/'/g, "&#39;"))}')" class="${getAppButtonClasses('secondary', { size: 'lg' })} border-2 border-white shadow-xl"><i data-lucide="user-round" class="w-4 h-4"></i>View profile</button>` : ''}
                                 ${!familyAuthored ? `<button onclick="togglePublishedRecipeLike('${recipe.id}', 'detail')" class="${getAppButtonClasses(hasUserLikedPublishedRecipe(recipe) ? 'danger' : 'secondary', { size: 'lg' })} border-2 border-white shadow-xl"><i data-lucide="heart" class="w-5 h-5 ${hasUserLikedPublishedRecipe(recipe) ? 'fill-current' : ''}"></i>Like (${getPublishedRecipeLikeCount(recipe)})</button>
                                 <button onclick="toggleSavedPublishedRecipe('${recipe.id}', 'detail')" class="${getAppButtonClasses(saved ? 'danger' : 'secondary', { size: 'lg' })} border-2 border-white shadow-xl"><i data-lucide="bookmark" class="w-5 h-5"></i>${saved ? 'Saved to Index' : 'Save to Index'}</button>` : `<span class="inline-flex items-center rounded-full bg-white px-4 py-3 text-xs font-bold uppercase tracking-[0.24em] text-sage shadow-xl border border-white">Family recipe</span>`}
+                                ${canAdminForceOfflinePublished ? `<button onclick="adminForceUnpublishByPublishedId('${recipe.id}', 'admin-force-browse-detail')" class="${getAppButtonClasses('danger', { size: 'lg' })} border-2 border-white shadow-xl"><i data-lucide="shield-x" class="w-4 h-4"></i>Admin offline now</button>` : ''}
                             </div>
                         `}
                     </div>
@@ -11177,6 +12053,10 @@
             const recipeHasUnpublishedChanges = hasRecipeChangesSincePublish(recipe);
             const publishActionLabel = getPublishActionLabel(recipe);
             const deletionVoteProgress = getDeletionVoteProgress(recipe);
+            const publishActionIcon = recipe.publicationState === 'pending-retract'
+                ? 'clock-3'
+                : (recipeIsLive ? 'cloud-off' : 'cloud-upload');
+            const canAdminForceOffline = isCurrentUserAdmin() && recipeIsLive && Boolean(recipe.publishedId);
             const latestPublishedRecipe = isSavedCommunityRecipe ? getPublishedRecipeFromCache(recipe.publishedId) : null;
             const savedRecipeIsOutdated = isSavedCommunityRecipe ? isSavedPublishedRecipeOutdated(recipe) : false;
             const savedRecipeSourceRetracted = Boolean(isSavedCommunityRecipe && latestPublishedRecipe?.publicationState === 'retracted');
@@ -11205,7 +12085,7 @@
             const detailActionButtonsMarkup = `
                 <div class="flex flex-wrap items-center gap-2 xl:justify-end">
                     ${savedRecipeIsOutdated ? renderDetailIconAction('Update warning', 'alert-circle', `toggleSavedRecipeUpdateNotice(${recipe.id})`, 'warning', '', true) : ''}
-                    <button onclick="toggleCookingMode(${recipe.id})" class="inline-flex h-11 items-center justify-center gap-2 rounded-lg transition-all bg-gold text-white font-bold text-xs uppercase tracking-wider px-4 shadow-sm hover:bg-opacity-90">
+                    <button onclick="toggleCookingMode(${recipe.id})" class="detail-cook-toggle-btn inline-flex h-11 items-center justify-center gap-2 rounded-lg transition-all bg-gold text-white font-bold text-xs uppercase tracking-wider px-4 shadow-sm hover:bg-opacity-90">
                         <i id="focus-btn-icon" data-lucide="${isCookingMode ? 'x-circle' : 'chef-hat'}" class="h-4 w-4"></i>
                         <span id="focus-btn-text">${isCookingMode ? 'Exit Cooking' : 'Cook Mode'}</span>
                     </button>
@@ -11217,8 +12097,8 @@
                     ${hasPremiumAccess()
                         ? renderDetailIconAction('Export', 'download', `exportRecipeAsPDF(${recipe.id})`, 'secondary', '', true)
                         : renderDetailIconAction('Export', 'lock', "showPremiumModal('download recipe PDFs')", 'muted', '', true)}
-                    ${isSavedCommunityRecipe ? '' : renderDetailIconAction(publishActionLabel, recipeIsLive ? 'cloud-upload' : 'cloud', `publishRecipe(${recipe.id})`, publishDetailVariant, '', true)}
-                    ${!isSavedCommunityRecipe && recipeIsLive ? renderDetailIconAction('Unpublish', 'cloud-off', `unpublishRecipe(${recipe.id})`, 'danger', '', true) : ''}
+                    ${isSavedCommunityRecipe ? '' : renderDetailIconAction(publishActionLabel, publishActionIcon, `publishRecipe(${recipe.id})`, publishDetailVariant, '', true)}
+                    ${canAdminForceOffline ? renderDetailIconAction('Admin: offline now', 'shield-x', `adminForceOfflineRecipe(${recipe.id})`, 'danger', '', true) : ''}
                     ${deletionVoteProgress
                         ? renderDetailIconAction('Vote pending', 'bell-ring', 'showNotificationsModal()', 'warning', '', true)
                         : renderDetailIconAction('Delete', 'trash-2', `requestRecipeDeletion(${recipe.id})`, 'danger', '', true)}
@@ -11233,7 +12113,7 @@
                 <button onclick="toggleCookingMode(${recipe.id})" id="cooking-mode-exit-btn" class="cooking-mode-exit-btn h-12 items-center gap-2 rounded-full bg-forest px-6 text-sm font-bold text-white shadow-xl transition-[background-color,color,border-color] duration-200 hover:bg-gold hover:text-forest border-2 border-white">
                     <i data-lucide="x-circle" class="w-5 h-5"></i> Exit Cooking Mode
                 </button>
-                <div class="mb-4 flex flex-wrap items-center gap-3">
+                <div class="detail-back-row mb-4 flex flex-wrap items-center gap-3">
                     <button onclick="renderList()" class="${getAppButtonClasses('secondary', { size: 'lg' })}">
                         <i data-lucide="arrow-left" class="w-4 h-4"></i> Back to Archive
                     </button>
