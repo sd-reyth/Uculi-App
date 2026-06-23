@@ -2614,6 +2614,8 @@
         let showFavoritesOnly = false;
         let draftIngredients = [];
         let draftSteps = [];
+        let editingDraftIngredientIndex = null;
+        let editingDraftStepIndex = null;
         var draftProfile = null; 
         let editingRecipeId = null;
         let recipeSubmitAction = 'save';
@@ -13221,6 +13223,8 @@
             recipeSubmitAction = 'save';
             draftIngredients = recipeToEdit ? [...(recipeToEdit.ingredients || [])] : [];
             draftSteps = recipeToEdit ? normalizeRecipeInstructions(recipeToEdit.instructions) : [];
+            editingDraftIngredientIndex = null;
+            editingDraftStepIndex = null;
             draftProfile = recipeToEdit?.profile && recipeToEdit.profile !== defaultPlaceholderProfile ? recipeToEdit.profile : null;
             const formTitle = recipeToEdit ? 'Edit Recipe' : 'Create Recipe';
             const submitLabel = recipeToEdit ? 'Update Recipe' : 'Save Recipe';
@@ -13460,18 +13464,59 @@
             if(input.value.trim() === '') return;
             draftIngredients.push(input.value.trim());
             input.value = '';
+            editingDraftIngredientIndex = null;
             renderDraftIngredients();
         }
 
-        function removeDraftIngredient(index) { draftIngredients.splice(index, 1); renderDraftIngredients(); }
+        function removeDraftIngredient(index) {
+            draftIngredients.splice(index, 1);
+            editingDraftIngredientIndex = null;
+            renderDraftIngredients();
+        }
+
+        function beginEditDraftIngredient(index) {
+            editingDraftIngredientIndex = index;
+            renderDraftIngredients();
+            const field = document.getElementById('edit-ingredient-input');
+            if (field) { field.focus(); field.select(); }
+        }
+
+        function cancelEditDraftIngredient() {
+            editingDraftIngredientIndex = null;
+            renderDraftIngredients();
+        }
+
+        function saveEditDraftIngredient(index) {
+            const field = document.getElementById('edit-ingredient-input');
+            if (!field) return;
+            const value = field.value.trim();
+            if (value === '') { showToast('Ingredient cannot be empty.', 'alert-circle'); return; }
+            draftIngredients[index] = value;
+            editingDraftIngredientIndex = null;
+            renderDraftIngredients();
+        }
 
         function renderDraftIngredients() {
-            document.getElementById('draft-ingredients-list').innerHTML = draftIngredients.map((ing, i) => `
-                <li class="flex justify-between items-center bg-white min-h-[48px] px-4 rounded-sm border border-parchmentDark shadow-sm text-sm font-semibold text-forest">
-                    <span class="flex items-center gap-2"><div class="w-1.5 h-1.5 bg-gold rounded-full"></div> ${ing}</span>
-                    <button type="button" onclick="removeDraftIngredient(${i})" class="text-red-400 hover:text-red-600 p-2"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                </li>
-            `).join('');
+            document.getElementById('draft-ingredients-list').innerHTML = draftIngredients.map((ing, i) => {
+                if (editingDraftIngredientIndex === i) {
+                    return `
+                        <li class="flex items-center gap-2 bg-white min-h-[48px] px-3 rounded-sm border border-gold shadow-sm">
+                            <input id="edit-ingredient-input" type="text" value="${escapeHTML(ing)}" class="flex-1 min-w-0 bg-transparent text-sm font-semibold text-forest focus:outline-none" onkeydown="if(event.key==='Enter'){event.preventDefault();saveEditDraftIngredient(${i});}else if(event.key==='Escape'){event.preventDefault();cancelEditDraftIngredient();}">
+                            <button type="button" onclick="saveEditDraftIngredient(${i})" class="text-forest hover:text-gold p-2 flex-shrink-0" aria-label="Save ingredient"><i data-lucide="check" class="w-4 h-4"></i></button>
+                            <button type="button" onclick="cancelEditDraftIngredient()" class="text-sage hover:text-red-500 p-2 flex-shrink-0" aria-label="Cancel edit"><i data-lucide="x" class="w-4 h-4"></i></button>
+                        </li>
+                    `;
+                }
+                return `
+                    <li class="flex justify-between items-center gap-2 bg-white min-h-[48px] px-4 rounded-sm border border-parchmentDark shadow-sm text-sm font-semibold text-forest">
+                        <span class="flex items-center gap-2 min-w-0"><div class="w-1.5 h-1.5 bg-gold rounded-full flex-shrink-0"></div> <span class="truncate">${escapeHTML(ing)}</span></span>
+                        <span class="flex items-center flex-shrink-0">
+                            <button type="button" onclick="beginEditDraftIngredient(${i})" class="text-sage hover:text-forest p-2" aria-label="Edit ingredient"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+                            <button type="button" onclick="removeDraftIngredient(${i})" class="text-red-400 hover:text-red-600 p-2" aria-label="Remove ingredient"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </span>
+                    </li>
+                `;
+            }).join('');
             lucide.createIcons();
         }
 
@@ -14161,10 +14206,38 @@
             if(input.value.trim() === '') return;
             draftSteps.push({ text: input.value.trim(), image: '' });
             input.value = '';
+            editingDraftStepIndex = null;
             renderDraftSteps();
         }
 
-        function removeDraftStep(index) { draftSteps.splice(index, 1); renderDraftSteps(); }
+        function removeDraftStep(index) {
+            draftSteps.splice(index, 1);
+            editingDraftStepIndex = null;
+            renderDraftSteps();
+        }
+
+        function beginEditDraftStep(index) {
+            editingDraftStepIndex = index;
+            renderDraftSteps();
+            const field = document.getElementById('edit-step-input');
+            if (field) { field.focus(); }
+        }
+
+        function cancelEditDraftStep() {
+            editingDraftStepIndex = null;
+            renderDraftSteps();
+        }
+
+        function saveEditDraftStep(index) {
+            const field = document.getElementById('edit-step-input');
+            if (!field) return;
+            const value = field.value.trim();
+            if (value === '') { showToast('Step text cannot be empty.', 'alert-circle'); return; }
+            const normalizedStep = normalizeRecipeInstructionStep(draftSteps[index]) || { text: '', image: '' };
+            draftSteps[index] = { ...normalizedStep, text: value };
+            editingDraftStepIndex = null;
+            renderDraftSteps();
+        }
 
         function handleDraftStepImageUpload(event, index) {
             const file = event.target.files[0];
@@ -14198,14 +14271,25 @@
                 const stepText = getRecipeInstructionText(step);
                 const stepImage = getRecipeInstructionImage(step);
 
+                const stepTextMarkup = editingDraftStepIndex === i
+                    ? `<div class="flex flex-col gap-2">
+                            <textarea id="edit-step-input" class="w-full min-h-[72px] rounded-sm border border-gold bg-white p-2 text-sm leading-relaxed text-forest focus:outline-none" onkeydown="if(event.key==='Enter'&&(event.metaKey||event.ctrlKey)){event.preventDefault();saveEditDraftStep(${i});}else if(event.key==='Escape'){event.preventDefault();cancelEditDraftStep();}">${escapeHTML(stepText)}</textarea>
+                            <div class="flex gap-2">
+                                <button type="button" onclick="saveEditDraftStep(${i})" class="inline-flex h-9 items-center justify-center gap-2 rounded-full border border-forest bg-forest px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-white shadow-sm transition-all hover:bg-gold hover:text-forest hover:border-gold"><i data-lucide="check" class="h-4 w-4"></i>Save</button>
+                                <button type="button" onclick="cancelEditDraftStep()" class="inline-flex h-9 items-center justify-center gap-2 rounded-full border border-parchmentDark bg-white px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-sage shadow-sm transition-all hover:border-red-400 hover:text-red-500"><i data-lucide="x" class="h-4 w-4"></i>Cancel</button>
+                            </div>
+                        </div>`
+                    : `<p class="leading-relaxed">${escapeHTML(stepText)}</p>`;
+
                 return `
                     <li class="bg-white p-3 rounded-sm border border-parchmentDark shadow-sm text-sm font-medium text-forest">
                         <div class="flex items-start gap-3">
                             <span class="bg-sage text-white w-6 h-6 flex items-center justify-center rounded-sm text-xs font-bold flex-shrink-0 mt-0.5">${i + 1}</span>
-                            <div class="flex-1 pt-0.5">
-                                <p class="leading-relaxed">${stepText}</p>
+                            <div class="flex-1 pt-0.5 min-w-0">
+                                ${stepTextMarkup}
                                 ${stepImage ? `<div class="mt-3 overflow-hidden rounded-md border border-parchmentDark bg-parchment"><img src="${stepImage}" alt="Draft step ${i + 1}" class="h-40 w-full object-cover"></div>` : ''}
                                 <div class="mt-3 flex flex-wrap gap-2">
+                                    ${editingDraftStepIndex === i ? '' : `<button type="button" onclick="beginEditDraftStep(${i})" class="inline-flex h-9 items-center justify-center gap-2 rounded-full border border-parchmentDark bg-white px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-sage shadow-sm transition-all hover:border-gold hover:text-forest"><i data-lucide="pencil" class="h-4 w-4 text-gold"></i>Edit text</button>`}
                                     <label class="inline-flex h-9 items-center justify-center gap-2 rounded-full border border-parchmentDark bg-white px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-sage shadow-sm transition-all hover:border-gold hover:text-forest cursor-pointer">
                                         <input type="file" accept="image/*" class="hidden" onchange="handleDraftStepImageUpload(event, ${i})">
                                         <i data-lucide="image-plus" class="h-4 w-4 text-gold"></i>${stepImage ? 'Change photo' : 'Add photo'}
