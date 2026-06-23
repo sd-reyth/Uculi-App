@@ -4266,12 +4266,32 @@
             maybeRunAutomaticDuplicateCleanup();
         }
 
+        function isStorageQuotaError(error) {
+            if (!error) return false;
+            // Different browsers report the quota error via name or legacy numeric code.
+            return error.name === 'QuotaExceededError'
+                || error.name === 'NS_ERROR_DOM_QUOTA_REACHED'
+                || error.code === 22
+                || error.code === 1014;
+        }
+
         function saveData() {
-            if (!currentUser?.uid) return;
+            if (!currentUser?.uid) return false;
             applyUserModeClasses();
-            localStorage.setItem(getScopedStorageKey(legacyRecipeSettingsStorageKey), JSON.stringify(userSettings));
-            localStorage.setItem(getScopedStorageKey(legacyRecipeDataStorageKey), JSON.stringify(recipes));
-            localStorage.setItem(getScopedStorageKey(legacyRecipeFamiliesStorageKey), JSON.stringify((userFamilies || []).map(normalizeFamilyRecord)));
+
+            try {
+                localStorage.setItem(getScopedStorageKey(legacyRecipeSettingsStorageKey), JSON.stringify(userSettings));
+                localStorage.setItem(getScopedStorageKey(legacyRecipeDataStorageKey), JSON.stringify(recipes));
+                localStorage.setItem(getScopedStorageKey(legacyRecipeFamiliesStorageKey), JSON.stringify((userFamilies || []).map(normalizeFamilyRecord)));
+            } catch (error) {
+                console.error('Saving to local storage failed.', error);
+                if (isStorageQuotaError(error)) {
+                    showToast('Local storage is full, so your latest change (often a large photo) was not saved. Try a smaller image or remove a few photos.', 'alert-circle', true);
+                } else {
+                    showToast('Saving locally failed, so your latest change may not stick after a refresh.', 'alert-circle', true);
+                }
+                return false;
+            }
 
             if (!isDeveloperBypassSession() && firebaseInitialized && isAuthenticated && currentUser) {
                 if (pendingCloudSyncTimer) {
@@ -4282,6 +4302,8 @@
                     syncToFirestore();
                 }, 450);
             }
+
+            return true;
         }
 
         function normalizeShoppingListLabel(value = '') {
@@ -14306,9 +14328,23 @@
                 });
             }
 
-            saveData();
+            const persisted = saveData();
             const savedRecipeId = recipePayload.id;
             editingRecipeId = null;
+
+            if (!persisted) {
+                // saveData already surfaced the reason (e.g. local storage is full),
+                // so skip the misleading success message but still reflect current state.
+                if (existingRecipe) {
+                    renderDetail(savedRecipeId);
+                } else {
+                    searchQuery = "";
+                    categoryFilter = "";
+                    renderList();
+                }
+                contentDiv.scrollTop = 0;
+                return;
+            }
 
             if (shouldPublishAfterSave) {
                 await publishRecipe(savedRecipeId);
