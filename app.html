@@ -6081,47 +6081,40 @@
         }
 
         function runUculiAI() {
-            showTemporaryFeatureOffline('Uculi AI Auto-Fill', 'It will stay offline until the recipe AI output is rebuilt and re-tested next week.');
-            return;
-
             if (draftIngredients.length === 0 && draftSteps.length === 0) {
                 showToast('Add ingredients or instructions first for the AI to analyze.', 'alert-circle');
                 return;
             }
 
-            let prepMins = 5 + (draftIngredients.length * 2);
-            let cookMins = 0;
-            let combinedText = [...draftIngredients, ...draftSteps.map(s => getRecipeInstructionText(s))].join(' ').toLowerCase();
+            const titleValue = document.getElementById('r-title')?.value || '';
+            const notesValue = document.getElementById('r-tips')?.value || '';
+            const ingredientsStr = draftIngredients.join(', ');
+            const stepsStr = draftSteps.map(step => getRecipeInstructionText(step)).join('\n');
 
-            if (combinedText.match(/bake|roast|oven|horno|hornear|cuire|backen|forno/)) cookMins += 30;
-            if (combinedText.match(/boil|simmer|hervir|bouillir|kochen|bollire/)) cookMins += 15;
-            if (combinedText.match(/fry|saute|freir|frire|braten|friggere/)) cookMins += 10;
+            const tags = localAutoTagRecipe(titleValue, ingredientsStr, notesValue, stepsStr);
 
-            let servings = 4;
-            let diff = draftSteps.length > 10 ? 'Hard' : (draftSteps.length > 5 ? 'Medium' : 'Easy');
+            const prepInput = document.getElementById('r-prepTime');
+            const cookInput = document.getElementById('r-cookTime');
+            const servingsInput = document.getElementById('r-servings');
+            const difficultyInput = document.getElementById('r-difficulty');
+            const cuisineInput = document.getElementById('r-cuisine');
+            const categoryInput = document.getElementById('r-category');
 
-            let cuisine = 'European';
-            if (combinedText.match(/soy|tofu|ginger|rice|noodle|sesame|soya/)) cuisine = 'Asian';
-            if (combinedText.match(/pasta|tomato|basil|mozzarella|parmesan|pizza/)) cuisine = 'Italian';
-            if (combinedText.match(/cumin|coriander|chili|tortilla|taco|curry|garam/)) cuisine = combinedText.includes('tortilla') ? 'Mexican' : 'Indian';
+            if (prepInput) prepInput.value = tags.prepTime;
+            if (cookInput) cookInput.value = tags.cookTime;
+            if (servingsInput) servingsInput.value = tags.servings;
+            if (difficultyInput) difficultyInput.value = tags.difficulty;
+            // Do not overwrite values the user already typed for cuisine/category.
+            if (cuisineInput && !cuisineInput.value.trim()) cuisineInput.value = tags.cuisine;
+            if (categoryInput && !categoryInput.value) categoryInput.value = tags.category;
 
-            let isVegetarian = !combinedText.match(/chicken|beef|pork|meat|fish|salmon|shrimp|pollo|carne|pescado|poulet|viande|poisson/);
-            let isVegan = isVegetarian && !combinedText.match(/cheese|milk|butter|egg|cream|queso|leche|mantequilla|huevo|fromage|lait|beurre|oeuf/);
-
-            document.getElementById('r-prepTime').value = prepMins;
-            document.getElementById('r-cookTime').value = cookMins;
-            document.getElementById('r-servings').value = servings;
-            document.getElementById('r-difficulty').value = diff;
-            document.getElementById('r-cuisine').value = cuisine;
-
-            const dietCheckboxes = document.querySelectorAll('.diet-checkbox');
-            dietCheckboxes.forEach(cb => {
-                cb.checked = false;
-                if (isVegetarian && cb.value === 'Vegetarian') cb.checked = true;
-                if (isVegan && cb.value === 'Vegan') cb.checked = true;
+            const estimatedDiet = new Set((tags.diet || []).map(item => String(item)));
+            document.querySelectorAll('.diet-checkbox').forEach(checkbox => {
+                if (estimatedDiet.has(checkbox.value)) checkbox.checked = true;
             });
 
-            showToast('Uculi AI has populated the recipe fields!', 'sparkles');
+            setRecipeDetailsVisibility(true);
+            showToast('Uculi AI estimated timing, servings, and tags. Tweak anything you like.', 'sparkles');
         }
 
         function cloneRecipeInstructionStep(step) {
@@ -13332,8 +13325,8 @@
 
                                 <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
                                     <div class="md:col-span-4 flex justify-end">
-                                        <button type="button" onclick="showTemporaryFeatureOffline('Uculi AI Auto-Fill', 'It is temporarily disabled because the current recipe suggestions are too unreliable.')" class="${getAppButtonClasses('muted', { size: 'md' })}">
-                                            <i data-lucide="sparkles" class="h-4 w-4"></i> Uculi AI Temporarily Offline
+                                        <button type="button" onclick="runUculiAI()" class="${getAppButtonClasses('accent', { size: 'md' })}">
+                                            <i data-lucide="sparkles" class="h-4 w-4"></i> Uculi AI Auto-Fill
                                         </button>
                                     </div>
                                     <div>
