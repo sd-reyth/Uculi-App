@@ -7797,9 +7797,8 @@
                                     <span class="text-xs font-bold uppercase tracking-[0.2em] text-forest">© 2026 Uculi, by SneezingDonkey.org</span>
                                 </div>
                                 <div class="flex gap-6 text-[10px] font-bold uppercase tracking-[0.2em] text-sage">
-                                    <a href="#" class="hover:text-gold transition-colors">Privacy</a>
-                                    <a href="#" class="hover:text-gold transition-colors">Terms</a>
-                                    <a href="#" class="hover:text-gold transition-colors">Instagram</a>
+                                    <button type="button" onclick="showPrivacyPolicy()" class="hover:text-gold transition-colors uppercase tracking-[0.2em]">Privacy</button>
+                                    <button type="button" onclick="showTermsOfUse()" class="hover:text-gold transition-colors uppercase tracking-[0.2em]">Terms</button>
                                 </div>
                             </div>
                         </div>
@@ -11092,7 +11091,13 @@
             };
 
             const filteredRecipes = recipes.filter(r => {
-                const matchesSearch = r.title.toLowerCase().includes(searchQuery.toLowerCase()) || r.ingredients.some(i => i.toLowerCase().includes(searchQuery.toLowerCase()));
+                const normalizedQuery = searchQuery.toLowerCase().trim();
+                const matchesSearch = normalizedQuery === ''
+                    || r.title.toLowerCase().includes(normalizedQuery)
+                    || r.ingredients.some(i => i.toLowerCase().includes(normalizedQuery))
+                    || (Array.isArray(r.mealType) && r.mealType.some(type => String(type).toLowerCase().includes(normalizedQuery)))
+                    || (r.cuisine && r.cuisine.toLowerCase().includes(normalizedQuery))
+                    || (r.category && r.category.toLowerCase().includes(normalizedQuery));
                 const matchesCategory = categoryFilter === "" || r.category === categoryFilter;
                 const matchesDifficulty = difficultyFilter === "" || r.difficulty === difficultyFilter;
                 const matchesDiet = doesRecipeMatchDietFilters(r);
