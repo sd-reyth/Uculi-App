@@ -2615,6 +2615,8 @@
         let showFavoritesOnly = false;
         let draftIngredients = [];
         let draftSteps = [];
+        let editingDraftIngredientIndex = null;
+        let editingDraftStepIndex = null;
         var draftProfile = null; 
         let editingRecipeId = null;
         let recipeSubmitAction = 'save';
@@ -4267,12 +4269,32 @@
             maybeRunAutomaticDuplicateCleanup();
         }
 
+        function isStorageQuotaError(error) {
+            if (!error) return false;
+            // Different browsers report the quota error via name or legacy numeric code.
+            return error.name === 'QuotaExceededError'
+                || error.name === 'NS_ERROR_DOM_QUOTA_REACHED'
+                || error.code === 22
+                || error.code === 1014;
+        }
+
         function saveData() {
-            if (!currentUser?.uid) return;
+            if (!currentUser?.uid) return false;
             applyUserModeClasses();
-            localStorage.setItem(getScopedStorageKey(legacyRecipeSettingsStorageKey), JSON.stringify(userSettings));
-            localStorage.setItem(getScopedStorageKey(legacyRecipeDataStorageKey), JSON.stringify(recipes));
-            localStorage.setItem(getScopedStorageKey(legacyRecipeFamiliesStorageKey), JSON.stringify((userFamilies || []).map(normalizeFamilyRecord)));
+
+            try {
+                localStorage.setItem(getScopedStorageKey(legacyRecipeSettingsStorageKey), JSON.stringify(userSettings));
+                localStorage.setItem(getScopedStorageKey(legacyRecipeDataStorageKey), JSON.stringify(recipes));
+                localStorage.setItem(getScopedStorageKey(legacyRecipeFamiliesStorageKey), JSON.stringify((userFamilies || []).map(normalizeFamilyRecord)));
+            } catch (error) {
+                console.error('Saving to local storage failed.', error);
+                if (isStorageQuotaError(error)) {
+                    showToast('Local storage is full, so your latest change (often a large photo) was not saved. Try a smaller image or remove a few photos.', 'alert-circle', true);
+                } else {
+                    showToast('Saving locally failed, so your latest change may not stick after a refresh.', 'alert-circle', true);
+                }
+                return false;
+            }
 
             if (!isDeveloperBypassSession() && firebaseInitialized && isAuthenticated && currentUser) {
                 if (pendingCloudSyncTimer) {
@@ -4283,6 +4305,8 @@
                     syncToFirestore();
                 }, 450);
             }
+
+            return true;
         }
 
         function normalizeShoppingListLabel(value = '') {
@@ -6075,47 +6099,40 @@
         }
 
         function runUculiAI() {
-            showTemporaryFeatureOffline('Uculi AI Auto-Fill', 'It will stay offline until the recipe AI output is rebuilt and re-tested next week.');
-            return;
-
             if (draftIngredients.length === 0 && draftSteps.length === 0) {
                 showToast('Add ingredients or instructions first for the AI to analyze.', 'alert-circle');
                 return;
             }
 
-            let prepMins = 5 + (draftIngredients.length * 2);
-            let cookMins = 0;
-            let combinedText = [...draftIngredients, ...draftSteps.map(s => getRecipeInstructionText(s))].join(' ').toLowerCase();
+            const titleValue = document.getElementById('r-title')?.value || '';
+            const notesValue = document.getElementById('r-tips')?.value || '';
+            const ingredientsStr = draftIngredients.join(', ');
+            const stepsStr = draftSteps.map(step => getRecipeInstructionText(step)).join('\n');
 
-            if (combinedText.match(/bake|roast|oven|horno|hornear|cuire|backen|forno/)) cookMins += 30;
-            if (combinedText.match(/boil|simmer|hervir|bouillir|kochen|bollire/)) cookMins += 15;
-            if (combinedText.match(/fry|saute|freir|frire|braten|friggere/)) cookMins += 10;
+            const tags = localAutoTagRecipe(titleValue, ingredientsStr, notesValue, stepsStr);
 
-            let servings = 4;
-            let diff = draftSteps.length > 10 ? 'Hard' : (draftSteps.length > 5 ? 'Medium' : 'Easy');
+            const prepInput = document.getElementById('r-prepTime');
+            const cookInput = document.getElementById('r-cookTime');
+            const servingsInput = document.getElementById('r-servings');
+            const difficultyInput = document.getElementById('r-difficulty');
+            const cuisineInput = document.getElementById('r-cuisine');
+            const categoryInput = document.getElementById('r-category');
 
-            let cuisine = 'European';
-            if (combinedText.match(/soy|tofu|ginger|rice|noodle|sesame|soya/)) cuisine = 'Asian';
-            if (combinedText.match(/pasta|tomato|basil|mozzarella|parmesan|pizza/)) cuisine = 'Italian';
-            if (combinedText.match(/cumin|coriander|chili|tortilla|taco|curry|garam/)) cuisine = combinedText.includes('tortilla') ? 'Mexican' : 'Indian';
+            if (prepInput) prepInput.value = tags.prepTime;
+            if (cookInput) cookInput.value = tags.cookTime;
+            if (servingsInput) servingsInput.value = tags.servings;
+            if (difficultyInput) difficultyInput.value = tags.difficulty;
+            // Do not overwrite values the user already typed for cuisine/category.
+            if (cuisineInput && !cuisineInput.value.trim()) cuisineInput.value = tags.cuisine;
+            if (categoryInput && !categoryInput.value) categoryInput.value = tags.category;
 
-            let isVegetarian = !combinedText.match(/chicken|beef|pork|meat|fish|salmon|shrimp|pollo|carne|pescado|poulet|viande|poisson/);
-            let isVegan = isVegetarian && !combinedText.match(/cheese|milk|butter|egg|cream|queso|leche|mantequilla|huevo|fromage|lait|beurre|oeuf/);
-
-            document.getElementById('r-prepTime').value = prepMins;
-            document.getElementById('r-cookTime').value = cookMins;
-            document.getElementById('r-servings').value = servings;
-            document.getElementById('r-difficulty').value = diff;
-            document.getElementById('r-cuisine').value = cuisine;
-
-            const dietCheckboxes = document.querySelectorAll('.diet-checkbox');
-            dietCheckboxes.forEach(cb => {
-                cb.checked = false;
-                if (isVegetarian && cb.value === 'Vegetarian') cb.checked = true;
-                if (isVegan && cb.value === 'Vegan') cb.checked = true;
+            const estimatedDiet = new Set((tags.diet || []).map(item => String(item)));
+            document.querySelectorAll('.diet-checkbox').forEach(checkbox => {
+                if (estimatedDiet.has(checkbox.value)) checkbox.checked = true;
             });
 
-            showToast('Uculi AI has populated the recipe fields!', 'sparkles');
+            setRecipeDetailsVisibility(true);
+            showToast('Uculi AI estimated timing, servings, and tags. Tweak anything you like.', 'sparkles');
         }
 
         function cloneRecipeInstructionStep(step) {
@@ -7774,9 +7791,8 @@
                                     <span class="text-xs font-bold uppercase tracking-[0.2em] text-forest">© 2026 Uculi, by SneezingDonkey.org</span>
                                 </div>
                                 <div class="flex gap-6 text-[10px] font-bold uppercase tracking-[0.2em] text-sage">
-                                    <a href="#" class="hover:text-gold transition-colors">Privacy</a>
-                                    <a href="#" class="hover:text-gold transition-colors">Terms</a>
-                                    <a href="#" class="hover:text-gold transition-colors">Instagram</a>
+                                    <button type="button" onclick="showPrivacyPolicy()" class="hover:text-gold transition-colors uppercase tracking-[0.2em]">Privacy</button>
+                                    <button type="button" onclick="showTermsOfUse()" class="hover:text-gold transition-colors uppercase tracking-[0.2em]">Terms</button>
                                 </div>
                             </div>
                         </div>
@@ -11069,7 +11085,13 @@
             };
 
             const filteredRecipes = recipes.filter(r => {
-                const matchesSearch = r.title.toLowerCase().includes(searchQuery.toLowerCase()) || r.ingredients.some(i => i.toLowerCase().includes(searchQuery.toLowerCase()));
+                const normalizedQuery = searchQuery.toLowerCase().trim();
+                const matchesSearch = normalizedQuery === ''
+                    || r.title.toLowerCase().includes(normalizedQuery)
+                    || r.ingredients.some(i => i.toLowerCase().includes(normalizedQuery))
+                    || (Array.isArray(r.mealType) && r.mealType.some(type => String(type).toLowerCase().includes(normalizedQuery)))
+                    || (r.cuisine && r.cuisine.toLowerCase().includes(normalizedQuery))
+                    || (r.category && r.category.toLowerCase().includes(normalizedQuery));
                 const matchesCategory = categoryFilter === "" || r.category === categoryFilter;
                 const matchesDifficulty = difficultyFilter === "" || r.difficulty === difficultyFilter;
                 const matchesDiet = doesRecipeMatchDietFilters(r);
@@ -12052,8 +12074,10 @@
                         </div>
                         <ul class="space-y-2">
                             ${featureRow(checkIcon, 'Up to 8 recipes')}
-                            ${featureRow(checkIcon, 'Notebook mode')}
-                            ${featureRow(checkIcon, 'Cloud sync (read)')}
+                            ${featureRow(checkIcon, 'Search, filters & favorites')}
+                            ${featureRow(checkIcon, 'Cook Mode & timers')}
+                            ${featureRow(lockIcon, 'Notebook mode')}
+                            ${featureRow(lockIcon, 'Cloud sync')}
                             ${featureRow(lockIcon, 'Unlimited recipes')}
                             ${featureRow(lockIcon, 'Publish & share recipes')}
                             ${featureRow(lockIcon, 'Family sharing')}
@@ -12073,6 +12097,8 @@
                         <ul class="space-y-2">
                             ${featureRow(checkIcon, 'Everything in Free')}
                             ${featureRow(checkIcon, 'Unlimited recipes')}
+                            ${featureRow(checkIcon, 'Notebook mode & sticky notes')}
+                            ${featureRow(checkIcon, 'Cloud sync across devices')}
                             ${featureRow(checkIcon, 'Publish & share recipes')}
                             ${featureRow(checkIcon, 'Family sharing')}
                             ${featureRow(checkIcon, 'PDF export')}
@@ -13200,6 +13226,8 @@
             recipeSubmitAction = 'save';
             draftIngredients = recipeToEdit ? [...(recipeToEdit.ingredients || [])] : [];
             draftSteps = recipeToEdit ? normalizeRecipeInstructions(recipeToEdit.instructions) : [];
+            editingDraftIngredientIndex = null;
+            editingDraftStepIndex = null;
             draftProfile = recipeToEdit?.profile && recipeToEdit.profile !== defaultPlaceholderProfile ? recipeToEdit.profile : null;
             const formTitle = recipeToEdit ? 'Edit Recipe' : 'Create Recipe';
             const submitLabel = recipeToEdit ? 'Update Recipe' : 'Save Recipe';
@@ -13326,8 +13354,8 @@
 
                                 <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
                                     <div class="md:col-span-4 flex justify-end">
-                                        <button type="button" onclick="showTemporaryFeatureOffline('Uculi AI Auto-Fill', 'It is temporarily disabled because the current recipe suggestions are too unreliable.')" class="${getAppButtonClasses('muted', { size: 'md' })}">
-                                            <i data-lucide="sparkles" class="h-4 w-4"></i> Uculi AI Temporarily Offline
+                                        <button type="button" onclick="runUculiAI()" class="${getAppButtonClasses('accent', { size: 'md' })}">
+                                            <i data-lucide="sparkles" class="h-4 w-4"></i> Uculi AI Auto-Fill
                                         </button>
                                     </div>
                                     <div>
@@ -13439,18 +13467,59 @@
             if(input.value.trim() === '') return;
             draftIngredients.push(input.value.trim());
             input.value = '';
+            editingDraftIngredientIndex = null;
             renderDraftIngredients();
         }
 
-        function removeDraftIngredient(index) { draftIngredients.splice(index, 1); renderDraftIngredients(); }
+        function removeDraftIngredient(index) {
+            draftIngredients.splice(index, 1);
+            editingDraftIngredientIndex = null;
+            renderDraftIngredients();
+        }
+
+        function beginEditDraftIngredient(index) {
+            editingDraftIngredientIndex = index;
+            renderDraftIngredients();
+            const field = document.getElementById('edit-ingredient-input');
+            if (field) { field.focus(); field.select(); }
+        }
+
+        function cancelEditDraftIngredient() {
+            editingDraftIngredientIndex = null;
+            renderDraftIngredients();
+        }
+
+        function saveEditDraftIngredient(index) {
+            const field = document.getElementById('edit-ingredient-input');
+            if (!field) return;
+            const value = field.value.trim();
+            if (value === '') { showToast('Ingredient cannot be empty.', 'alert-circle'); return; }
+            draftIngredients[index] = value;
+            editingDraftIngredientIndex = null;
+            renderDraftIngredients();
+        }
 
         function renderDraftIngredients() {
-            document.getElementById('draft-ingredients-list').innerHTML = draftIngredients.map((ing, i) => `
-                <li class="flex justify-between items-center bg-white min-h-[48px] px-4 rounded-sm border border-parchmentDark shadow-sm text-sm font-semibold text-forest">
-                    <span class="flex items-center gap-2"><div class="w-1.5 h-1.5 bg-gold rounded-full"></div> ${ing}</span>
-                    <button type="button" onclick="removeDraftIngredient(${i})" class="text-red-400 hover:text-red-600 p-2"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                </li>
-            `).join('');
+            document.getElementById('draft-ingredients-list').innerHTML = draftIngredients.map((ing, i) => {
+                if (editingDraftIngredientIndex === i) {
+                    return `
+                        <li class="flex items-center gap-2 bg-white min-h-[48px] px-3 rounded-sm border border-gold shadow-sm">
+                            <input id="edit-ingredient-input" type="text" value="${escapeHTML(ing)}" class="flex-1 min-w-0 bg-transparent text-sm font-semibold text-forest focus:outline-none" onkeydown="if(event.key==='Enter'){event.preventDefault();saveEditDraftIngredient(${i});}else if(event.key==='Escape'){event.preventDefault();cancelEditDraftIngredient();}">
+                            <button type="button" onclick="saveEditDraftIngredient(${i})" class="text-forest hover:text-gold p-2 flex-shrink-0" aria-label="Save ingredient"><i data-lucide="check" class="w-4 h-4"></i></button>
+                            <button type="button" onclick="cancelEditDraftIngredient()" class="text-sage hover:text-red-500 p-2 flex-shrink-0" aria-label="Cancel edit"><i data-lucide="x" class="w-4 h-4"></i></button>
+                        </li>
+                    `;
+                }
+                return `
+                    <li class="flex justify-between items-center gap-2 bg-white min-h-[48px] px-4 rounded-sm border border-parchmentDark shadow-sm text-sm font-semibold text-forest">
+                        <span class="flex items-center gap-2 min-w-0"><div class="w-1.5 h-1.5 bg-gold rounded-full flex-shrink-0"></div> <span class="truncate">${escapeHTML(ing)}</span></span>
+                        <span class="flex items-center flex-shrink-0">
+                            <button type="button" onclick="beginEditDraftIngredient(${i})" class="text-sage hover:text-forest p-2" aria-label="Edit ingredient"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+                            <button type="button" onclick="removeDraftIngredient(${i})" class="text-red-400 hover:text-red-600 p-2" aria-label="Remove ingredient"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </span>
+                    </li>
+                `;
+            }).join('');
             lucide.createIcons();
         }
 
@@ -14140,10 +14209,38 @@
             if(input.value.trim() === '') return;
             draftSteps.push({ text: input.value.trim(), image: '' });
             input.value = '';
+            editingDraftStepIndex = null;
             renderDraftSteps();
         }
 
-        function removeDraftStep(index) { draftSteps.splice(index, 1); renderDraftSteps(); }
+        function removeDraftStep(index) {
+            draftSteps.splice(index, 1);
+            editingDraftStepIndex = null;
+            renderDraftSteps();
+        }
+
+        function beginEditDraftStep(index) {
+            editingDraftStepIndex = index;
+            renderDraftSteps();
+            const field = document.getElementById('edit-step-input');
+            if (field) { field.focus(); }
+        }
+
+        function cancelEditDraftStep() {
+            editingDraftStepIndex = null;
+            renderDraftSteps();
+        }
+
+        function saveEditDraftStep(index) {
+            const field = document.getElementById('edit-step-input');
+            if (!field) return;
+            const value = field.value.trim();
+            if (value === '') { showToast('Step text cannot be empty.', 'alert-circle'); return; }
+            const normalizedStep = normalizeRecipeInstructionStep(draftSteps[index]) || { text: '', image: '' };
+            draftSteps[index] = { ...normalizedStep, text: value };
+            editingDraftStepIndex = null;
+            renderDraftSteps();
+        }
 
         function handleDraftStepImageUpload(event, index) {
             const file = event.target.files[0];
@@ -14177,14 +14274,25 @@
                 const stepText = getRecipeInstructionText(step);
                 const stepImage = getRecipeInstructionImage(step);
 
+                const stepTextMarkup = editingDraftStepIndex === i
+                    ? `<div class="flex flex-col gap-2">
+                            <textarea id="edit-step-input" class="w-full min-h-[72px] rounded-sm border border-gold bg-white p-2 text-sm leading-relaxed text-forest focus:outline-none" onkeydown="if(event.key==='Enter'&&(event.metaKey||event.ctrlKey)){event.preventDefault();saveEditDraftStep(${i});}else if(event.key==='Escape'){event.preventDefault();cancelEditDraftStep();}">${escapeHTML(stepText)}</textarea>
+                            <div class="flex gap-2">
+                                <button type="button" onclick="saveEditDraftStep(${i})" class="inline-flex h-9 items-center justify-center gap-2 rounded-full border border-forest bg-forest px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-white shadow-sm transition-all hover:bg-gold hover:text-forest hover:border-gold"><i data-lucide="check" class="h-4 w-4"></i>Save</button>
+                                <button type="button" onclick="cancelEditDraftStep()" class="inline-flex h-9 items-center justify-center gap-2 rounded-full border border-parchmentDark bg-white px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-sage shadow-sm transition-all hover:border-red-400 hover:text-red-500"><i data-lucide="x" class="h-4 w-4"></i>Cancel</button>
+                            </div>
+                        </div>`
+                    : `<p class="leading-relaxed">${escapeHTML(stepText)}</p>`;
+
                 return `
                     <li class="bg-white p-3 rounded-sm border border-parchmentDark shadow-sm text-sm font-medium text-forest">
                         <div class="flex items-start gap-3">
                             <span class="bg-sage text-white w-6 h-6 flex items-center justify-center rounded-sm text-xs font-bold flex-shrink-0 mt-0.5">${i + 1}</span>
-                            <div class="flex-1 pt-0.5">
-                                <p class="leading-relaxed">${stepText}</p>
+                            <div class="flex-1 pt-0.5 min-w-0">
+                                ${stepTextMarkup}
                                 ${stepImage ? `<div class="mt-3 overflow-hidden rounded-md border border-parchmentDark bg-parchment"><img src="${stepImage}" alt="Draft step ${i + 1}" class="h-40 w-full object-cover"></div>` : ''}
                                 <div class="mt-3 flex flex-wrap gap-2">
+                                    ${editingDraftStepIndex === i ? '' : `<button type="button" onclick="beginEditDraftStep(${i})" class="inline-flex h-9 items-center justify-center gap-2 rounded-full border border-parchmentDark bg-white px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-sage shadow-sm transition-all hover:border-gold hover:text-forest"><i data-lucide="pencil" class="h-4 w-4 text-gold"></i>Edit text</button>`}
                                     <label class="inline-flex h-9 items-center justify-center gap-2 rounded-full border border-parchmentDark bg-white px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-sage shadow-sm transition-all hover:border-gold hover:text-forest cursor-pointer">
                                         <input type="file" accept="image/*" class="hidden" onchange="handleDraftStepImageUpload(event, ${i})">
                                         <i data-lucide="image-plus" class="h-4 w-4 text-gold"></i>${stepImage ? 'Change photo' : 'Add photo'}
@@ -14307,9 +14415,23 @@
                 });
             }
 
-            saveData();
+            const persisted = saveData();
             const savedRecipeId = recipePayload.id;
             editingRecipeId = null;
+
+            if (!persisted) {
+                // saveData already surfaced the reason (e.g. local storage is full),
+                // so skip the misleading success message but still reflect current state.
+                if (existingRecipe) {
+                    renderDetail(savedRecipeId);
+                } else {
+                    searchQuery = "";
+                    categoryFilter = "";
+                    renderList();
+                }
+                contentDiv.scrollTop = 0;
+                return;
+            }
 
             if (shouldPublishAfterSave) {
                 await publishRecipe(savedRecipeId);

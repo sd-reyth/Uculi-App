@@ -3,6 +3,8 @@
 firebase-debug.log
 firebase-config.js
 
+node_modules/
+
 .env
 .env.*
 !.env.example
