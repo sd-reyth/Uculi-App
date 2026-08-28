@@ -91,22 +91,24 @@ Notes:
 
 ## Step 5: Add The Config To The App
 
-1. Open `index.html`.
-2. Find `initializeFirebase()`.
-3. Replace the placeholder config with your project values.
+1. Copy `firebase-config.example.js` to `firebase-config.js`.
+2. Replace the placeholder values with your Firebase project config.
+3. Keep `firebase-config.js` local only. It is gitignored and must be deployed from your machine.
 
-Example:
+Example `firebase-config.js`:
 
 ```javascript
-const firebaseConfig = {
+window.UCULI_FIREBASE_CONFIG = {
   apiKey: "YOUR_ACTUAL_API_KEY",
   authDomain: "your-project.firebaseapp.com",
   projectId: "your-project-id",
-  storageBucket: "your-project.appspot.com",
+  storageBucket: "your-project.firebasestorage.app",
   messagingSenderId: "123456789",
   appId: "1:123456789:web:abc123def456"
 };
 ```
+
+`app.html` loads this file before `initializeFirebase()` runs.
 
 ## Step 6: Authorize Domains
 
@@ -193,7 +195,7 @@ published-recipes/{docId}
 
 ### Firebase config missing
 
-- Re-check the config values inside `initializeFirebase()`.
+- Re-check the values inside `firebase-config.js`.
 - Verify the Firebase project is still active.
 
 ### Sign-in button does not work

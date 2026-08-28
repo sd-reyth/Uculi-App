@@ -4,13 +4,11 @@
     {
       "label": "Deploy Uculi Hosting",
       "type": "shell",
-      "command": "firebase.cmd",
+      "command": "firebase",
       "args": [
         "deploy",
         "--only",
-        "hosting",
-        "--project",
-        "uculi-24ecd"
+        "hosting"
       ],
       "isBackground": false
     }

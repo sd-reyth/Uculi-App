@@ -65,23 +65,40 @@ If a note overlaps with one of these files, merge it into the relevant canonical
 
 ## Safe Hosting Flow
 
-- Use `index.html` as the single source of truth for the app shell.
-- Firebase Hosting now deploys from repo root with an explicit ignore list in `firebase.json`.
-- The legacy `public/index.html` staging copy flow has been removed to avoid drift.
+- Use `index.html` as the marketing landing page and `app.html` as the authenticated app shell.
+- Copy `firebase-config.example.js` to `firebase-config.js` before local testing or deploy.
+- Firebase Hosting deploys from repo root with an explicit ignore list in `firebase.json`.
 - Security headers and a restrictive Content Security Policy are set at the hosting layer before launch.
-- Keep `.firebaserc` local so the repo does not need to carry your live project binding.
+- Keep `.firebaserc` and `firebase-config.js` local so the public repo does not carry live project bindings.
 - Treat `.noop/` as disposable local runtime scratch, not as product source.
 
 For `www.uculi.com`, use `www` as the primary production host and redirect the apex `uculi.com` domain to it once Hosting is connected.
 
 ## Repo Layout
 
-- `index.html` - application UI, state, and logic.
+- `index.html` - marketing landing page.
+- `app.html` - authenticated application UI, state, and logic.
+- `firebase-config.example.js` - Firebase config template for local setup.
+- `firebase-config.js` - local-only Firebase config (gitignored).
 - `firebase.json` - Hosting configuration, rewrites, and security headers.
 - `README.md` - high-level repo guide.
 - `docs/STRICT_LAUNCH_BACKLOG.md` - active launch backlog.
 - `docs/FINAL_BILLING_AI_EXECUTION_PLAN.md` - billing implementation plan.
 - `docs/PHASE_2_SETUP.md` - Firebase configuration guide.
+
+## Public Repo Security
+
+This repository is public. Keep these files local only:
+
+- `firebase-config.js`
+- `.firebaserc`
+- `.env` / `.env.local`
+- `Notes.txt`
+- `personal/`
+
+Never commit Stripe secrets, webhook secrets, or Firebase service-account JSON files.
+
+After making the repo public, also restrict the Firebase Web API key in Google Cloud Console to your production domains and localhost.
 
 ## Next Major Work
 

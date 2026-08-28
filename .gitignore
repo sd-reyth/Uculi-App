@@ -1,6 +1,7 @@
 .firebase/
 .firebaserc
 firebase-debug.log
+firebase-config.js
 
 .env
 .env.*
@@ -8,3 +9,10 @@ firebase-debug.log
 
 public/*
 !public/.gitkeep
+
+# Local-only notes and planning files
+Notes.txt
+personal/
+
+# Legacy duplicate app source (use app.html instead)
+script.js
