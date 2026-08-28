@@ -1,6 +1,0 @@
-Instructies:
-
-Ik mis een edit knop bij recepten bewerken.
-Geuploade foto's worden niet weergegeven in receptenoverzicht
-Mijn zelfgemaakte AI zit er niet meer in, die alle hoeveelheden e.d. converteerd en schat hoeveel personen, baktijd etc.
-notebook is nog fucked up.

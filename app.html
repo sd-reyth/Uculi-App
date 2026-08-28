@@ -14,6 +14,7 @@
         <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js" defer></script>
         <!-- Google Sign-In -->
         <script src="https://accounts.google.com/gsi/client" async defer></script>
+        <script src="firebase-config.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -5736,14 +5737,7 @@
         }
 
         function initializeFirebase() {
-            const firebaseConfig = {
-                apiKey: "AIzaSyD7JnQgnVrzsueRRKVc1GKZ9jRhb1iS51Q",
-                authDomain: "uculi-24ecd.firebaseapp.com",
-                projectId: "uculi-24ecd",
-                storageBucket: "uculi-24ecd.firebasestorage.app",
-                messagingSenderId: "522301414957",
-                appId: "1:522301414957:web:db58cc94c72e8322eee2a4"
-            };
+            const firebaseConfig = window.UCULI_FIREBASE_CONFIG || {};
 
             if (!firebaseConfig.apiKey || firebaseConfig.apiKey === 'YOUR_API_KEY') {
                 return;
