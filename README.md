@@ -65,7 +65,8 @@ If a note overlaps with one of these files, merge it into the relevant canonical
 
 ## Safe Hosting Flow
 
-- Use `index.html` as the marketing landing page and `app.html` as the authenticated app shell.
+- Use `index.html` as the public marketing landing page.
+- Use `app.html` for the authenticated app experience (login/register and in-app UI).
 - Copy `firebase-config.example.js` to `firebase-config.js` before local testing or deploy.
 - Firebase Hosting deploys from repo root with an explicit ignore list in `firebase.json`.
 - Security headers and a restrictive Content Security Policy are set at the hosting layer before launch.

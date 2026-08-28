@@ -5629,10 +5629,6 @@
             return '';
         }
 
-        function shouldSkipLegacyAppLanding() {
-            return Boolean(getRequestedAuthViewMode());
-        }
-
         function setAuthViewMode(mode = 'login') {
             authViewMode = mode === 'register' ? 'register' : 'login';
             renderAuthGate();
@@ -5647,7 +5643,11 @@
             const showRegister = authViewMode === 'register';
             const authText = getAuthI18n();
             contentDiv.innerHTML = `
-                <div class="mx-auto flex min-h-full w-full max-w-5xl items-center justify-center py-8 md:py-12">
+                <div class="mx-auto flex min-h-full w-full max-w-5xl flex-col items-center justify-center gap-4 py-8 md:py-12">
+                    <a href="index.html" class="inline-flex items-center gap-2 text-sm font-bold text-sage transition-colors hover:text-forest">
+                        <i data-lucide="arrow-left" class="h-4 w-4"></i>
+                        Back to Uculi home
+                    </a>
                     <div class="grid w-full overflow-hidden rounded-[32px] border border-parchmentDark bg-white shadow-[0_30px_80px_rgba(44,61,46,0.12)] lg:grid-cols-[minmax(0,1.05fr)_28rem]">
                         <section class="relative overflow-hidden bg-[linear-gradient(135deg,rgba(244,239,230,0.98),rgba(255,255,255,0.94))] px-6 py-8 md:px-10 md:py-12">
                             <div class="absolute inset-0 pointer-events-none opacity-50" style="background-image: radial-gradient(circle at 10% 0%, rgba(212,167,98,0.18) 0%, transparent 40%), radial-gradient(circle at 90% 100%, rgba(90,118,95,0.16) 0%, transparent 38%);"></div>
@@ -5792,9 +5792,6 @@
                         } else {
                             maybeShowFirstRunTutorial();
                         }
-                        // Auto-dismiss landing page when a returning session is restored
-                        document.getElementById('app-landing')?.remove();
-                        sessionStorage.setItem(landingSessionKey, '1');
                         dismissAuthLoadingScreen();
                         loadFamiliesFromFirestore();
                         setTimeout(() => checkFamilyRemovals(), 1000);
@@ -5930,16 +5927,6 @@
             }
         }
 
-        async function signInFromLanding() {
-            if (isAuthenticated) {
-                enterAppFromLanding('existing-account');
-                return;
-            }
-
-            authViewMode = 'login';
-            enterAppFromLanding('landing-login');
-        }
-
         async function signOut() {
             if (isDeveloperBypassSession()) {
                 clearDeveloperBypassPreference();
@@ -5948,7 +5935,6 @@
                 resetAuthenticatedUserState();
                 syncAuthenticatedAppChrome();
                 showToast('Developer bypass disabled.', 'shield-off');
-                showAppLanding();
                 renderAuthGate();
                 return;
             }
@@ -7486,7 +7472,7 @@
             const scrollState = getDesktopNavScrollState();
             if (!scrollState.scrollable) return true;
             if (scrollState.scrollTop <= 24) return true;
-            if (document.getElementById('app-landing') || document.getElementById('first-run-onboarding')) return true;
+            if (document.getElementById('first-run-onboarding')) return true;
             if (document.querySelector('[id^="dynamic-modal-"]')) return true;
             if (isElementVisible(document.getElementById('notes-modal')) || isElementVisible(document.getElementById('cover-editor-modal')) || isElementVisible(document.getElementById('timer-modal'))) return true;
             const activeElement = document.activeElement;
@@ -7573,7 +7559,7 @@
         function scrollFocusedFieldIntoView(event) {
             const target = event.target;
             if (!(target instanceof HTMLElement) || !target.matches('input, textarea, select')) return;
-            const withinOverlay = target.closest('.app-overlay, [id^="dynamic-modal-"], #app-landing, #first-run-onboarding');
+            const withinOverlay = target.closest('.app-overlay, [id^="dynamic-modal-"], #first-run-onboarding');
             if (!withinOverlay) return;
 
             window.setTimeout(() => {
@@ -7590,7 +7576,6 @@
         }
 
         function showCloudSetupStatusModal(origin = 'app') {
-            const landingVisible = Boolean(document.getElementById('app-landing'));
             const isSettingsOrigin = origin === 'settings-cloud';
             let modalId = null;
 
@@ -7608,17 +7593,9 @@
                         </ul>
                     </div>
                 </div>
-            `, landingVisible
-                ? [
-                    { text: 'Maybe Later', onClick: () => closeModal(modalId) },
-                    { text: 'Enter App', primary: true, onClick: () => {
-                        closeModal(modalId);
-                        window.setTimeout(() => enterAppFromLanding('cloud-setup-modal'), 220);
-                    }}
-                ]
-                : [
-                    { text: isSettingsOrigin ? 'Close' : 'Okay', primary: true, onClick: () => closeModal(modalId) }
-                ]);
+            `, [
+                { text: isSettingsOrigin ? 'Close' : 'Okay', primary: true, onClick: () => closeModal(modalId) }
+            ]);
         }
 
         function showBillingRestoreSetupStatusModal(origin = 'settings-billing') {
@@ -7645,154 +7622,6 @@
             ]);
         }
 
-        function showAppLanding() {
-            if (shouldSkipLegacyAppLanding()) {
-                return;
-            }
-
-            if (isDeveloperBypassRequested()) {
-                return;
-            }
-
-            if (sessionStorage.getItem(landingSessionKey) === '1' || document.getElementById('app-landing')) {
-                return;
-            }
-
-            trackLaunchEvent('landingViewed');
-            const authText = getAuthI18n();
-            const landingAuthActionLabel = firebaseInitialized ? authText.legacyPrimaryAuth : authText.legacyPrimaryGetStarted;
-            const landingAuthActionIcon = firebaseInitialized ? 'log-in' : 'chef-hat';
-            document.body.insertAdjacentHTML('beforeend', `
-                <div id="app-landing" class="fixed inset-0 z-[140] overflow-y-auto bg-[#FBF8F1] text-forest selection:bg-gold selection:text-white">
-                    <div class="absolute inset-0 pointer-events-none opacity-40 mix-blend-multiply" style="background-image: radial-gradient(circle at 10% 0%, rgba(212,167,98,0.15) 0%, transparent 40%), radial-gradient(circle at 90% 100%, rgba(90,118,95,0.15) 0%, transparent 40%);"></div>
-                    <div class="relative min-h-full px-5 py-8 md:px-8 md:py-12 flex flex-col">
-                        
-                        <!-- Header -->
-                        <div class="mx-auto w-full max-w-6xl flex items-center justify-between mb-12 md:mb-20">
-                            <div class="flex items-center gap-3">
-                                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-forest text-white shadow-lg shadow-forest/20">
-                                    <i data-lucide="book-open" class="h-5 w-5"></i>
-                                </div>
-                                <span class="font-fantasy text-2xl font-bold tracking-wide text-forest">Uculi</span>
-                            </div>
-                            <button type="button" onclick="signInFromLanding()" class="hidden md:flex h-10 items-center gap-2 rounded-xl border border-parchmentDark bg-white px-5 text-sm font-bold text-forest shadow-sm transition-all hover:border-gold hover:text-gold">
-                                <i data-lucide="log-in" class="h-4 w-4"></i> ${authText.legacyMobileLogin}
-                            </button>
-                        </div>
-
-                        <!-- Hero Section -->
-                        <div class="mx-auto w-full max-w-5xl text-center mb-20 md:mb-32">
-                            <div class="inline-flex items-center gap-2 rounded-full border border-gold/30 bg-gold/10 px-4 py-1.5 mb-8 text-[10px] font-bold uppercase tracking-[0.25em] text-forest">
-                                <i data-lucide="sparkles" class="h-3 w-3 text-gold"></i> Your Culinary Archive
-                            </div>
-                            <h1 class="mx-auto max-w-4xl font-fantasy text-5xl font-bold leading-[1.05] tracking-tight text-forest md:text-7xl lg:text-[5.5rem]">
-                                A beautiful home for the recipes you love.
-                            </h1>
-                            <p class="mx-auto mt-8 max-w-2xl text-lg font-semibold leading-relaxed text-sage md:text-xl">
-                                No clutter, no pop-ups, just cooking. Uculi turns your scattered notes and internet finds into a calm, focused digital cookbook.
-                            </p>
-                            <div class="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
-                                <button type="button" onclick="enterAppFromLanding('hero-enter')" class="flex h-14 items-center justify-center gap-2 rounded-2xl bg-forest px-8 text-base font-bold text-white shadow-xl shadow-forest/20 transition-all hover:-translate-y-0.5 hover:bg-inkDark hover:shadow-2xl">
-                                    <i data-lucide="${landingAuthActionIcon}" class="h-5 w-5"></i> ${landingAuthActionLabel}
-                                </button>
-                                <button type="button" onclick="signInFromLanding()" class="md:hidden flex h-14 items-center justify-center gap-2 rounded-2xl border border-parchmentDark bg-white px-8 text-base font-bold text-forest shadow-sm transition-all hover:-translate-y-0.5 hover:border-gold hover:text-gold hover:shadow-md">
-                                    <i data-lucide="log-in" class="h-5 w-5"></i> ${authText.legacyMobileLogin}
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Bento Grid Features -->
-                        <div class="mx-auto w-full max-w-6xl grid gap-5 md:grid-cols-2 lg:grid-cols-3 mb-20">
-                            <!-- Feature 1: Focus Mode -->
-                            <div class="group relative overflow-hidden rounded-[2rem] border border-parchmentDark bg-white p-8 shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl lg:col-span-2">
-                                <div class="absolute -right-10 -top-10 h-64 w-64 rounded-full bg-forest/5 blur-3xl transition-all group-hover:bg-forest/10"></div>
-                                <div class="relative z-10 flex h-full flex-col justify-between">
-                                    <div class="mb-12">
-                                        <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-forest shadow-sm">
-                                            <i data-lucide="chef-hat" class="h-6 w-6"></i>
-                                        </div>
-                                        <h3 class="font-fantasy text-3xl font-bold text-forest md:text-4xl">Cook Mode</h3>
-                                        <p class="mt-3 max-w-lg text-base font-semibold leading-relaxed text-sage">Drop into a focused, distraction-free view that keeps your screen awake while you cook. Just the ingredients you need and the step you're on.</p>
-                                    </div>
-                                    <div class="flex items-center gap-3 rounded-2xl border border-sage/20 bg-parchment p-4">
-                                        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-forest text-white"><i data-lucide="check" class="h-4 w-4"></i></div>
-                                        <span class="text-sm font-bold text-forest line-through opacity-60">Chop the onions finely.</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Feature 2: Shopping List -->
-                            <div class="group relative overflow-hidden rounded-[2rem] border border-parchmentDark bg-white p-8 shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl">
-                                <div class="absolute -bottom-10 -right-10 h-48 w-48 rounded-full bg-gold/10 blur-3xl transition-all group-hover:bg-gold/20"></div>
-                                <div class="relative z-10 flex h-full flex-col justify-between">
-                                    <div>
-                                        <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-forest shadow-sm">
-                                            <i data-lucide="shopping-basket" class="h-6 w-6"></i>
-                                        </div>
-                                        <h3 class="font-fantasy text-2xl font-bold text-forest md:text-3xl">Smart Grocery List</h3>
-                                        <p class="mt-3 text-base font-semibold leading-relaxed text-sage">Turn any recipe into a shopping list instantly. Add custom items, share with your family, and check off items in real-time.</p>
-                                    </div>
-                                    <div class="mt-8 flex gap-2">
-                                        <span class="text-3xl filter drop-shadow-sm transition-transform group-hover:scale-110">🍎</span>
-                                        <span class="text-3xl filter drop-shadow-sm transition-transform group-hover:scale-110 delay-75">🥖</span>
-                                        <span class="text-3xl filter drop-shadow-sm transition-transform group-hover:scale-110 delay-150">🧀</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Feature 3: Notebook View -->
-                            <div class="group relative overflow-hidden rounded-[2rem] border border-parchmentDark bg-[#2C3D2E] text-white p-8 shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl">
-                                <div class="absolute inset-0 opacity-20" style="background-image: radial-gradient(rgba(255, 255, 255, 0.3) 1px, transparent 1px); background-size: 20px 20px;"></div>
-                                <div class="relative z-10">
-                                    <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-gold shadow-sm backdrop-blur-sm">
-                                        <i data-lucide="book-open" class="h-6 w-6"></i>
-                                    </div>
-                                    <h3 class="font-fantasy text-2xl font-bold text-white md:text-3xl">Notebook Layout</h3>
-                                    <p class="mt-3 text-base font-semibold leading-relaxed text-white/80">Flip through your recipes just like a physical cookbook with our beautiful spread design.</p>
-                                </div>
-                            </div>
-
-                            <!-- Feature 4: Cloud Sync -->
-                            <div class="group relative overflow-hidden rounded-[2rem] border border-parchmentDark bg-white p-8 shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl lg:col-span-2">
-                                <div class="relative z-10 flex h-full flex-col justify-between">
-                                    <div>
-                                        <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-forest shadow-sm">
-                                            <i data-lucide="cloud-lightning" class="h-6 w-6"></i>
-                                        </div>
-                                        <h3 class="font-fantasy text-3xl font-bold text-forest md:text-4xl">Cloud Connected</h3>
-                                        <p class="mt-3 max-w-lg text-base font-semibold leading-relaxed text-sage">Your recipes are safe and synced across all your devices. Plan on your laptop, cook with your tablet, shop with your phone.</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Footer -->
-                        <div class="mx-auto w-full max-w-6xl mt-auto border-t border-sage/20 pt-8 pb-4">
-                            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
-                                <div class="flex items-center gap-2 opacity-60">
-                                    <i data-lucide="book-open" class="h-4 w-4 text-forest"></i>
-                                    <span class="text-xs font-bold uppercase tracking-[0.2em] text-forest">© 2026 Uculi, by SneezingDonkey.org</span>
-                                </div>
-                                <div class="flex gap-6 text-[10px] font-bold uppercase tracking-[0.2em] text-sage">
-                                    <a href="#" class="hover:text-gold transition-colors">Privacy</a>
-                                    <a href="#" class="hover:text-gold transition-colors">Terms</a>
-                                    <a href="#" class="hover:text-gold transition-colors">Instagram</a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `);
-
-            lucide.createIcons();
-        }
-
-        function enterAppFromLanding(origin = 'landing-enter') {
-            sessionStorage.setItem(landingSessionKey, '1');
-            document.getElementById('app-landing')?.remove();
-            trackLaunchEvent('appEntered');
-            renderList();
-        }
 
         const familyColorOptions = [
             { key: 'sage', name: 'Sage', hex: '#6d8a69', soft: 'rgba(109, 138, 105, 0.14)' },
@@ -14403,7 +14232,6 @@
             if (requestedAuthMode) {
                 authViewMode = requestedAuthMode;
                 sessionStorage.setItem(landingSessionKey, '1');
-                document.getElementById('app-landing')?.remove();
             }
 
             if (typeof firebase !== 'undefined') {
@@ -14428,7 +14256,6 @@
             lucide.createIcons();
         });
         ensureUiLanguagePreference();
-        showAppLanding();
     </script>
 </body>
 </html>
